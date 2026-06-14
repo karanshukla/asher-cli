@@ -9,13 +9,31 @@ Terminal dashboard for Litter Robot (LR3/LR4/LR5) via the Whisker cloud API.
 - **pylitterbot** — unofficial Whisker API wrapper (`pylitterbot>=3.0`)
 - **python-dotenv** — credential loading
 
-## Entry point
+## Entry points
 
 ```
-python app.py
+python app.py          # compatibility shim (calls asher/__main__.py)
+python -m asher        # run as module
+asher                  # after: pip install -e .
 ```
 
-All logic lives in `app.py` (single-file architecture).
+## Package structure
+
+```
+asher/
+  __init__.py
+  app.py        AsherApp class + CSS
+  helpers.py    fmt_ago(), drawer_bar(), ts(), STATUS_COLORS  (pure, testable)
+  cats.py       CATS dict (ASCII art)
+  __main__.py   main() entry point
+
+tests/
+  conftest.py       shared fixtures (mock_robot, mock_account)
+  testhelpers.py    unit tests for helpers.py
+
+.github/workflows/
+  ci.yml            ruff + mypy + pytest on every push/PR
+```
 
 ## Credentials
 
@@ -72,11 +90,16 @@ pylitterbot auto-detects robot type. Any attribute/method missing on a given mod
 - All command execution runs in `@work` async workers to keep the UI responsive
 - Cat modes: `idle`, `happy`, `cleaning` (animated), `sleeping`, `error`, `full`
 - `_cmd_nightlight` tries `set_night_light_brightness` first, falls back to `set_night_light_mode`
+- `VERSION` is read from `importlib.metadata.version("asher-cli")` — falls back to `"dev"` when running from source
 
 ## Common tasks
 
-**Add a new command:** add a branch in `_run_cmd()` and implement `_cmd_<name>()`.
+**Add a new command:** add a branch in `_run_cmd()` (in `asher/app.py`) and implement `_cmd_<name>()`.
 
 **Change poll interval:** `self.set_interval(30, ...)` in `on_mount`.
 
-**Add a new cat state:** add entry to `CATS` dict (str for static, list[str] for animated), call `_set_cat("name", "label")`.
+**Add a new cat state:** add entry to `CATS` dict in `asher/cats.py` (str for static, list[str] for animated), then call `_set_cat("name", "label")`.
+
+**Run tests:** `pytest tests/` (or `uv run pytest` if using uv).
+
+**File naming convention:** no underscores in filenames (except Python-required `__init__.py` and `__main__.py`).

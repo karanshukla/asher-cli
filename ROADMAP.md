@@ -276,22 +276,110 @@ sleep-schedule disable    clear all days
 
 ## 8. Fault monitoring & alerts
 
-The following properties indicate hardware faults — none are surfaced in the UI:
+### 8a. Safety events (highest priority — surface immediately)
 
-| Property | Meaning |
-|---|---|
-| `globe_motor_fault_status` | Globe motor stall |
-| `globe_motor_retract_fault_status` | Globe retract fault |
-| `usb_fault_status` | USB power fault |
-| `is_waste_drawer_full` | Boolean version of drawer full |
-| `is_hopper_removed` _(LR4)_ | Litter hopper removed |
-| `is_bonnet_removed` _(LR5)_ | Bonnet lid removed |
-| `is_laser_dirty` _(LR5)_ | Laser sensor needs cleaning |
-| `is_gas_sensor_fault_detected` _(LR5)_ | Gas / odor sensor fault |
+These indicate the robot stopped mid-cycle or refused to run for a safety reason.
+They're not hardware faults; they're expected protective states that the user
+needs to act on.
 
-Suggested: auto-scan these on every refresh and show a persistent amber or red
-banner beneath the status bar if any fault is active. Also set the cat to "error"
-mode.
+| Property / Status | Meaning | Urgency |
+|---|---|---|
+| `LitterBoxStatus.CAT_DETECTED` | Cat entered globe during or before a cycle — robot halted | 🔴 red banner |
+| `LitterBoxStatus.CAT_SENSOR_INTERRUPTED` | Cat sensor tripped mid-cycle (pinch risk) | 🔴 red banner |
+| `LitterBoxStatus.PINCH_DETECT` | Motor detected resistance (possible obstruction or cat limb) | 🔴 red banner |
+| `is_cat_detected` | Boolean shorthand for the cat-sensor trip state | same |
+| `LitterBoxStatus.TIMING_FAULT` | Cycle took too long — globe may be stuck | 🟠 amber banner |
+| `LitterBoxStatus.OVER_TORQUE_FAULT` | Motor drew too much current — globe blocked or jammed | 🟠 amber banner |
+
+**Cat detected / pinch** should also trigger:
+- Log entry: `⚠ Cat detected — cycle halted at HH:MM`
+- Cat animation switched to `"alert"` mode (new state, blinking/urgent art)
+- Auto-dismiss the banner once the robot returns to `READY` on the next refresh
+
+### 8b. Hardware faults
+
+These indicate a component failure that won't self-resolve. They persist until
+the user physically intervenes.
+
+| Property | Meaning | Model |
+|---|---|---|
+| `globe_motor_fault_status` | Globe motor stall / winding fault | LR4/LR5 |
+| `globe_motor_retract_fault_status` | Globe failed to retract to home position | LR4/LR5 |
+| `usb_fault_status` | USB power rail fault | LR4/LR5 |
+| `is_hopper_removed` | Litter hopper physically removed | LR4 |
+| `is_bonnet_removed` | Bonnet lid open or removed | LR5 |
+| `is_laser_dirty` | Cat-detection laser sensor obscured by litter dust | LR5 |
+| `is_gas_sensor_fault_detected` | Odor / gas sensor hardware fault | LR5 |
+| `is_waste_drawer_full` | Drawer full (boolean complement of `waste_drawer_level`) | all |
+| `is_drawer_removed` _(LR5)_ | Drawer physically removed mid-session | LR5 |
+
+### 8c. Surfacing strategy
+
+**Banner widget** — a `FaultBanner` widget docked between the status bar and the
+main area. Hidden by default; appears when any fault is active.
+
+```
+┌──────────────────────────────────────────────────────┐
+│ ⚠  CAT DETECTED — cycle halted 14:32  [dismiss: d]  │  ← amber
+│ ✗  GLOBE MOTOR FAULT — check globe rotation          │  ← red
+└──────────────────────────────────────────────────────┘
+```
+
+Multiple faults stack vertically. `d` key (or `dismiss` command) hides the
+banner for the current fault until state changes.
+
+```python
+FAULT_CHECKS = [
+    # (attr_or_status, label, severity)
+    ("is_cat_detected",              "CAT DETECTED — cycle halted",        "warn"),
+    ("LitterBoxStatus.PINCH_DETECT", "PINCH DETECT — possible obstruction","error"),
+    ("globe_motor_fault_status",     "GLOBE MOTOR FAULT",                   "error"),
+    ("globe_motor_retract_fault_status", "GLOBE RETRACT FAULT",            "error"),
+    ("usb_fault_status",             "USB POWER FAULT",                     "error"),
+    ("is_hopper_removed",            "HOPPER REMOVED",                      "warn"),
+    ("is_bonnet_removed",            "BONNET OPEN",                         "warn"),
+    ("is_laser_dirty",               "LASER SENSOR DIRTY — clean globe",   "warn"),
+    ("is_gas_sensor_fault_detected", "GAS SENSOR FAULT",                   "error"),
+    ("is_waste_drawer_full",         "DRAWER FULL — empty now",            "warn"),
+]
+
+def _check_faults(self, robot) -> list[tuple[str, str]]:
+    active = []
+    status = getattr(robot, "status", None)
+    for attr, label, sev in FAULT_CHECKS:
+        if attr.startswith("LitterBoxStatus."):
+            enum_name = attr.split(".")[1]
+            if status and status.name == enum_name:
+                active.append((label, sev))
+        elif getattr(robot, attr, False):
+            active.append((label, sev))
+    return active
+```
+
+**Cat animation modes** to add alongside `"error"`:
+- `"alert"` — blinking/urgent art for cat-detected / pinch events (clears automatically)
+- `"fault"` — static red-tinted art for persistent hardware faults (requires user action)
+
+**Log entries on state change** — only log when fault state transitions (not on
+every 30 s poll), to avoid flooding the log:
+
+```python
+prev_faults = set()
+
+def _refresh_faults(self, robot) -> None:
+    current = set(label for label, _ in self._check_faults(robot))
+    new_faults = current - self.prev_faults
+    cleared    = self.prev_faults - current
+    for f in new_faults:
+        self._log_err(f"FAULT: {f}")
+    for f in cleared:
+        self._log_ok(f"Cleared: {f}")
+    self.prev_faults = current
+```
+
+**Desktop notification** (see §11) — cat detected and pinch faults are good
+candidates for an OS-level `plyer` notification, since the user may not be
+watching the terminal.
 
 ---
 
@@ -342,6 +430,151 @@ colours:
 If `account.robots` has more than one unit, a tab bar across the top (Textual's
 `TabbedContent` widget) would let users switch without `/robot n`.
 
+### Readable event labels (replace raw library strings)
+
+The current `_cmd_history_list` renders `action.text` or `str(action)` directly,
+which produces whatever pylitterbot happens to expose — enum names, internal
+strings, or unprintable objects. It needs a translation layer.
+
+**Current output:**
+```
+  06/14 14:22  Litter Robot is Ready.
+  06/14 13:55  Clean Cycle Complete
+  06/14 13:54  Cat Detected
+  06/14 12:01  Drawer Full
+```
+
+**Target output:**
+```
+  06/14 14:22  Ready                          (muted grey)
+  06/14 13:55  Clean cycle complete  1m 42s   (green, with duration)
+  06/14 13:54  Cat detected  Asher  9.1 lb    (amber, with weight + pet)
+  06/14 12:01  Drawer full — empty now        (red)
+  06/14 11:30  Sleep mode on                  (muted)
+```
+
+**Implementation — event label map:**
+
+```python
+ACTION_LABELS: dict[str, tuple[str, str]] = {
+    # lowercased raw text → (display label, colour)
+    "ready":                      ("Ready",                   "#484f58"),
+    "litter robot is ready.":     ("Ready",                   "#484f58"),
+    "clean cycle complete":       ("Clean cycle complete",     "#3fb950"),
+    "clean cycle in progress":    ("Cleaning…",               "#58a6ff"),
+    "cat detected":               ("Cat detected",            "#d29922"),
+    "cat sensor interrupted":     ("Cat sensor tripped",      "#d29922"),
+    "drawer full":                ("Drawer full — empty now", "#f85149"),
+    "drawer full cleared":        ("Drawer emptied",          "#3fb950"),
+    "sleep mode on":              ("Sleep mode on",           "#484f58"),
+    "sleep mode off":             ("Sleep mode off",          "#484f58"),
+    "panel locked":               ("Panel locked",            "#484f58"),
+    "panel unlocked":             ("Panel unlocked",          "#484f58"),
+    "offline":                    ("Offline",                 "#f85149"),
+    "power off":                  ("Powered off",             "#f85149"),
+    "power on":                   ("Powered on",              "#3fb950"),
+    "motor fault":                ("Motor fault",             "#f85149"),
+    "pinch detect":               ("Pinch detected",          "#f85149"),
+    "timing fault":               ("Timing fault",            "#d29922"),
+}
+
+def _fmt_action(act, pets: list) -> tuple[str, str]:
+    raw     = getattr(act, "action", None)
+    raw_str = (raw.text if hasattr(raw, "text") else str(raw)).strip()
+    label, colour = ACTION_LABELS.get(raw_str.lower(), (raw_str, "#8b949e"))
+
+    weight  = getattr(act, "weight", None)
+    pet_id  = getattr(act, "pet_id", None)
+    pet_name = next((p.name for p in pets if p.id == pet_id), None)
+
+    if weight and "cat" in raw_str.lower():
+        label += f"  {pet_name}  {weight:.1f} lb" if pet_name else f"  {weight:.1f} lb"
+
+    return label, colour
+```
+
+**Fallback:** unknown event types fall through to the raw string in muted grey
+rather than crashing — new pylitterbot event types shouldn't break the display.
+
+### History as a scrollable sub-view (pager mode)
+
+Currently `history` dumps rows into the main log, which then scrolls off.
+The better pattern — like Claude Code's diff/file viewers — is a dedicated
+screen pushed over the main UI that the user scrolls through and dismisses.
+
+**Behaviour:**
+- `history` command pushes a `HistoryScreen` over the main app
+- Full-width, full-height overlay with its own scroll container
+- Page Up / Page Down, arrow keys, Home / End all work naturally
+- `q`, `Escape`, or `Enter` pops back to the main view instantly
+- A header bar shows the robot name and event count
+
+**Textual implementation:**
+
+```python
+from textual.screen import Screen
+from textual.widgets import Static, Footer
+from textual.containers import ScrollableContainer
+
+class HistoryScreen(Screen):
+    BINDINGS = [
+        ("escape,q,enter", "app.pop_screen", "Close"),
+        ("page_up",        "scroll_up",      "Page up"),
+        ("page_down",      "scroll_down",    "Page down"),
+    ]
+
+    def __init__(self, rows: list[Text], title: str) -> None:
+        super().__init__()
+        self._rows  = rows
+        self._title = title
+
+    def compose(self):
+        yield Static(self._title, id="history-header")
+        with ScrollableContainer(id="history-scroll"):
+            for row in self._rows:
+                yield Static(row)
+        yield Footer()
+
+    def action_scroll_up(self):
+        self.query_one("#history-scroll").scroll_page_up()
+
+    def action_scroll_down(self):
+        self.query_one("#history-scroll").scroll_page_down()
+```
+
+Invoke it from `_cmd_history_list`:
+
+```python
+rows = [_fmt_row(act, self._pets) for act in acts]
+title = Text(f"  Activity history — {self._robot.name}  ({len(acts)} events)  [q] close",
+             style="bold #58a6ff")
+await self.app.push_screen(HistoryScreen(rows, title))
+```
+
+**CSS sketch:**
+
+```css
+HistoryScreen {
+    background: #0d1117;
+    border: solid #30363d;
+}
+
+#history-header {
+    dock: top;
+    height: 1;
+    background: #161b22;
+    padding: 0 2;
+    color: #58a6ff;
+}
+
+#history-scroll {
+    padding: 1 2;
+}
+```
+
+This approach means `history 100` is just as usable as `history 10` — the
+events don't pollute the log and the user can scroll at their own pace.
+
 ### Timestamps in activity history
 The history output currently shows `mm/dd HH:MM`. Adding the year for older
 events and relative time (like the status bar's "7d ago") would be cleaner.
@@ -360,10 +593,9 @@ only cat visits, only cleans, etc.
 
 | Idea | Notes |
 |---|---|
-| Desktop notifications | `plyer` or `win10toast` on drawer full / fault |
+| Desktop notifications | `plyer` / `winotify` toasts + `winsound` bell — see §20 |
 | Export to CSV | `history export` → writes activity to `.csv` |
 | Weight sparkline in cat panel | Replace idle cat with a 7-day weight chart |
-| Sound alert on fault | `winsound.Beep` (Windows) / `os.system("afplay")` (Mac) |
 | Dark / light theme toggle | `/theme light` swaps colour palette |
 | Startup robot selection | If multiple robots, prompt on launch instead of defaulting to `[0]` |
 | `.env` wizard | First-run prompt if no `.env` found, writes creds interactively |
@@ -489,35 +721,80 @@ This could be built with a `ListView` widget overlaid at the bottom of the
 
 ---
 
-## 14. Packaging as a standalone binary
+## 14. PyPI publishing — `pip install asher-cli`
 
-### Option A — `pipx` (simplest, recommended)
+The goal: any Python user can run `pip install asher-cli` (or `pipx install asher-cli`)
+and immediately type `asher` in any terminal, with no manual venv or clone required.
 
-`pipx` installs into an isolated venv and exposes the command globally.
-Requires a proper `pyproject.toml`:
+### What's already in place
 
-```toml
-[project]
-name = "asher-cli"
-version = "1.0.0"
-requires-python = ">=3.10"
-dependencies = [
-    "pylitterbot>=3.0.0",
-    "textual>=0.47.0",
-    "python-dotenv>=1.0.0",
-]
+`pyproject.toml` now has everything needed:
+- `[project]` metadata (name, version, description, classifiers)
+- `dependencies` pinned to minimum versions
+- `[project.scripts]` entry point: `asher = "asher.__main__:main"`
+- `[build-system]` using `hatchling`
 
-[project.scripts]
-asher = "asher_cli.app:main"
+### Publishing to PyPI
 
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+```bash
+# 1. Build the distribution
+pip install hatch
+hatch build
+# → dist/asher-1.0.0-py3-none-any.whl
+# → dist/asher-cli-1.0.0.tar.gz
+
+# 2. Test in a clean environment first
+pipx install asher-cli --index-url https://test.pypi.org/simple/
+
+# 3. Upload to PyPI
+pip install twine
+twine upload dist/*
+
+# then anywhere:
+pip install asher-cli
+asher
 ```
 
-Then:
+### Automate publishing on tag push (release.yml)
+
+```yaml
+name: Release
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write   # OIDC trusted publishing — no API token needed
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv build
+      - uses: pypa/gh-action-pypi-publish@release/v1
+```
+
+**Trusted publishing** (recommended): configure PyPI to trust the GitHub Actions
+OIDC token for `your-user/asher-cli` — no `PYPI_TOKEN` secret needed.
+
+### Package release checklist
+
+- [ ] `hatch version minor` — bump version in `pyproject.toml`
+- [ ] `CHANGELOG.md` updated
+- [ ] `README.md` has `pip install asher-cli` install instructions
+- [ ] Tested in a clean venv: `pip install .` then `asher`
+- [ ] `git tag -s v1.1.0 -m "release: v1.1.0" && git push origin v1.1.0`
+
+---
+
+## 15. Standalone binary — no Python required
+
+### Option A — `pipx` (simplest — wraps the PyPI package)
+
 ```bash
-pipx install .
+pipx install asher-cli
 asher   # works anywhere
 ```
 
@@ -595,7 +872,7 @@ The core logic to test in isolation (no Whisker API, no Textual):
 | Command parsing in `_run_cmd` | Verify correct method called for each verb |
 
 ```python
-# tests/test_helpers.py
+# tests/testhelpers.py
 from datetime import datetime, timedelta, timezone
 from app import fmt_ago, drawer_bar
 
@@ -645,7 +922,7 @@ def mock_account(mock_robot):
 Then test the app worker methods by injecting the mock:
 
 ```python
-# tests/test_commands.py
+# tests/testcommands.py
 async def test_clean_calls_start_cleaning(mock_robot, mock_account):
     app = AsherApp()
     app._robot = mock_robot
@@ -710,10 +987,10 @@ jobs:
 ```
 tests/
   conftest.py          shared fixtures (mock_robot, mock_account, mock_app)
-  test_helpers.py      pure function tests (fmt_ago, drawer_bar)
-  test_commands.py     command handler integration tests
-  test_slash.py        slash command tests
-  test_ui.py           Textual snapshot / pilot tests
+  testhelpers.py      pure function tests (fmt_ago, drawer_bar)
+  testcommands.py     command handler integration tests
+  testslash.py        slash command tests
+  testui.py           Textual snapshot / pilot tests
   snapshots/           baseline TUI screenshots
 ```
 
@@ -816,7 +1093,7 @@ module split makes it easier to test, extend, and read.
 ### Proposed package layout
 
 ```
-asher_cli/
+asher/
   __init__.py
   app.py            AsherApp class only — compose, mount, bindings
   commands.py       _run_cmd, _run_slash, all _cmd_* methods (mixin or module)
@@ -826,10 +1103,10 @@ asher_cli/
   helpers.py        fmt_ago(), drawer_bar(), ts(), STATUS_COLORS
   widgets/
     __init__.py
-    status_bar.py   StatusBar(Widget) — self-contained header widget
-    cat_panel.py    CatPanel(Widget) — art + label + status badges
-    log_panel.py    LogPanel(Widget) — RichLog wrapper with helpers
-    input_bar.py    InputBar(Widget) — prompt + Input + completion
+    statusbar.py    StatusBar(Widget) — self-contained header widget
+    catpanel.py     CatPanel(Widget) — art + label + status badges
+    logpanel.py     LogPanel(Widget) — RichLog wrapper with helpers
+    inputbar.py     InputBar(Widget) — prompt + Input + completion
   __main__.py       if __name__ == "__main__": main()
 ```
 
@@ -896,14 +1173,14 @@ pylitterbot. Makes them trivially unit-testable.
 
 ### Migration path
 
-1. Create `asher_cli/` package, move `app.py` → `asher_cli/app.py`
+1. Create `asher/` package, move `app.py` → `asher/app.py`
 2. Extract `helpers.py` first (zero dependencies, easy test wins)
 3. Extract `cats.py` (pure data)
 4. Extract `config.py` (no Textual dependency)
 5. Extract `StatusBar` widget (isolate header from app logic)
 6. Extract `CatPanel` widget
 7. Extract `CommandHandler` (biggest win for testability)
-8. Update `pyproject.toml` entry point: `asher = "asher_cli.__main__:main"`
+8. Update `pyproject.toml` entry point: `asher = "asher.__main__:main"`
 
 Each step is independently mergeable — no big-bang rewrite needed.
 
@@ -1047,7 +1324,7 @@ jobs:
       - run: uv sync --dev
       - run: uv run ruff check .
       - run: uv run ruff format --check .
-      - run: uv run mypy asher_cli/ --ignore-missing-imports
+      - run: uv run mypy asher/ --ignore-missing-imports
 
   test:
     needs: lint
@@ -1095,7 +1372,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v3
       - run: uv sync
-      - run: uv run pyinstaller --onefile --name asher asher_cli/__main__.py
+      - run: uv run pyinstaller --onefile --name asher asher/__main__.py
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
@@ -1234,23 +1511,149 @@ testpaths = ["tests"]
 
 ---
 
+## 20. Desktop notifications
+
+Yes, a CLI app can push OS-level toast notifications — the terminal doesn't need
+to be in focus. The approach depends on platform but `plyer` abstracts it cleanly.
+
+### How it works
+
+```python
+from plyer import notification   # pip install plyer
+
+notification.notify(
+    title="Asher — Cat Detected",
+    message="Cycle halted at 14:32. Check the litter box.",
+    app_name="Asher CLI",
+    timeout=8,          # seconds before auto-dismiss
+)
+```
+
+That's it. On Windows this fires a native Action Center toast. On macOS it goes
+through Notification Center. On Linux it uses `libnotify` (`notify-send`).
+
+### Installation
+
+```bash
+pip install plyer
+```
+
+Add to `pyproject.toml`:
+```toml
+dependencies = [
+    ...
+    "plyer>=2.1",
+]
+```
+
+`plyer` is pure-Python with no C extensions — no binary complications for
+PyInstaller packaging.
+
+### When to notify
+
+Only notify on **state transitions** (fault appeared, not "fault is still
+active"). Wire into `_refresh_faults` from §8c:
+
+```python
+from plyer import notification as _notify
+
+NOTIFY_EVENTS = {
+    "CAT DETECTED — cycle halted":          ("Asher — Cat Detected",    8),
+    "PINCH DETECT — possible obstruction":  ("Asher — Safety Cutoff",   10),
+    "GLOBE MOTOR FAULT":                    ("Asher — Motor Fault",      0),  # 0 = persistent
+    "DRAWER FULL — empty now":              ("Asher — Drawer Full",      8),
+}
+
+def _refresh_faults(self, robot) -> None:
+    current = set(label for label, _ in self._check_faults(robot))
+    for label in current - self.prev_faults:           # newly appeared
+        self._log_err(f"FAULT: {label}")
+        if label in NOTIFY_EVENTS:
+            title, timeout = NOTIFY_EVENTS[label]
+            _notify.notify(title=title, message=label,
+                           app_name="Asher CLI", timeout=timeout)
+    for label in self.prev_faults - current:           # cleared
+        self._log_ok(f"Cleared: {label}")
+    self.prev_faults = current
+```
+
+### Sound alert alongside the toast
+
+On Windows, `winsound` is stdlib (no install needed):
+
+```python
+import sys, winsound
+
+def _alert_sound(critical: bool = False) -> None:
+    if sys.platform != "win32":
+        print("\a", end="", flush=True)   # terminal bell on macOS/Linux
+        return
+    freq = 880 if critical else 440
+    winsound.Beep(freq, 300)
+```
+
+Call `_alert_sound(critical=True)` for pinch/cat-detected, `_alert_sound()` for
+drawer-full and hardware faults.
+
+### `/notify` slash command — opt-in control
+
+```
+/notify           show current notification settings
+/notify on        enable desktop notifications (default)
+/notify off       disable all notifications
+/notify sound off disable sound only
+/notify test      fire a test notification immediately
+```
+
+Persist the preference in `config.json` (§9):
+```json
+{ "notifications": true, "notification_sound": true }
+```
+
+### Platform note (Windows-specific refinement)
+
+`plyer` on Windows uses `win10toast` under the hood, which works fine but
+produces older-style balloon tips on some Windows 11 builds. For a sharper
+Windows 11 toast (with the app icon and action buttons), `winotify` is a
+drop-in upgrade:
+
+```python
+try:
+    from winotify import Notification, audio   # pip install winotify
+    def _toast(title, msg, timeout):
+        n = Notification(app_id="Asher CLI", title=title, msg=msg, duration="short")
+        n.set_audio(audio.Default, loop=False)
+        n.show()
+except ImportError:
+    from plyer import notification as _plyer
+    def _toast(title, msg, timeout):
+        _plyer.notify(title=title, message=msg, app_name="Asher CLI", timeout=timeout)
+```
+
+`winotify` is Windows-only; the `ImportError` fallback keeps the code
+cross-platform.
+
+---
+
 ## Priority suggestion
 
 Ranked by user-visible impact vs. implementation effort:
 
-### Foundation (do these first — everything else builds on them)
+### Foundation ✅ (done)
 
-1. **`pyproject.toml` + `importlib.metadata` version** (§18) — single source of truth, unlocks packaging and CI
-2. **Architecture refactor** (§17) — extract helpers + widgets; makes the codebase testable before adding more features
-3. **Lint + test CI** (§19 `ci.yml`) — `ruff` + `mypy` + `pytest` gate on every PR; free confidence net
+1. ~~**`pyproject.toml` + `importlib.metadata` version**~~ — single source of truth, packaging unlocked
+2. ~~**Architecture refactor**~~ — `asher/` package with `helpers.py`, `cats.py`, `app.py`; testable
+3. ~~**Lint + test CI**~~ — `ruff` + `mypy` + `pytest` in `.github/workflows/ci.yml`
 
 ### High-value features (biggest user-visible wins)
 
 4. **Cat panel status badges** (§16) — lock, sleep, night light, wait time under the art; high visibility, one-afternoon job
 5. **WebSocket subscription** (§5) — replace 30 s polling with real-time push updates
 6. **Token persistence** (§12) — skip password re-entry on every run
-7. **Fault monitoring** (§8) — safety alerts; just read properties already on the robot object
+7. **Fault & safety monitoring** (§8) — cat detected, pinch, motor faults; banner + log transition + cat alert mode
 8. **Status color-coding** (§10) — `LitterBoxStatus` → colour in status bar and cat badges
+9. **Readable history events** (§10) — map raw pylitterbot strings to human labels with weight, pet name, and colour
+10. **History pager sub-view** (§10) — `push_screen(HistoryScreen)` with Page Up/Down and `q` to dismiss; events no longer dump into the main log
 
 ### Commands & slash system
 
@@ -1261,24 +1664,23 @@ Ranked by user-visible impact vs. implementation effort:
 
 ### Release pipeline
 
-13. **Versioning discipline** (§18) — tag convention, `hatch version`, `CHANGELOG.md`
-14. **Release CI** (§19 `release.yml`) — auto-build binaries + GitHub Release on `v*` tag
-15. **Dependabot / Renovate** (§19) — automated dependency PRs, `pylitterbot` pinned to manual review
+13. **PyPI publish** (§14) — `pip install asher-cli`; `release.yml` auto-publishes on `v*` tag push
+14. **Versioning discipline** (§18) — `hatch version`, `CHANGELOG.md`, signed tags
+15. **Standalone binary** (§15) — PyInstaller `.exe` + macOS/Linux builds via CI matrix
+16. **Dependabot / Renovate** (§19) — automated dependency PRs, `pylitterbot` pinned to manual review
 
 ### Device & platform expansion
 
-16. **LR5 extras** (§3) — privacy, volume, camera, night-light colour — detect model first
-17. **Feeder robot support** (§4) — snack, gravity, meal size commands
-18. **Multi-robot tab view** (§10) — `TabbedContent` widget when `len(robots) > 1`
+17. **LR5 extras** (§3) — privacy, volume, camera, night-light colour — detect model first
+18. **Feeder robot support** (§4) — snack, gravity, meal size commands
+19. **Multi-robot tab view** (§10) — `TabbedContent` widget when `len(robots) > 1`
 
 ### Polish & stretch
 
-19. **Config persistence** (`config.json`, §12) — runtime settings survive restarts
-20. **`pipx` install + standalone binary** (§14) — for non-developer users
+20. **Config persistence** (`config.json`, §9) — runtime settings survive restarts
 21. **Weight sparkline in cat panel** (§6) — 7-day ASCII chart; delightful but non-essential
-22. **Desktop / sound notifications** (§11) — `plyer` on drawer full or faults
+22. **Desktop notifications** (§20) — `plyer` toasts + `winsound` bell on fault/cat-detected; `/notify on|off` command
 23. **Dark/light theme toggle** (§11) — CSS variable swap; nice-to-have but not critical
-24. **Startup Animation** (§9) — cute but adds friction to quick status checks; could be opt-in
-```
+24. **Startup animation** (§11) — cute but adds friction to quick status checks; could be opt-in
 
 
