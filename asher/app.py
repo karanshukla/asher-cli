@@ -33,7 +33,7 @@ class AsherApp(UIMixin, ConnectionMixin, MonitoringMixin, CommandsMixin, App):  
         self._cat_frame: int = 0
         self._cmd_history: list[str] = []
         self._hist_idx: int = -1
-        self._login_state: str = ""   # "" | "awaiting_email" | "awaiting_password"
+        self._login_state: str = ""  # "" | "awaiting_email" | "awaiting_password"
         self._login_email: str = ""
 
     _INPUT_STYLES = "border: none; background: #161b22; outline: none;"
@@ -44,6 +44,7 @@ class AsherApp(UIMixin, ConnectionMixin, MonitoringMixin, CommandsMixin, App):  
         self._connect_worker()
         self.set_interval(30, self._poll_status_interval)
         self.set_interval(0.9, self._tick_cat)
+        # this doesn't work for some reason :(
         inp = self.query_one("#cmd-input", Input)
         inp.set_styles(self._INPUT_STYLES)
         inp.focus()

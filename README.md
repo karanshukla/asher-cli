@@ -1,48 +1,52 @@
 # Asher CLI
 
-A Claude Code-style terminal dashboard for monitoring and controlling Litter Robot via a Python Whisker cloud API
+A Claude Code-style terminal dashboard for monitoring and controlling Litter Robot via the Whisker cloud API.
 
 <img width="808" height="351" alt="image" src="https://github.com/user-attachments/assets/6599966f-837c-419c-8692-bfda3533e730" />
 
 ## Features
 
 - Live status bar — unit name, online/offline, drawer fill level, last activity, cat weight
+- Human-readable robot status — translates raw API states into plain English (`Ready`, `Cleaning`, `Cat Detected`, `Drawer Full`, etc.)
 - Scrollable activity log with timestamps
-- Command prompt supporting: `clean`, `status`, `lock`, `unlock`, `sleep`, `wake`, `night-light`, `history`, `help`, `quit`
+- Commands: `clean`, `status`, `lock`, `unlock`, `sleep`, `wake`, `night-light`, `history`, `help`, `quit`
+- Slash commands for app management: `/login`, `/logout`, `/exit`
 - Cat animation panel that reacts to robot state
 - Command history (↑/↓ arrows)
 - Auto-refreshes every 30 seconds
 
-## Setup
-
-### 1. Install dependencies
+## Install
 
 ```bash
-python -m venv .venv
-# Windows
-.venv\Scripts\activate
-# macOS/Linux
-source .venv/bin/activate
-
-pip install -r requirements.txt
+pip install asher-cli
+asher
 ```
 
-### 2. Create `.env`
+Or run from source:
+
+```bash
+git clone https://github.com/karanshukla/asher-cli
+cd asher-cli
+pip install -e .
+asher
+```
+
+## Credentials
+
+On first run, type `/login` at the command prompt. Your credentials are saved to the OS keyring (Windows Credential Manager / macOS Keychain / Linux Secret Service) and reused automatically on subsequent runs.
+
+To sign out: `/logout`
+
+`.env` fallback (for CI or existing users):
 
 ```env
 LITTER_ROBOT_USER=your@email.com
 LITTER_ROBOT_PASSWORD=yourpassword
 ```
 
-Both `LITTER_ROBOT_USER`/`LITTER_ROBOT_PASSWORD` and `LR4_EMAIL`/`LR4_PASSWORD` are accepted.
-
-### 3. Run
-
-```bash
-python app.py
-```
-
 ## Commands
+
+### Robot commands
 
 | Command | Description |
 |---|---|
@@ -55,6 +59,14 @@ python app.py
 | `clear` | Clear the log |
 | `help` | Show command list |
 | `quit` | Exit |
+
+### Slash commands
+
+| Command | Description |
+|---|---|
+| `/login` | Sign in or switch accounts |
+| `/logout` | Sign out and clear saved credentials |
+| `/exit` | Exit Asher CLI |
 
 **Keyboard shortcuts:** `Ctrl+L` clears the log, `Ctrl+C` quits.
 
