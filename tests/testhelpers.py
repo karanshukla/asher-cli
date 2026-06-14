@@ -29,7 +29,7 @@ class TestFmtAgo:
         assert fmt_ago(dt) == "7d ago"
 
     def test_naive_datetime_treated_as_utc(self):
-        dt = datetime.now() - timedelta(minutes=10)
+        dt = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=10)
         result = fmt_ago(dt)
         assert result.endswith("m ago")
 
