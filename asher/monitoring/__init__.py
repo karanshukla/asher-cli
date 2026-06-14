@@ -26,8 +26,10 @@ class MonitoringMixin:
             acts = await self._robot.get_activity_history(limit=10)
             for act in acts:
                 w = getattr(act, "weight", None)
-                action = getattr(act, "action", None)
-                action_text = (action.text if hasattr(action, "text") else str(action)).lower()
+                action: Any = getattr(act, "action", None)
+                action_text = (
+                    action.text if hasattr(action, "text") else str(action or "")
+                ).lower()
                 if (w is not None and float(w) > 0) or "cat" in action_text:
                     ts_dt = getattr(act, "timestamp", None)
                     if ts_dt is not None:

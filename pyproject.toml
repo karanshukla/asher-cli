@@ -34,7 +34,17 @@ dev = [
     "ruff>=0.4",
     "mypy>=1.10",
     "bump-my-version>=0.24",
+    "poethepoet>=0.27",
 ]
+
+[tool.poe.tasks]
+lint   = "ruff check ."
+fmt    = "ruff format --check ."
+types  = "mypy asher/ --ignore-missing-imports"
+test   = "pytest tests/ -v --tb=short"
+fix    = "ruff check --fix ."
+check.sequence = ["lint", "fmt", "types", "test"]
+check.help = "run all CI checks locally"
 
 [build-system]
 requires = ["hatchling"]

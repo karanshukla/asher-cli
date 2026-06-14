@@ -38,6 +38,13 @@ uv sync --dev
 git config core.hooksPath .githooks   # run lint + tests before every push
 ```
 
+```bash
+uv run poe check   # ruff + mypy + pytest (same as CI)
+uv run poe fix     # auto-fix ruff issues
+uv run poe test    # tests only
+uv run poe types   # mypy only
+```
+
 ## Credentials
 
 On first run, type `/login` at the command prompt. Your credentials are saved to the OS keyring (Windows Credential Manager / macOS Keychain / Linux Secret Service) and reused automatically on subsequent runs.
