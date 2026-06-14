@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 from typing import Any
 
+from textual import events
 from textual.app import App
 from textual.binding import Binding
 from textual.widgets import Input
@@ -16,6 +17,7 @@ from .ui import UIMixin
 
 
 class AsherApp(UIMixin, ConnectionMixin, MonitoringMixin, CommandsMixin, App):  # type: ignore[type-arg]
+    CSS = UIMixin.CSS  # must live in AsherApp.__dict__ so Textual gives it full user-CSS priority
     BINDINGS = [
         Binding("ctrl+c", "quit", "Quit", priority=True),
         Binding("ctrl+l", "clear_log", "Clear log"),
@@ -31,6 +33,10 @@ class AsherApp(UIMixin, ConnectionMixin, MonitoringMixin, CommandsMixin, App):  
         self._cat_frame: int = 0
         self._cmd_history: list[str] = []
         self._hist_idx: int = -1
+        self._login_state: str = ""   # "" | "awaiting_email" | "awaiting_password"
+        self._login_email: str = ""
+
+    _INPUT_STYLES = "border: none; background: #161b22; outline: none;"
 
     def on_mount(self) -> None:
         self._refresh_title()
@@ -38,7 +44,13 @@ class AsherApp(UIMixin, ConnectionMixin, MonitoringMixin, CommandsMixin, App):  
         self._connect_worker()
         self.set_interval(30, self._poll_status_interval)
         self.set_interval(0.9, self._tick_cat)
-        self.query_one("#cmd-input", Input).focus()
+        inp = self.query_one("#cmd-input", Input)
+        inp.set_styles(self._INPUT_STYLES)
+        inp.focus()
+
+    def on_focus(self, event: events.Focus) -> None:
+        if getattr(event.widget, "id", None) == "cmd-input":
+            event.widget.set_styles(self._INPUT_STYLES)  # type: ignore[union-attr]
 
     async def on_unmount(self) -> None:
         if self._account:

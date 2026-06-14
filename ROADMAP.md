@@ -9,16 +9,20 @@ Current state, missing functionality, and suggested additions — grounded in wh
 
 | Area | Status |
 |---|---|
-| Auth (email/password via `.env`) | ✅ |
+| Auth — keyring (primary) → `.env` fallback → `/login` prompt | ✅ |
 | Connect & load robots | ✅ |
 | Status bar (name, online, drawer %, last seen, pet weight) | ✅ |
 | Pet name from Whisker account profile | ✅ |
 | Commands: clean, status, lock, unlock, sleep, wake, night-light, history, help, clear, quit | ✅ |
+| Slash commands: `/login`, `/logout`, `/exit`, `/help` | ✅ |
+| Inline login flow (email → password in command bar, no restart) | ✅ |
+| `LoginScreen` modal (`auth.py`) — available for future use | ✅ |
 | Activity history (`get_activity_history`) | ✅ |
 | Cat animation panel with mode changes | ✅ |
 | Command history (↑/↓) | ✅ |
 | Auto-refresh every 30 s | ✅ |
 | LR4 / LR5 / LR3 polymorphic support | ✅ (getattr fallback) |
+| PyPI release workflow (`release.yml` — `release/*` branches) | ✅ |
 
 ---
 
@@ -39,14 +43,15 @@ The app already fetches all robots on connect — switching just needs
 `self._robot = robots[n]` and a status bar refresh. Useful for households with
 multiple units (e.g. LR4 + LR5).
 
-### `/auth` — update credentials without restart
+### ~~`/auth`~~ → `/login` ✅ — update credentials without restart
 
-```
-/auth email@example.com p@ssw0rd
-```
+`/login` starts an inline credential entry flow directly in the command bar:
+the prompt label changes to `email ›` then `password ›`, the password field
+masks input as `••••••••`, and on submit the credentials are saved to the OS
+keyring and the connection is re-established — no restart needed.
 
-Disconnects the current session, writes the new values to `.env`, then
-reconnects. Avoids the need to edit the file and restart manually.
+`/logout` disconnects, deletes credentials from keyring, and prompts
+`/login` to sign back in.
 
 ### `/cat` — configure the cat animation
 
@@ -605,37 +610,40 @@ only cat visits, only cleans, etc.
 
 ## 12. Account management
 
-### Token persistence (avoid re-login on every run)
+### Credential persistence ✅ — OS keyring
+
+Credentials (email + password) are stored in the OS keyring after the first
+`/login`. On subsequent runs `_keyring_load()` retrieves them — no re-entry
+needed. `.env` is still supported as a fallback for CI and existing users.
+
+Helper functions in `asher/connection/__init__.py`:
+- `_keyring_load() → tuple[str, str]` — returns `(email, password)` or `("", "")`
+- `_keyring_save(email, password) → bool`
+- `_keyring_delete()` — called by `/logout`
+
+Keyring service name: `asher-cli`, keys `email` and `password`.
+
+### Token persistence (stretch — avoid API re-auth on every run)
 
 `Account.connect()` accepts a pre-existing `token` dict and exposes a
-`token_update_callback`. If we save the session token to a local file after
-first login, subsequent runs skip the username/password auth entirely — faster
-startup and more resilient to rate-limiting.
+`token_update_callback`. If we save the session token alongside credentials
+after first login, subsequent runs skip the username/password API call entirely
+— faster startup and more resilient to rate-limiting.
 
 ```python
-TOKEN_FILE = Path("~/.asher_token.json").expanduser()
-
-def load_token() -> dict | None:
-    if TOKEN_FILE.exists():
-        return json.loads(TOKEN_FILE.read_text())
-    return None
-
 def save_token(token: dict | None) -> None:
     if token:
-        TOKEN_FILE.write_text(json.dumps(token))
+        keyring.set_password("asher-cli", "token", json.dumps(token))
 
 account = Account(
-    token=load_token(),
+    token=json.loads(keyring.get_password("asher-cli", "token") or "null"),
     token_update_callback=save_token,
 )
 ```
 
-The token is automatically refreshed by pylitterbot when it expires (via
-`session.refresh_tokens()`). This means the user only has to enter their
-password once.
-
-**Security note:** the token file should be `chmod 600` on Unix. On Windows,
-consider the Credential Manager via `keyring` instead of a plaintext file.
+The token is automatically refreshed by pylitterbot when it expires. This
+would mean users only re-enter their password when the refresh token itself
+expires (typically months).
 
 ### `subscribe_for_updates` — let pylitterbot manage WebSocket per robot
 
@@ -673,26 +681,28 @@ Slash commands (`/foo`) are distinguished from robot-action commands (`clean`,
 `status`) by the leading `/`. They configure the app rather than send commands
 to the robot.
 
-### Parsing
+### Parsing ✅
 
-Current `_run_cmd` dispatches on the first word. Extend it:
+Dispatch is live in `on_input_submitted` in `asher/commands/__init__.py`:
 
 ```python
 if raw.startswith("/"):
-    await self._run_slash(raw[1:])
+    self._run_slash_cmd(raw)
 else:
-    await self._run_robot_cmd(raw)
+    self._run_cmd(raw)
 ```
 
 ### Full slash command table
 
 | Command | Description | Implementation note |
 |---|---|---|
+| `/login` ✅ | Enter credentials inline, save to keyring, reconnect | Inline flow in command bar |
+| `/logout` ✅ | Delete keyring credentials, disconnect | `_keyring_delete()` + disconnect |
+| `/exit` ✅ | Exit the app | `self.exit()` |
+| `/help` ✅ | Show all commands | Two-section output: robot cmds + slash cmds |
 | `/robot [index\|name]` | List or switch active robot | `self._robot = robots[n]` + status refresh |
 | `/pet [index\|name]` | List or switch which pet shows in status bar | `self._active_pet = pets[n]` |
-| `/auth <email> <pass>` | Re-authenticate | Disconnect, update `.env`, reconnect |
-| `/account` | Show account info | `account.user_id`, email from `.env` |
-| `/account logout` | Clear saved token | Delete `~/.asher_token.json` |
+| `/account` | Show account info | `account.user_id`, email from keyring |
 | `/refresh [seconds\|off]` | Change poll interval | Cancel + recreate `set_interval` timer |
 | `/cat [on\|off]` | Show/hide cat panel | `add_class` / `remove_class` on `#cat-panel` |
 | `/cat color <hex>` | Change cat art colour | Update `_cat_color` attr, redraw |
@@ -702,7 +712,7 @@ else:
 | `/theme [dark\|light]` | Swap colour scheme | Swap Textual CSS variables |
 | `/log [n]` | Set max log lines to keep | `RichLog(max_lines=n)` |
 | `/export [path]` | Export last activity to CSV | Write `activity_export.csv` |
-| `/help` | List all slash commands | Separate from robot `help` |
+| `/notify [on\|off\|test]` | Desktop notification settings | See §20 |
 
 ### Tab-completion
 
@@ -755,29 +765,58 @@ pip install asher-cli
 asher
 ```
 
-### Automate publishing on tag push (release.yml)
+### Automate publishing on release branch push (release.yml) ✅
+
+`.github/workflows/release.yml` is live. Triggered by pushing to any
+`release/*` branch (not tags — tags are for git history only, not CI triggers):
 
 ```yaml
 name: Release
 on:
   push:
-    tags: ["v*"]
+    branches:
+      - "release/*"
 
 jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
   publish:
+    needs: build
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
       id-token: write   # OIDC trusted publishing — no API token needed
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
-      - run: uv build
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
 ```
 
-**Trusted publishing** (recommended): configure PyPI to trust the GitHub Actions
-OIDC token for `your-user/asher-cli` — no `PYPI_TOKEN` secret needed.
+**Trusted publishing**: PyPI is configured to trust the OIDC token for
+`karanshukla/asher-cli` → `release.yml` → `pypi` environment. No stored API
+token needed.
+
+**Hotfix flow** — branch from the last release branch directly, don't touch
+`main`:
+
+```bash
+git checkout release/1.0.0
+git checkout -b release/1.0.1
+# cherry-pick fix, bump version in pyproject.toml
+git push origin release/1.0.1   # → triggers publish
+git tag v1.0.1                  # optional, for git history only
+```
 
 ### Package release checklist
 
@@ -785,7 +824,7 @@ OIDC token for `your-user/asher-cli` — no `PYPI_TOKEN` secret needed.
 - [ ] `CHANGELOG.md` updated
 - [ ] `README.md` has `pip install asher-cli` install instructions
 - [ ] Tested in a clean venv: `pip install .` then `asher`
-- [ ] `git tag -s v1.1.0 -m "release: v1.1.0" && git push origin v1.1.0`
+- [ ] `git checkout -b release/X.Y.Z && git push origin release/X.Y.Z`
 
 ---
 
@@ -1345,13 +1384,14 @@ jobs:
           path: tests/snapshots/
 ```
 
-### `.github/workflows/release.yml` — triggered on `v*` tag
+### `.github/workflows/release.yml` ✅ — triggered on `release/*` branch push
 
 ```yaml
 name: Release
 on:
   push:
-    tags: ["v*"]
+    branches:
+      - "release/*"
 
 jobs:
   build:
@@ -1635,6 +1675,141 @@ cross-platform.
 
 ---
 
+## 21. Tab completion for slash commands
+
+Inspired by Claude Code's `/` menu — when the user types `/` into the command
+input, a completion overlay appears above the input bar listing all slash
+commands. Narrows in real time as they type.
+
+### Behaviour
+
+```
+/ro[b...]
+  ┌──────────────────────────────────────┐
+  │  /robot    switch active robot       │
+  │  /refresh  change poll interval      │
+  └──────────────────────────────────────┘
+```
+
+- Overlay appears immediately on `/` keypress
+- Filtered as the user continues typing (prefix match)
+- `Tab` or `↓` moves focus into the list; `↑` moves back to the input
+- `Enter` on a completion fills the command; `Escape` dismisses without filling
+- Unknown `/xyz` commands fall through to `_run_slash_cmd` with the current
+  "unknown slash command" warning — completion is an enhancement, not a gate
+
+### Textual implementation
+
+A `ListView` (or plain `Container` of `Static` rows) mounted in `#main-area`
+or just above `#input-bar`, hidden by default. Shown/hidden reactively as the
+`Input.Changed` event fires:
+
+```python
+def on_input_changed(self, event: Input.Changed) -> None:
+    raw = event.value
+    overlay = self.query_one("#completion-overlay")
+    if raw.startswith("/") and len(raw) > 0:
+        prefix = raw[1:].lower()
+        matches = [cmd for cmd in SLASH_COMMANDS if cmd.startswith(prefix)]
+        overlay.display = bool(matches)
+        # rebuild rows...
+    else:
+        overlay.display = False
+```
+
+`SLASH_COMMANDS` is a dict `{name: description}` imported from
+`asher/slash-commands/__init__.py`, making the registry the single source of
+truth for both dispatch and completion.
+
+### CSS sketch
+
+```css
+#completion-overlay {
+    dock: bottom;
+    offset-y: -3;          /* sit just above the input bar */
+    background: #161b22;
+    border: solid #30363d;
+    width: 48;
+    height: auto;
+    max-height: 8;
+    padding: 0 1;
+    display: none;
+    layer: overlay;
+}
+
+.completion-row {
+    height: 1;
+    padding: 0 1;
+    color: #e6edf3;
+}
+
+.completion-row.--highlight {
+    background: #1f6feb33;
+    color: #58a6ff;
+}
+
+.completion-desc {
+    color: #484f58;
+}
+```
+
+---
+
+## 22. Version display
+
+`VERSION` is already read from `importlib.metadata` and shown in the title
+chip of the status bar:
+
+```
+◆ Asher CLI v1.0.0   [robot name]   ● ONLINE   [Ready]
+```
+
+The `_refresh_title()` method in `asher/ui/__init__.py` builds this; version
+falls back to `"dev"` when running from source without `pip install -e .`.
+
+### `/version` slash command
+
+A convenience command that prints version info to the log without requiring
+the user to look at the status bar:
+
+```
+  Asher CLI v1.0.0
+  Python 3.12.3
+  pylitterbot 3.x.x
+  textual 0.x.x
+```
+
+```python
+async def _slash_version(self) -> None:
+    import sys
+    from importlib.metadata import version as pkg_version, PackageNotFoundError
+
+    def _v(pkg):
+        try:
+            return pkg_version(pkg)
+        except PackageNotFoundError:
+            return "?"
+
+    self._log_info(f"Asher CLI v{_v('asher-cli')}")
+    self._log_info(f"Python {sys.version.split()[0]}")
+    self._log_info(f"pylitterbot {_v('pylitterbot')}")
+    self._log_info(f"textual {_v('textual')}")
+```
+
+### Status bar title — model badge
+
+Once the robot is connected, show its model type next to the name so the user
+knows at a glance which API surface is available:
+
+```
+◆ Asher CLI v1.0.0   Idiot Box (LR4)   ● ONLINE   [Ready]
+```
+
+`type(robot).__name__` already returns `"LitterRobot4"`, `"LitterRobot5"`, etc.
+Strip the `"LitterRobot"` prefix for display: `model = type(robot).__name__.replace("LitterRobot", "LR")`.
+
+---
+
 ## Priority suggestion
 
 Ranked by user-visible impact vs. implementation effort:
@@ -1642,8 +1817,11 @@ Ranked by user-visible impact vs. implementation effort:
 ### Foundation ✅ (done)
 
 1. ~~**`pyproject.toml` + `importlib.metadata` version**~~ — single source of truth, packaging unlocked
-2. ~~**Architecture refactor**~~ — `asher/` package with `helpers.py`, `cats.py`, `app.py`; testable
+2. ~~**Architecture refactor**~~ — `asher/` package with `helpers.py`, `cats.py`, `app.py`; mixin split
 3. ~~**Lint + test CI**~~ — `ruff` + `mypy` + `pytest` in `.github/workflows/ci.yml`
+4. ~~**Keyring credential storage**~~ — `_keyring_load/save/delete`; credentials persist across restarts
+5. ~~**Slash command dispatch + `/login` `/logout` `/exit` `/help`**~~ — inline login flow, no restart needed
+6. ~~**PyPI release workflow**~~ — `release.yml` triggers on `release/*` branches; OIDC trusted publisher
 
 ### High-value features (biggest user-visible wins)
 
@@ -1657,14 +1835,15 @@ Ranked by user-visible impact vs. implementation effort:
 
 ### Commands & slash system
 
-9. **`/robot` and `/pet` slash commands** (§1, §13) — robot/pet switcher
-10. **`wait-time`, `power`, `rename`, `insight` commands** (§2) — each is a two-line wiring job
-11. **Sleep schedule viewer** (§7) — read-only first, config wizard later
-12. **Tab-completion for slash commands** (§13) — overlay dropdown on `/` keypress
+9. **`/robot` and `/pet` slash commands** (§1, §13) — robot/pet switcher; needs `/account` setup first
+10. **Tab-completion for slash commands** (§21) — Claude Code-style overlay dropdown on `/` keypress; single-source registry drives both dispatch and completion
+11. **`/version` command + model badge in status bar** (§22) — show Python/package versions in log; show `LR4`/`LR5` model next to robot name
+12. **`wait-time`, `power`, `rename`, `insight` commands** (§2) — each is a two-line wiring job
+13. **Sleep schedule viewer** (§7) — read-only first, config wizard later
 
 ### Release pipeline
 
-13. **PyPI publish** (§14) — `pip install asher-cli`; `release.yml` auto-publishes on `v*` tag push
+13. ~~**PyPI publish**~~ (§14) ✅ — `release.yml` live; push `release/x.y.z` branch to publish
 14. **Versioning discipline** (§18) — `hatch version`, `CHANGELOG.md`, signed tags
 15. **Standalone binary** (§15) — PyInstaller `.exe` + macOS/Linux builds via CI matrix
 16. **Dependabot / Renovate** (§19) — automated dependency PRs, `pylitterbot` pinned to manual review

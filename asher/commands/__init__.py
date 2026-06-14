@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from typing import Any
 
 from rich.text import Text
 from textual import work
-from textual.widgets import Input, RichLog
+from textual.widgets import Input, RichLog, Static
+
+_HINT_DEFAULT = "help · clean · status · history · /login · /logout · quit"
+_HINT_SIGNIN = "/login to sign in"
 
 from ..helpers import ts
 
@@ -15,8 +19,11 @@ from ..helpers import ts
 class CommandsMixin:
     # declared for type checkers; assigned in AsherApp.__init__
     _robot: Any
+    _account: Any
     _cmd_history: list[str]
     _hist_idx: int
+    _login_state: str
+    _login_email: str
 
     # ── input events ─────────────────────────────────────────────────────────
 
@@ -26,10 +33,27 @@ class CommandsMixin:
         if not raw:
             return
 
+        log = self.query_one("#log", RichLog)  # type: ignore[attr-defined]
+
+        # Login flow intercepts before history/echo
+        if self._login_state == "awaiting_email":
+            t = ts()
+            t.append(f"  {raw}", style="#e6edf3")
+            log.write(t)
+            self._handle_login_email(raw)
+            return
+
+        if self._login_state == "awaiting_password":
+            t = ts()
+            t.append("  ••••••••", style="#484f58")
+            log.write(t)
+            self._handle_login_password(raw)
+            return
+
+        # Normal command — add to history and echo
         self._cmd_history.insert(0, raw)
         self._hist_idx = -1
 
-        log = self.query_one("#log", RichLog)  # type: ignore[attr-defined]
         t = ts()
         t.append("> ", style="bold #3fb950")
         t.append(raw, style="#e6edf3")
@@ -47,12 +71,17 @@ class CommandsMixin:
             log.clear()
             return
 
-        self._run_cmd(raw)
+        if raw.startswith("/"):
+            self._run_slash_cmd(raw)
+        else:
+            self._run_cmd(raw)
 
     def on_key(self, event) -> None:  # type: ignore[override]
         cmd_input = self.query_one("#cmd-input", Input)  # type: ignore[attr-defined]
         if not cmd_input.has_focus:
             return
+        if self._login_state:
+            return  # disable history nav during login
 
         if event.key == "up":
             event.prevent_default()
@@ -70,7 +99,77 @@ class CommandsMixin:
                 self._hist_idx = -1
                 cmd_input.value = ""
 
-    # ── dispatch ──────────────────────────────────────────────────────────────
+    # ── inline login flow ─────────────────────────────────────────────────────
+
+    def _start_login_flow(self) -> None:
+        """Enter interactive login mode — prompts for email then password in the command bar."""
+        self._login_state = "awaiting_email"
+        self._login_email = ""
+        self._set_cat("idle", "sign in")  # type: ignore[attr-defined]
+        self.query_one("#prompt", Static).update("email ›")  # type: ignore[attr-defined]
+        self.query_one("#hint-bar", Static).update("enter your Whisker account email")  # type: ignore[attr-defined]
+        self.query_one("#cmd-input", Input).placeholder = "your@email.com"  # type: ignore[attr-defined]
+        self.query_one("#cmd-input", Input).password = False  # type: ignore[attr-defined]
+        self.query_one("#cmd-input", Input).focus()  # type: ignore[attr-defined]
+        self._log_info("Enter your Whisker account email:")  # type: ignore[attr-defined]
+
+    def _handle_login_email(self, email: str) -> None:
+        self._login_email = email
+        self._login_state = "awaiting_password"
+        self.query_one("#prompt", Static).update("password ›")  # type: ignore[attr-defined]
+        self.query_one("#hint-bar", Static).update("password will not be shown")  # type: ignore[attr-defined]
+        self.query_one("#cmd-input", Input).placeholder = "password"  # type: ignore[attr-defined]
+        self.query_one("#cmd-input", Input).password = True  # type: ignore[attr-defined]
+        self._log_info("Enter your password:")  # type: ignore[attr-defined]
+
+    @work
+    async def _handle_login_password(self, password: str) -> None:
+        from ..connection import _keyring_save  # noqa: PLC0415
+
+        email = self._login_email
+        self._login_state = ""
+        self._login_email = ""
+
+        # Restore prompt and input to normal
+        self.query_one("#prompt", Static).update(">")  # type: ignore[attr-defined]
+        self.query_one("#hint-bar", Static).update(_HINT_DEFAULT)  # type: ignore[attr-defined]
+        self.query_one("#cmd-input", Input).password = False  # type: ignore[attr-defined]
+        self.query_one("#cmd-input", Input).placeholder = "type a command  (help for list)…"  # type: ignore[attr-defined]
+
+        if _keyring_save(email, password):
+            self._log_info("Credentials saved to keyring.")  # type: ignore[attr-defined]
+        else:
+            self._log_warn("Could not save to keyring — you'll be prompted again next launch.")  # type: ignore[attr-defined]
+
+        if self._account:
+            with contextlib.suppress(Exception):
+                await self._account.disconnect()
+        self._account = None
+        self._robot = None
+        self._set_cat("idle", "connecting…")  # type: ignore[attr-defined]
+        self._connect_worker()  # type: ignore[attr-defined]
+
+    # ── slash-command dispatch (app management) ───────────────────────────────
+
+    @work
+    async def _run_slash_cmd(self, raw: str) -> None:
+        parts = raw.strip().split()
+        cmd = parts[0].lstrip("/").lower() if parts else ""
+
+        if cmd in ("exit", "quit", "q"):
+            self.exit()  # type: ignore[attr-defined]
+        elif cmd == "login":
+            self._start_login_flow()
+        elif cmd == "logout":
+            await self._cmd_logout()
+        elif cmd == "help":
+            self._show_help()
+        else:
+            self._log_warn(  # type: ignore[attr-defined]
+                f"Unknown slash command: '{raw}'  — try /login, /logout, /exit"
+            )
+
+    # ── robot-command dispatch ────────────────────────────────────────────────
 
     @work
     async def _run_cmd(self, raw: str) -> None:
@@ -79,7 +178,7 @@ class CommandsMixin:
         args = parts[1:] if len(parts) > 1 else []
 
         if self._robot is None:
-            self._log_err("Not connected. Check .env credentials and restart.")  # type: ignore[attr-defined]
+            self._log_err("Not connected — type '/login' to sign in.")  # type: ignore[attr-defined]
             return
 
         if cmd == "clean":
@@ -101,7 +200,23 @@ class CommandsMixin:
         else:
             self._log_warn(f"Unknown command: '{cmd}'  — type 'help' for list")  # type: ignore[attr-defined]
 
-    # ── individual handlers ───────────────────────────────────────────────────
+    # ── slash-command handlers ────────────────────────────────────────────────
+
+    async def _cmd_logout(self) -> None:
+        from ..connection import _keyring_delete  # noqa: PLC0415
+
+        if self._account:
+            with contextlib.suppress(Exception):
+                await self._account.disconnect()
+        self._account = None
+        self._robot = None
+        _keyring_delete()
+        self._log_ok("Signed out.")  # type: ignore[attr-defined]
+        self._log_info("Type /login to sign in.")  # type: ignore[attr-defined]
+        self._set_cat("idle", "not signed in")  # type: ignore[attr-defined]
+        self.query_one("#hint-bar", Static).update(_HINT_SIGNIN)  # type: ignore[attr-defined]
+
+    # ── robot-command handlers ────────────────────────────────────────────────
 
     async def _cmd_clean(self) -> None:
         self._set_cat("cleaning", "cleaning…")  # type: ignore[attr-defined]
@@ -203,23 +318,33 @@ class CommandsMixin:
     def _show_help(self) -> None:
         log = self.query_one("#log", RichLog)  # type: ignore[attr-defined]
         log.write("")
-        log.write(Text.from_markup("[bold #58a6ff]Commands[/]"))
-        cmds = [
+        log.write(Text.from_markup("[bold #58a6ff]Robot commands[/]"))
+        robot_cmds = [
             ("clean", "start a clean cycle"),
             ("status", "refresh and display full status"),
-            ("lock", "enable panel lockout"),
-            ("unlock", "disable panel lockout"),
-            ("sleep", "enable sleep mode"),
-            ("wake", "wake from sleep"),
+            ("lock / unlock", "toggle panel lockout"),
+            ("sleep / wake", "toggle sleep mode"),
             ("night-light on|off", "toggle night light"),
             ("history", "show recent activity log"),
             ("clear", "clear the log"),
             ("help", "show this message"),
-            ("quit", "exit Asher CLI"),
+            ("quit / exit", "exit Asher CLI"),
         ]
-        for name, desc in cmds:
+        for name, desc in robot_cmds:
             t = Text()
             t.append(f"  {name:<22}", style="#3fb950")
+            t.append(desc, style="#8b949e")
+            log.write(t)
+        log.write("")
+        log.write(Text.from_markup("[bold #58a6ff]Slash commands[/]  [#484f58](app management)[/]"))
+        slash_cmds = [
+            ("/login", "sign in or switch accounts"),
+            ("/logout", "sign out and re-enter credentials"),
+            ("/exit", "exit Asher CLI"),
+        ]
+        for name, desc in slash_cmds:
+            t = Text()
+            t.append(f"  {name:<22}", style="#d29922")
             t.append(desc, style="#8b949e")
             log.write(t)
         log.write("")

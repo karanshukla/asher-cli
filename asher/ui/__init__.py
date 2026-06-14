@@ -57,6 +57,7 @@ Screen {
     height: 1fr;
     background: #0d1117;
     padding: 1 2;
+    overflow-x: hidden;
     scrollbar-background: #161b22;
     scrollbar-color: #30363d;
     scrollbar-color-hover: #58a6ff;
@@ -89,15 +90,28 @@ Screen {
     height: 3;
 }
 
-/* ── Input bar ── */
+/* ── Input area (outer dock + hint below the box) ── */
+#bottom-dock {
+    dock: bottom;
+    height: 4;
+    background: #161b22;
+    layout: vertical;
+    padding: 0 0 0 0;
+}
+
 #input-bar {
     background: #161b22;
     height: 3;
     border-top: solid #30363d;
-    dock: bottom;
-    layout: horizontal;
-    align: left middle;
+    border-bottom: solid #30363d;
+    layout: vertical;
     padding: 0 2;
+}
+
+#input-row {
+    layout: horizontal;
+    height: 1;
+    align: left middle;
 }
 
 #prompt {
@@ -105,6 +119,13 @@ Screen {
     width: auto;
     text-style: bold;
     padding: 0 1 0 0;
+    height: 1;
+}
+
+#hint-bar {
+    color: #484f58;
+    height: 1;
+    padding: 0 2;
 }
 
 #cmd-input {
@@ -120,11 +141,6 @@ Input {
     border: none;
     background: #161b22;
     padding: 0;
-}
-
-Input:focus {
-    border: none;
-    outline: none;
 }
 """
 
@@ -149,14 +165,20 @@ class UIMixin:
                 yield Static("", id="weight-lbl", classes="chunk")
 
         with Container(id="main-area"):
-            yield RichLog(id="log", highlight=True, markup=True, wrap=True)
+            yield RichLog(id="log", highlight=True, markup=True, wrap=True, min_width=0)
             with Container(id="cat-panel"):
                 yield Static(CATS["idle"], id="cat-art")  # type: ignore[arg-type]
                 yield Static("idle", id="cat-label")
 
-        with Container(id="input-bar"):
-            yield Static(">", id="prompt")
-            yield Input(placeholder="type a command  (help for list)…", id="cmd-input")
+        with Container(id="bottom-dock"):
+            with Container(id="input-bar"):
+                with Container(id="input-row"):
+                    yield Static(">", id="prompt")
+                    yield Input(placeholder="type a command  (help for list)…", id="cmd-input")
+            yield Static(
+                "help · clean · status · history · /login · /logout · quit",
+                id="hint-bar",
+            )
 
     def _refresh_title(self) -> None:
         t = Text()
