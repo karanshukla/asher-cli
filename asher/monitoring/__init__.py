@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from rich.text import Text
 from textual import work
 from textual.widgets import Static
@@ -11,7 +13,7 @@ from ..helpers import drawer_bar, fmt_ago
 
 class MonitoringMixin:
     # declared for type checkers; assigned in AsherApp.__init__
-    _robot: object | None
+    _robot: Any
     _pets: list
     _cat_mode: str
 
@@ -79,7 +81,7 @@ class MonitoringMixin:
         if self._robot is None:
             return
         try:
-            await self._robot.refresh()  # type: ignore[union-attr]
+            await self._robot.refresh()
             await self._refresh_status()
         except Exception:
             pass

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+from typing import Any
 
 from textual.app import App
 from textual.binding import Binding
@@ -23,8 +24,8 @@ class AsherApp(UIMixin, ConnectionMixin, MonitoringMixin, CommandsMixin, App):  
 
     def __init__(self) -> None:
         super().__init__()
-        self._account: object | None = None
-        self._robot: object | None = None
+        self._account: Any = None
+        self._robot: Any = None
         self._pets: list = []
         self._cat_mode: str = "idle"
         self._cat_frame: int = 0
@@ -42,4 +43,4 @@ class AsherApp(UIMixin, ConnectionMixin, MonitoringMixin, CommandsMixin, App):  
     async def on_unmount(self) -> None:
         if self._account:
             with contextlib.suppress(Exception):
-                await self._account.disconnect()  # type: ignore[union-attr]
+                await self._account.disconnect()

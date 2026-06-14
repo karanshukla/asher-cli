@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from typing import Any
 
 from rich.text import Text
 from textual import work
@@ -13,7 +14,7 @@ from ..helpers import ts
 
 class CommandsMixin:
     # declared for type checkers; assigned in AsherApp.__init__
-    _robot: object | None
+    _robot: Any
     _cmd_history: list[str]
     _hist_idx: int
 
@@ -105,10 +106,10 @@ class CommandsMixin:
     async def _cmd_clean(self) -> None:
         self._set_cat("cleaning", "cleaning…")  # type: ignore[attr-defined]
         try:
-            await self._robot.start_cleaning()  # type: ignore[union-attr]
+            await self._robot.start_cleaning()
             self._log_ok("Clean cycle started")  # type: ignore[attr-defined]
             await asyncio.sleep(3)
-            await self._robot.refresh()  # type: ignore[union-attr]
+            await self._robot.refresh()
             await self._refresh_status()  # type: ignore[attr-defined]
             self._set_cat("happy", "all done!")  # type: ignore[attr-defined]
         except Exception as exc:
@@ -117,7 +118,7 @@ class CommandsMixin:
 
     async def _cmd_status(self) -> None:
         try:
-            await self._robot.refresh()  # type: ignore[union-attr]
+            await self._robot.refresh()
             await self._refresh_status()  # type: ignore[attr-defined]
             r = self._robot
             rows = [
@@ -142,14 +143,14 @@ class CommandsMixin:
     async def _cmd_lock(self, lock: bool) -> None:
         action = "locked" if lock else "unlocked"
         try:
-            await self._robot.set_panel_lockout(lock)  # type: ignore[union-attr]
+            await self._robot.set_panel_lockout(lock)
             self._log_ok(f"Panel {action}")  # type: ignore[attr-defined]
         except Exception as exc:
             self._log_err(f"Failed: {exc}")  # type: ignore[attr-defined]
 
     async def _cmd_sleep(self, sleep: bool) -> None:
         try:
-            await self._robot.set_sleep_mode(sleep)  # type: ignore[union-attr]
+            await self._robot.set_sleep_mode(sleep)
             if sleep:
                 self._log_ok("Sleep mode enabled")  # type: ignore[attr-defined]
                 self._set_cat("sleeping", "sleeping…")  # type: ignore[attr-defined]
@@ -166,12 +167,12 @@ class CommandsMixin:
             return
         try:
             if hasattr(self._robot, "set_night_light_brightness"):
-                await self._robot.set_night_light_brightness(100 if arg == "on" else 0)  # type: ignore[union-attr]
+                await self._robot.set_night_light_brightness(100 if arg == "on" else 0)
             elif hasattr(self._robot, "set_night_light_mode"):
                 from pylitterbot.enums import NightLightMode  # noqa: PLC0415
 
                 mode = NightLightMode.ON if arg == "on" else NightLightMode.OFF
-                await self._robot.set_night_light_mode(mode)  # type: ignore[union-attr]
+                await self._robot.set_night_light_mode(mode)
             else:
                 self._log_warn("Night light control not supported by this robot version.")  # type: ignore[attr-defined]
                 return
@@ -181,7 +182,7 @@ class CommandsMixin:
 
     async def _cmd_history_list(self) -> None:
         try:
-            acts = await self._robot.get_activity_history(limit=25)  # type: ignore[union-attr]
+            acts = await self._robot.get_activity_history(limit=25)
             log = self.query_one("#log", RichLog)  # type: ignore[attr-defined]
             if not acts:
                 self._log_info("No activity history available.")  # type: ignore[attr-defined]

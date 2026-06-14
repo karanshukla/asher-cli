@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from typing import Any
 
 from dotenv import load_dotenv
 from textual import work
@@ -18,8 +19,8 @@ PASSWORD = os.getenv("LITTER_ROBOT_PASSWORD") or os.getenv("LR4_PASSWORD", "")
 
 class ConnectionMixin:
     # declared for type checkers; assigned in AsherApp.__init__
-    _account: object | None
-    _robot: object | None
+    _account: Any
+    _robot: Any
     _pets: list
 
     @work(exclusive=True)
@@ -35,11 +36,11 @@ class ConnectionMixin:
             from pylitterbot import Account  # noqa: PLC0415
 
             self._account = Account()
-            await self._account.connect(  # type: ignore[union-attr]
+            await self._account.connect(
                 username=EMAIL, password=PASSWORD, load_robots=True, load_pets=True
             )
-            self._pets = list(self._account.pets)  # type: ignore[union-attr]
-            robots = list(self._account.robots)  # type: ignore[union-attr]
+            self._pets = list(self._account.pets)
+            robots = list(self._account.robots)
 
             if not robots:
                 self._log_err("No Litter Robots found on this account.")  # type: ignore[attr-defined]

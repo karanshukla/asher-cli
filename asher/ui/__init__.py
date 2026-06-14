@@ -151,7 +151,7 @@ class UIMixin:
         with Container(id="main-area"):
             yield RichLog(id="log", highlight=True, markup=True, wrap=True)
             with Container(id="cat-panel"):
-                yield Static(CATS["idle"], id="cat-art")
+                yield Static(CATS["idle"], id="cat-art")  # type: ignore[arg-type]
                 yield Static("idle", id="cat-label")
 
         with Container(id="input-bar"):
