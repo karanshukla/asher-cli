@@ -1,6 +1,6 @@
 # Asher CLI
 
-A Claude Code-style terminal dashboard for monitoring and controlling Litter Robot via the Whisker cloud API (pylitterobot, unofficial)
+A Claude Code-style terminal dashboard for monitoring and controlling Litter Robot via a Python Whisker cloud API
 
 <img width="808" height="351" alt="image" src="https://github.com/user-attachments/assets/6599966f-837c-419c-8692-bfda3533e730" />
 
