@@ -169,7 +169,7 @@ class UIMixin:
         log = self.query_one("#log", RichLog)  # type: ignore[attr-defined]
         log.write("")
         log.write(
-            Text.from_markup(" [bold #58a6ff]◆ Asher CLI[/] [#484f58]— Litter Robot 4 Dashboard[/]")
+            Text.from_markup(" [bold #58a6ff]◆ Asher CLI[/] [#484f58]— Litter Robot Dashboard[/]")
         )
         log.write(Text.from_markup(" [#484f58]Connecting to Whisker cloud API…[/]"))
         log.write(
