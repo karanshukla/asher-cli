@@ -171,10 +171,9 @@ class UIMixin:
                 yield Static("idle", id="cat-label")
 
         with Container(id="bottom-dock"):
-            with Container(id="input-bar"):
-                with Container(id="input-row"):
-                    yield Static(">", id="prompt")
-                    yield Input(placeholder="type a command  (help for list)…", id="cmd-input")
+            with Container(id="input-bar"), Container(id="input-row"):
+                yield Static(">", id="prompt")
+                yield Input(placeholder="type a command  (help for list)…", id="cmd-input")
             yield Static(
                 "help · clean · status · history · /login · /logout · quit",
                 id="hint-bar",

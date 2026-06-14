@@ -10,10 +10,10 @@ from rich.text import Text
 from textual import work
 from textual.widgets import Input, RichLog, Static
 
+from ..helpers import ts
+
 _HINT_DEFAULT = "help · clean · status · history · /login · /logout · quit"
 _HINT_SIGNIN = "/login to sign in"
-
-from ..helpers import ts
 
 
 class CommandsMixin:
