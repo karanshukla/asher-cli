@@ -27,7 +27,7 @@ Screen {
 /* ── Status bar ── */
 #status-bar {
     background: #161b22;
-    height: 5;
+    height: 4;
     border-bottom: solid #30363d;
     dock: top;
     padding: 0;
@@ -41,10 +41,8 @@ Screen {
     padding: 0 2;
 }
 
-#status-rule {
-    height: 1;
+.srow:first-child {
     border-bottom: solid #30363d;
-    background: #161b22;
 }
 
 .sep {
@@ -178,7 +176,6 @@ class UIMixin:
                 yield Static("", id="robot-lbl", classes="chunk")
                 yield Static("", id="online-lbl", classes="chunk")
                 yield Static("", id="status-lbl", classes="chunk")
-            yield Container(id="status-rule")
             with Container(classes="srow"):
                 yield Static("", id="drawer-lbl", classes="chunk")
                 yield Static("│", classes="sep")
