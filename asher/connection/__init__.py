@@ -56,8 +56,8 @@ class ConnectionMixin:
         email, password = _keyring_load()
 
         if not email or not password:
-            env_email = os.getenv("LITTER_ROBOT_USER") or os.getenv("LR4_EMAIL", "")
-            env_pass = os.getenv("LITTER_ROBOT_PASSWORD") or os.getenv("LR4_PASSWORD", "")
+            env_email = os.getenv("LITTER_ROBOT_USER") or os.getenv("LR4_EMAIL") or ""
+            env_pass = os.getenv("LITTER_ROBOT_PASSWORD") or os.getenv("LR4_PASSWORD") or ""
             email = email or env_email
             password = password or env_pass
 

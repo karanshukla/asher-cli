@@ -17,7 +17,7 @@ from .ui import UIMixin
 
 
 class AsherApp(UIMixin, ConnectionMixin, MonitoringMixin, CommandsMixin, App):  # type: ignore[type-arg]
-    CSS = UIMixin.CSS  # must live in AsherApp.__dict__ so Textual gives it full user-CSS priority
+    CSS = UIMixin.CSS  # type: ignore[misc]  # must live in AsherApp.__dict__ so Textual gives it full user-CSS priority
     BINDINGS = [
         Binding("ctrl+c", "quit", "Quit", priority=True),
         Binding("ctrl+l", "clear_log", "Clear log"),
@@ -49,9 +49,10 @@ class AsherApp(UIMixin, ConnectionMixin, MonitoringMixin, CommandsMixin, App):  
         inp.set_styles(self._INPUT_STYLES)
         inp.focus()
 
-    def on_focus(self, event: events.Focus) -> None:
-        if getattr(event.widget, "id", None) == "cmd-input":
-            event.widget.set_styles(self._INPUT_STYLES)  # type: ignore[union-attr]
+    def on_focus(self, _event: events.Focus) -> None:
+        focused = self.focused
+        if focused is not None and getattr(focused, "id", None) == "cmd-input":
+            focused.set_styles(self._INPUT_STYLES)  # type: ignore[attr-defined]
 
     async def on_unmount(self) -> None:
         if self._account:
