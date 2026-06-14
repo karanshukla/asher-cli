@@ -18,6 +18,15 @@ A Claude Code-style terminal dashboard for monitoring and controlling Litter Rob
 ## Install
 
 ```bash
+pipx install asher-cli
+asher
+```
+
+`pipx` installs the CLI into an isolated environment and puts `asher` on your PATH automatically. Install `pipx` with `pip install pipx` if you don't have it.
+
+Or with plain pip (ensure Python's `Scripts` folder is on your PATH):
+
+```bash
 pip install asher-cli
 asher
 ```
