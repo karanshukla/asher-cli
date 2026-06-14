@@ -1,7 +1,9 @@
 """UI layout, CSS, cat panel, and log helpers."""
+
 from __future__ import annotations
 
-from importlib.metadata import PackageNotFoundError, version as pkg_version
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as pkg_version
 
 from rich.text import Text
 from textual.app import ComposeResult
@@ -137,13 +139,13 @@ class UIMixin:
     def compose(self) -> ComposeResult:
         with Container(id="status-bar"):
             with Container(classes="srow"):
-                yield Static("", id="title-lbl",  classes="chunk")
-                yield Static("", id="robot-lbl",  classes="chunk")
+                yield Static("", id="title-lbl", classes="chunk")
+                yield Static("", id="robot-lbl", classes="chunk")
                 yield Static("", id="online-lbl", classes="chunk")
                 yield Static("", id="status-lbl", classes="chunk")
             with Container(classes="srow"):
                 yield Static("", id="drawer-lbl", classes="chunk")
-                yield Static("", id="clean-lbl",  classes="chunk")
+                yield Static("", id="clean-lbl", classes="chunk")
                 yield Static("", id="weight-lbl", classes="chunk")
 
         with Container(id="main-area"):
@@ -166,15 +168,15 @@ class UIMixin:
     def _show_welcome(self) -> None:
         log = self.query_one("#log", RichLog)  # type: ignore[attr-defined]
         log.write("")
-        log.write(Text.from_markup(
-            " [bold #58a6ff]◆ Asher CLI[/] [#484f58]— Litter Robot 4 Dashboard[/]"
-        ))
-        log.write(Text.from_markup(
-            " [#484f58]Connecting to Whisker cloud API…[/]"
-        ))
-        log.write(Text.from_markup(
-            " [#484f58]Type [/][#3fb950]help[/][#484f58] to see available commands.[/]"
-        ))
+        log.write(
+            Text.from_markup(" [bold #58a6ff]◆ Asher CLI[/] [#484f58]— Litter Robot 4 Dashboard[/]")
+        )
+        log.write(Text.from_markup(" [#484f58]Connecting to Whisker cloud API…[/]"))
+        log.write(
+            Text.from_markup(
+                " [#484f58]Type [/][#3fb950]help[/][#484f58] to see available commands.[/]"
+            )
+        )
         log.write(Text.from_markup(" [#21262d]" + "─" * 52 + "[/]"))
         log.write("")
 
@@ -184,8 +186,8 @@ class UIMixin:
         cats = CATS.get(mode, CATS["idle"])
         frame = cats[0] if isinstance(cats, list) else cats
         color = "#f85149" if mode == "error" else "#d29922" if mode == "full" else "#58a6ff"
-        self.query_one("#cat-art",   Static).update(Text(frame, style=color))  # type: ignore[attr-defined]
-        self.query_one("#cat-label", Static).update(                            # type: ignore[attr-defined]
+        self.query_one("#cat-art", Static).update(Text(frame, style=color))  # type: ignore[attr-defined]
+        self.query_one("#cat-label", Static).update(  # type: ignore[attr-defined]
             Text(label or mode, style="italic #484f58")
         )
 
@@ -198,19 +200,23 @@ class UIMixin:
         self.query_one("#cat-art", Static).update(Text(frame, style="#58a6ff"))  # type: ignore[attr-defined]
 
     def _log_ok(self, msg: str) -> None:
-        t = ts(); t.append(f"✓ {msg}", style="#3fb950")
+        t = ts()
+        t.append(f"✓ {msg}", style="#3fb950")
         self.query_one("#log", RichLog).write(t)  # type: ignore[attr-defined]
 
     def _log_err(self, msg: str) -> None:
-        t = ts(); t.append(f"✖ {msg}", style="#f85149")
+        t = ts()
+        t.append(f"✖ {msg}", style="#f85149")
         self.query_one("#log", RichLog).write(t)  # type: ignore[attr-defined]
 
     def _log_warn(self, msg: str) -> None:
-        t = ts(); t.append(f"⚠ {msg}", style="#d29922")
+        t = ts()
+        t.append(f"⚠ {msg}", style="#d29922")
         self.query_one("#log", RichLog).write(t)  # type: ignore[attr-defined]
 
     def _log_info(self, msg: str) -> None:
-        t = ts(); t.append(f"  {msg}", style="#8b949e")
+        t = ts()
+        t.append(f"  {msg}", style="#8b949e")
         self.query_one("#log", RichLog).write(t)  # type: ignore[attr-defined]
 
     def action_clear_log(self) -> None:

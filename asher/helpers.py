@@ -1,23 +1,22 @@
 """Pure helper functions — no Textual or pylitterbot imports."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Optional
 
 from rich.text import Text
 
-
 STATUS_COLORS: dict[str, str] = {
-    "Ready":        "#3fb950",  # green
-    "Cycling":      "#58a6ff",  # blue
+    "Ready": "#3fb950",  # green
+    "Cycling": "#58a6ff",  # blue
     "Cat Detected": "#d29922",  # amber
-    "Drawer Full":  "#f85149",  # red
-    "Offline":      "#f85149",  # red
-    "Sleeping":     "#484f58",  # muted
+    "Drawer Full": "#f85149",  # red
+    "Offline": "#f85149",  # red
+    "Sleeping": "#484f58",  # muted
 }
 
 
-def fmt_ago(dt: Optional[datetime]) -> str:
+def fmt_ago(dt: datetime | None) -> str:
     if dt is None:
         return "never"
     if dt.tzinfo is None:

@@ -1,14 +1,14 @@
 import asyncio
+import os
 
-from pylitterbot import Account
-
-import os 
 from dotenv import load_dotenv
+from pylitterbot import Account
 
 load_dotenv()
 
 username = os.getenv("LITTER_ROBOT_USER")
 password = os.getenv("LITTER_ROBOT_PASSWORD")
+
 
 async def main():
     # Create an account.

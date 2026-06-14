@@ -1,4 +1,5 @@
 """Entry point — `asher` CLI command and `python -m asher`."""
+
 from .app import AsherApp
 
 

@@ -1,9 +1,8 @@
 """Tests for asher.helpers pure functions."""
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-
-import pytest
 
 from asher.helpers import drawer_bar, fmt_ago
 

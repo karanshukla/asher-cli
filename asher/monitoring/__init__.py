@@ -1,4 +1,5 @@
 """Robot status polling and refresh."""
+
 from __future__ import annotations
 
 from rich.text import Text
@@ -10,8 +11,8 @@ from ..helpers import drawer_bar, fmt_ago
 
 class MonitoringMixin:
     # declared for type checkers; assigned in AsherApp.__init__
-    _robot:    object | None
-    _pets:     list
+    _robot: object | None
+    _pets: list
     _cat_mode: str
 
     async def _refresh_status(self) -> None:
@@ -19,12 +20,12 @@ class MonitoringMixin:
         if r is None:
             return
 
-        name      = getattr(r, "name",               "—")
-        online    = getattr(r, "is_online",           False)
-        drawer    = float(getattr(r, "waste_drawer_level", 0) or 0)
-        status    = getattr(r, "status",              None)
-        sleeping  = getattr(r, "sleeping",            False)
-        last_seen = getattr(r, "last_seen",           None)
+        name = getattr(r, "name", "—")
+        online = getattr(r, "is_online", False)
+        drawer = float(getattr(r, "waste_drawer_level", 0) or 0)
+        status = getattr(r, "status", None)
+        sleeping = getattr(r, "sleeping", False)
+        last_seen = getattr(r, "last_seen", None)
 
         status_str = status.value if status else ("Sleeping" if sleeping else "Ready")
 
@@ -42,7 +43,7 @@ class MonitoringMixin:
 
         online_lbl = self.query_one("#online-lbl", Static)  # type: ignore[attr-defined]
         if online:
-            online_lbl.update(Text("● ONLINE",  style="bold #3fb950"))
+            online_lbl.update(Text("● ONLINE", style="bold #3fb950"))
         else:
             online_lbl.update(Text("○ OFFLINE", style="bold #f85149"))
 
@@ -64,9 +65,9 @@ class MonitoringMixin:
         wt_text = Text()
         if pet_name:
             wt_text.append(pet_name, style="#8b949e")
-            wt_text.append(" 🐱 ",   style="#484f58")
+            wt_text.append(" 🐱 ", style="#484f58")
         else:
-            wt_text.append("cat ",   style="#484f58")
+            wt_text.append("cat ", style="#484f58")
         wt_text.append(weight_val, style="#8b949e")
         self.query_one("#weight-lbl", Static).update(wt_text)  # type: ignore[attr-defined]
 
