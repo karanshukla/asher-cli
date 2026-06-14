@@ -31,6 +31,13 @@ pip install -e .
 asher
 ```
 
+### Dev setup
+
+```bash
+uv sync --dev
+git config core.hooksPath .githooks   # run lint + tests before every push
+```
+
 ## Credentials
 
 On first run, type `/login` at the command prompt. Your credentials are saved to the OS keyring (Windows Credential Manager / macOS Keychain / Linux Secret Service) and reused automatically on subsequent runs.
@@ -51,7 +58,8 @@ LITTER_ROBOT_PASSWORD=yourpassword
 | Command | Description |
 |---|---|
 | `clean` | Start a clean cycle |
-| `status` | Refresh and show full status |
+| `status` | Refresh and show what matters — online state, drawer level, last activity |
+| `info` | Full dump of all robot properties (serial, firmware, all settings) |
 | `lock` / `unlock` | Toggle panel lockout |
 | `sleep` / `wake` | Toggle sleep mode |
 | `night-light on\|off` | Toggle night light |
@@ -69,6 +77,27 @@ LITTER_ROBOT_PASSWORD=yourpassword
 | `/exit` | Exit Asher CLI |
 
 **Keyboard shortcuts:** `Ctrl+L` clears the log, `Ctrl+C` quits.
+
+## Releasing
+
+```bash
+# bump version, commit, and tag in one step
+uv run bump-my-version bump patch    # 0.0.1 → 0.0.2
+uv run bump-my-version bump minor    # 0.0.2 → 0.1.0
+uv run bump-my-version bump major    # 0.1.0 → 1.0.0
+
+# then push the release branch to trigger PyPI publish
+git checkout -b release/0.0.2
+git push origin release/0.0.2
+```
+
+## Testing
+
+```bash
+uv run pytest
+```
+
+CI runs on Python 3.10 / 3.11 / 3.12 across Ubuntu, Windows, and macOS on every push.
 
 ## Notes
 

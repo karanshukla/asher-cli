@@ -27,10 +27,10 @@ Screen {
 /* ── Status bar ── */
 #status-bar {
     background: #161b22;
-    height: 4;
+    height: 5;
     border-bottom: solid #30363d;
     dock: top;
-    padding: 0 2;
+    padding: 0;
     layout: vertical;
 }
 
@@ -38,6 +38,20 @@ Screen {
     height: 2;
     layout: horizontal;
     align: left middle;
+    padding: 0 2;
+}
+
+#status-rule {
+    height: 1;
+    border-bottom: solid #30363d;
+    background: #161b22;
+}
+
+.sep {
+    color: #30363d;
+    width: auto;
+    height: 1;
+    padding: 0 1;
 }
 
 .chunk {
@@ -145,12 +159,17 @@ Input {
 """
 
 
+_SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+
+
 class UIMixin:
     CSS: str = _CSS
 
     # declared for type checkers; assigned in AsherApp.__init__
     _cat_mode: str
     _cat_frame: int
+    _is_loading: bool
+    _spinner_idx: int
 
     def compose(self) -> ComposeResult:
         with Container(id="status-bar"):
@@ -159,10 +178,13 @@ class UIMixin:
                 yield Static("", id="robot-lbl", classes="chunk")
                 yield Static("", id="online-lbl", classes="chunk")
                 yield Static("", id="status-lbl", classes="chunk")
+            yield Container(id="status-rule")
             with Container(classes="srow"):
                 yield Static("", id="drawer-lbl", classes="chunk")
-                yield Static("", id="clean-lbl", classes="chunk")
+                yield Static("│", classes="sep")
                 yield Static("", id="weight-lbl", classes="chunk")
+                yield Static("│", classes="sep")
+                yield Static("", id="clean-lbl", classes="chunk")
 
         with Container(id="main-area"):
             yield RichLog(id="log", highlight=True, markup=True, wrap=True, min_width=0)
@@ -185,6 +207,14 @@ class UIMixin:
         t.append("Asher CLI", style="bold #e6edf3")
         t.append(f" v{VERSION}", style="#484f58")
         self.query_one("#title-lbl", Static).update(t)  # type: ignore[attr-defined]
+
+    def _show_loading_state(self) -> None:
+        self.query_one("#online-lbl", Static).update(  # type: ignore[attr-defined]
+            Text(f"{_SPINNER[0]} connecting…", style="#484f58")
+        )
+        dash = Text("—", style="#30363d")
+        for wid in ("#robot-lbl", "#status-lbl", "#drawer-lbl", "#weight-lbl", "#clean-lbl"):
+            self.query_one(wid, Static).update(dash)  # type: ignore[attr-defined]
 
     def _show_welcome(self) -> None:
         log = self.query_one("#log", RichLog)  # type: ignore[attr-defined]
@@ -213,6 +243,11 @@ class UIMixin:
         )
 
     def _tick_cat(self) -> None:
+        if self._is_loading:
+            self._spinner_idx = (self._spinner_idx + 1) % len(_SPINNER)
+            self.query_one("#online-lbl", Static).update(  # type: ignore[attr-defined]
+                Text(f"{_SPINNER[self._spinner_idx]} connecting…", style="#484f58")
+            )
         cats = CATS.get(self._cat_mode, CATS["idle"])
         if not isinstance(cats, list):
             return

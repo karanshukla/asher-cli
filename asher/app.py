@@ -35,12 +35,16 @@ class AsherApp(UIMixin, ConnectionMixin, MonitoringMixin, CommandsMixin, App):  
         self._hist_idx: int = -1
         self._login_state: str = ""  # "" | "awaiting_email" | "awaiting_password"
         self._login_email: str = ""
+        self._last_cat_seen: Any = None
+        self._is_loading: bool = True
+        self._spinner_idx: int = 0
 
     _INPUT_STYLES = "border: none; background: #161b22; outline: none;"
 
     def on_mount(self) -> None:
         self._refresh_title()
         self._show_welcome()
+        self._show_loading_state()
         self._connect_worker()
         self.set_interval(30, self._poll_status_interval)
         self.set_interval(0.9, self._tick_cat)

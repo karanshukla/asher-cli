@@ -106,6 +106,38 @@ codes `pets[0]`. With multiple cats this matters.
 All of these are real `LitterRobot4` / `LitterRobot5` methods in pylitterbot
 that aren't wired up yet.
 
+### `status` vs `info` — split the current status command
+
+`status` currently dumps every known property into the log. It should instead
+surface only what the user actually needs at a glance — the same information
+shown in the status bar, refreshed on demand:
+
+```
+  Online         yes
+  Status         Ready
+  Drawer         48%
+  Last seen      4m ago
+  Cat weight     9.1 lb
+```
+
+`info` handles the full property dump — serial number, firmware version, wait
+time, all boolean flags, model type, etc. Useful for debugging or first-time
+setup, not something you need every time you check in:
+
+```
+  Name           Idiot Box
+  Model          LR4  (LitterRobot4)
+  Serial         LR4C012345
+  Firmware       ESP: 1.1.50  STM: 1.0.11
+  Wait time      7 min
+  Sleeping       no
+  Panel locked   no
+  Night light    off
+  Drawer         48%
+  Online         yes
+  Last seen      4m ago
+```
+
 ### `power on` / `power off`
 ```python
 await robot.set_power_status(True / False)
@@ -900,137 +932,135 @@ Run with `uv run app.py` — no venv setup needed, `uv` handles it.
 
 ## 15. Testing
 
-### Unit tests
+### Unit tests ✅
 
-The core logic to test in isolation (no Whisker API, no Textual):
+Pure function tests with no Textual or API dependency. Already in place:
 
-| Function | Test |
-|---|---|
-| `fmt_ago(dt)` | Various timedeltas — seconds, minutes, hours, days, None |
-| `drawer_bar(pct)` | 0%, 50%, 85%, 100% — verify bar length and colour |
-| Command parsing in `_run_cmd` | Verify correct method called for each verb |
-
-```python
-# tests/testhelpers.py
-from datetime import datetime, timedelta, timezone
-from app import fmt_ago, drawer_bar
-
-def test_fmt_ago_minutes():
-    dt = datetime.now(timezone.utc) - timedelta(minutes=5)
-    assert fmt_ago(dt) == "5m ago"
-
-def test_drawer_bar_full_is_red():
-    bar = drawer_bar(90)
-    assert "#f85149" in bar._spans[1].style   # red segment
+```
+tests/
+  conftest.py       shared fixtures (mock_robot, mock_account)
+  testhelpers.py    fmt_ago, drawer_bar — 12 tests, all passing
 ```
 
-### Integration tests — pylitterbot mocking
+Run: `uv run pytest`
 
-Rather than hitting the live API, mock `Account`:
+CI matrix: Python 3.10 / 3.11 / 3.12 × Ubuntu / Windows / macOS.
 
-```python
-# tests/conftest.py
-from unittest.mock import AsyncMock, MagicMock, patch
-import pytest
+### Integration tests — pylitterbot mocking ✅ (fixtures ready, handlers not yet covered)
 
-@pytest.fixture
-def mock_robot():
-    r = MagicMock()
-    r.name = "Test Box"
-    r.is_online = True
-    r.waste_drawer_level = 42.0
-    r.pet_weight = 9.1
-    r.status.value = "Ready"
-    r.last_seen = datetime.now(timezone.utc)
-    r.refresh = AsyncMock()
-    r.start_cleaning = AsyncMock(return_value=True)
-    r.set_panel_lockout = AsyncMock(return_value=True)
-    r.get_activity_history = AsyncMock(return_value=[])
-    return r
-
-@pytest.fixture
-def mock_account(mock_robot):
-    a = MagicMock()
-    a.robots = [mock_robot]
-    a.pets = []
-    a.connect = AsyncMock()
-    a.disconnect = AsyncMock()
-    return a
-```
-
-Then test the app worker methods by injecting the mock:
+`tests/conftest.py` already provides `mock_robot` and `mock_account` fixtures
+using `AsyncMock`. The next step is wiring them into command handler tests:
 
 ```python
 # tests/testcommands.py
-async def test_clean_calls_start_cleaning(mock_robot, mock_account):
+async def test_clean_calls_start_cleaning(mock_robot):
     app = AsherApp()
     app._robot = mock_robot
     await app._cmd_clean()
     mock_robot.start_cleaning.assert_called_once()
+
+async def test_unknown_command_logs_warning(mock_robot):
+    app = AsherApp()
+    app._robot = mock_robot
+    # assert _log_warn was called with "Unknown command"
 ```
 
-### TUI / snapshot tests
+Slash command tests follow the same pattern — inject state, call `_run_slash_cmd`,
+assert on side effects (keyring calls, cat mode, log output).
 
-Textual has a built-in test harness:
+### E2E — Textual Pilot harness
+
+Textual ships a `Pilot` test harness that drives the full TUI — keypresses,
+widget queries, and assertions — without a real terminal. No extra install
+needed; it's part of `textual` itself.
 
 ```python
-from textual.testing import AppTest
+# tests/teste2e.py
+import pytest
+from asher.app import AsherApp
 
-async def test_help_renders(mock_account):
-    async with AppTest(AsherApp()) as pilot:
+@pytest.mark.asyncio
+async def test_help_renders():
+    async with AsherApp().run_test() as pilot:
         await pilot.press("h", "e", "l", "p", "enter")
-        assert "clean" in pilot.app.query_one("#log").renderable
+        log = pilot.app.query_one("#log")
+        content = str(log.renderable)
+        assert "clean" in content
+        assert "/login" in content
+
+@pytest.mark.asyncio
+async def test_quit_exits():
+    async with AsherApp().run_test() as pilot:
+        await pilot.press("q", "enter")
+        assert pilot.app._exit  # app exited cleanly
+
+@pytest.mark.asyncio
+async def test_clear_empties_log():
+    async with AsherApp().run_test() as pilot:
+        await pilot.press("c", "l", "e", "a", "r", "enter")
+        log = pilot.app.query_one("#log")
+        assert str(log.renderable).strip() == ""
 ```
 
-And snapshot tests via `textual-snapshot` that render the app to a file and
-diff it on CI:
+The key `run_test()` context manager boots the full app headlessly, fires the
+compose/mount lifecycle, and lets tests assert on real widget state. No mocking
+of Textual internals required — only the pylitterbot layer needs mocking.
+
+**Mocking the connection in E2E tests:**
+
+```python
+from unittest.mock import AsyncMock, MagicMock, patch
+
+@pytest.mark.asyncio
+async def test_status_bar_updates_on_connect(mock_robot, mock_account):
+    with patch("asher.connection.Account", return_value=mock_account):
+        async with AsherApp().run_test() as pilot:
+            await pilot.pause(0.1)   # let _connect_worker finish
+            lbl = pilot.app.query_one("#online-lbl").renderable
+            assert "ONLINE" in str(lbl)
+```
+
+### Code coverage
+
+Add `pytest-cov` to dev dependencies:
+
+```toml
+[dependency-groups]
+dev = [
+    ...
+    "pytest-cov>=5.0",
+]
+```
+
+Run with terminal report:
 
 ```bash
-pip install textual-snapshot
-pytest --snapshot-update   # generate baseline
-pytest                     # compare on CI
+uv run pytest --cov=asher --cov-report=term-missing
 ```
 
-### CI pipeline (GitHub Actions)
+Target coverage by layer:
 
-```yaml
-# .github/workflows/ci.yml
-name: CI
-on: [push, pull_request]
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
-      - run: uv sync
-      - run: uv run pytest tests/ -v
-  build:
-    needs: test
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
-      - run: uv run pyinstaller --onefile --name asher app.py
-      - uses: actions/upload-artifact@v4
-        with:
-          name: asher-${{ matrix.os }}
-          path: dist/asher*
-```
+| Layer | Target | Notes |
+|---|---|---|
+| `helpers.py` | 100% | Pure functions, trivially testable |
+| `commands/` | ≥ 80% | Mock robot; cover each command branch |
+| `connection/` | ≥ 70% | Mock keyring + pylitterbot Account |
+| `monitoring/` | ≥ 70% | Mock robot; test drawer full threshold |
+| `ui/` | ≥ 50% | E2E pilot covers compose/log helpers |
 
-### Suggested test structure
+Add to CI once a baseline is established — fail the build if coverage drops
+below the agreed floor.
+
+### Suggested test structure (target)
 
 ```
 tests/
-  conftest.py          shared fixtures (mock_robot, mock_account, mock_app)
-  testhelpers.py      pure function tests (fmt_ago, drawer_bar)
-  testcommands.py     command handler integration tests
-  testslash.py        slash command tests
-  testui.py           Textual snapshot / pilot tests
-  snapshots/           baseline TUI screenshots
+  conftest.py         ✅ shared fixtures (mock_robot, mock_account)
+  testhelpers.py      ✅ fmt_ago, drawer_bar (12 tests)
+  testcommands.py        robot command handler integration tests
+  testslash.py           /login, /logout, /exit slash command tests
+  teste2e.py             Textual Pilot end-to-end tests
+  snapshots/             baseline TUI screenshots (textual-snapshot)
 ```
 
 ---

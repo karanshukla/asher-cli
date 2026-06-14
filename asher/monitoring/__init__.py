@@ -16,18 +16,38 @@ class MonitoringMixin:
     _robot: Any
     _pets: list
     _cat_mode: str
+    _last_cat_seen: Any
+
+    async def _update_last_cat_seen(self) -> None:
+        """Cache the timestamp of the most recent cat-detection event from activity history."""
+        if self._robot is None:
+            return
+        try:
+            acts = await self._robot.get_activity_history(limit=10)
+            for act in acts:
+                w = getattr(act, "weight", None)
+                action = getattr(act, "action", None)
+                action_text = (action.text if hasattr(action, "text") else str(action)).lower()
+                if (w is not None and float(w) > 0) or "cat" in action_text:
+                    ts_dt = getattr(act, "timestamp", None)
+                    if ts_dt is not None:
+                        self._last_cat_seen = ts_dt
+                        return
+        except Exception:
+            pass
 
     async def _refresh_status(self) -> None:
         r = self._robot
         if r is None:
             return
+        self._is_loading = False
 
         name = getattr(r, "name", "—")
         online = getattr(r, "is_online", False)
         drawer = float(getattr(r, "waste_drawer_level", 0) or 0)
         status = getattr(r, "status", None)
         sleeping = getattr(r, "sleeping", False)
-        last_seen = getattr(r, "last_seen", None)
+        last_seen = self._last_cat_seen or getattr(r, "last_seen", None)
 
         status_str = status.value if status else ("Sleeping" if sleeping else "Ready")
 
@@ -60,8 +80,9 @@ class MonitoringMixin:
         dt.append(f" {drawer:.0f}%", style="#8b949e")
         self.query_one("#drawer-lbl", Static).update(dt)  # type: ignore[attr-defined]
 
+        visit_label = "Last visit" if self._last_cat_seen else "Last seen"
         self.query_one("#clean-lbl", Static).update(  # type: ignore[attr-defined]
-            Text(f"Last seen {fmt_ago(last_seen)}", style="#484f58")
+            Text(f"{visit_label} {fmt_ago(last_seen)}", style="#484f58")
         )
 
         wt_text = Text()
@@ -82,6 +103,7 @@ class MonitoringMixin:
             return
         try:
             await self._robot.refresh()
+            await self._update_last_cat_seen()
             await self._refresh_status()
         except Exception:
             pass

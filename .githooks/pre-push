@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -e
+
+echo "► ruff check"
+uv run ruff check .
+
+echo "► ruff format"
+uv run ruff format --check .
+
+echo "► mypy"
+uv run mypy asher/ --ignore-missing-imports
+
+echo "► pytest"
+uv run pytest tests/ -v --tb=short
+
+echo "✓ all checks passed"

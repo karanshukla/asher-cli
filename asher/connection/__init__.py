@@ -64,6 +64,7 @@ class ConnectionMixin:
         if not email or not password:
             from textual.widgets import Static  # noqa: PLC0415
 
+            self._is_loading = False  # type: ignore[attr-defined]
             self._log_info("No saved credentials found.")  # type: ignore[attr-defined]
             self._log_info("Type /login to sign in.")  # type: ignore[attr-defined]
             self._set_cat("idle", "not signed in")  # type: ignore[attr-defined]
@@ -96,6 +97,7 @@ class ConnectionMixin:
                         f"  [{i}] {getattr(rb, 'name', '?')} ({model}  serial={getattr(rb, 'serial', '?')})"
                     )
 
+            await self._update_last_cat_seen()  # type: ignore[attr-defined]
             await self._refresh_status()  # type: ignore[attr-defined]
 
             t = ts()
@@ -108,9 +110,11 @@ class ConnectionMixin:
             self._set_cat("happy", "connected!")  # type: ignore[attr-defined]
 
         except ImportError:
+            self._is_loading = False  # type: ignore[attr-defined]
             self._log_err("pylitterbot not installed. Run: pip install pylitterbot")  # type: ignore[attr-defined]
             self._set_cat("error", "missing dep")  # type: ignore[attr-defined]
         except Exception as exc:
+            self._is_loading = False  # type: ignore[attr-defined]
             self._log_err(f"Connection failed: {exc}")  # type: ignore[attr-defined]
             self._log_warn("Type '/logout' to clear saved credentials and try again.")  # type: ignore[attr-defined]
             self._set_cat("error", "auth error")  # type: ignore[attr-defined]
