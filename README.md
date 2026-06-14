@@ -107,6 +107,35 @@ git checkout -b release/0.0.2
 git push origin release/0.0.2
 ```
 
+## Troubleshooting
+
+**`asher` not found after `pip install asher-cli`**
+
+Python's `Scripts` folder isn't on your PATH. Use `pipx` instead — it handles this automatically:
+
+```bash
+pip install pipx
+pipx install asher-cli
+asher
+```
+
+If you're in a virtualenv, deactivate it first:
+
+```bash
+deactivate
+pip install pipx
+pipx install asher-cli
+```
+
+**`pipx: command not found`**
+
+Run it as a module instead:
+
+```bash
+python -m pip install pipx
+python -m pipx install asher-cli
+```
+
 ## Testing
 
 ```bash
