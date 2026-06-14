@@ -909,25 +909,376 @@ Each step is independently mergeable — no big-bang rewrite needed.
 
 ---
 
+## 18. Versioning
+
+### Single source of truth
+
+Version lives in exactly one place — `pyproject.toml` — and is read everywhere else:
+
+```toml
+# pyproject.toml
+[project]
+name = "asher-cli"
+version = "1.0.0"
+```
+
+`app.py` reads it at runtime instead of hard-coding `VERSION = "1.0.0"`:
+
+```python
+from importlib.metadata import version, PackageNotFoundError
+
+try:
+    VERSION = version("asher-cli")
+except PackageNotFoundError:
+    VERSION = "dev"   # running from source without install
+```
+
+This means the version shown in the status bar header always matches whatever
+is in `pyproject.toml` — no drift.
+
+### Scheme — Semantic Versioning
+
+```
+MAJOR.MINOR.PATCH[-prerelease]
+
+1.0.0        stable release
+1.1.0        new commands or UI features (minor, backward-compatible)
+1.1.1        bug fixes only
+2.0.0        breaking change (e.g. config file format change, renamed commands)
+1.2.0-alpha  pre-release, not on stable channel
+```
+
+Rules of thumb:
+- Bump **PATCH** for bug fixes, typo corrections, dependency pin updates
+- Bump **MINOR** for new commands, new config keys, new widgets
+- Bump **MAJOR** if the `.env` format changes, a command is renamed/removed,
+  or the config schema breaks backward compatibility
+
+### Bumping the version
+
+Using `hatch` (pairs naturally with `hatchling` build backend):
+
+```bash
+hatch version patch    # 1.0.0 → 1.0.1
+hatch version minor    # 1.0.1 → 1.1.0
+hatch version major    # 1.1.0 → 2.0.0
+hatch version 1.2.0-alpha  # explicit
+```
+
+Or `bump-my-version` (more configurable):
+
+```bash
+pip install bump-my-version
+bump-my-version bump patch
+```
+
+Both write directly to `pyproject.toml` and can be configured to also tag the
+commit.
+
+### Git tagging convention
+
+Every release gets a signed tag:
+
+```bash
+git tag -s v1.1.0 -m "release: v1.1.0"
+git push origin v1.1.0
+```
+
+The `v` prefix is conventional and lets GitHub Actions trigger release workflows
+on `v*` tag pushes.
+
+### Changelog
+
+Keep a `CHANGELOG.md` in [Keep a Changelog](https://keepachangelog.com) format.
+Each PR merges under `## [Unreleased]`; on release that section becomes
+`## [1.1.0] — 2026-06-20`.
+
+```markdown
+## [Unreleased]
+### Added
+- Cat panel status badges (lock, sleep, night light, wait time)
+- `/robot` slash command for switching active robot
+
+### Fixed
+- `history` command using wrong method name (`get_activity` → `get_activity_history`)
+- `quit`/`exit` crash in async worker (`call_from_thread` on same thread)
+
+## [1.0.0] — 2026-06-14
+### Added
+- Initial release
+```
+
+**Automation option:** `git-cliff` auto-generates changelog entries from
+conventional commit messages (`feat:`, `fix:`, `chore:` prefixes):
+
+```bash
+pip install git-cliff
+git cliff --tag v1.1.0 -o CHANGELOG.md
+```
+
+---
+
+## 19. CI / CD pipeline
+
+### Workflow overview
+
+```
+push / PR  ──► lint ──► test ──► build artifacts
+                                       │
+tag v*  ──────────────────────────►  release
+                                    (attach binaries, publish changelog)
+```
+
+### `.github/workflows/ci.yml` — lint + test on every push
+
+```yaml
+name: CI
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv sync --dev
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy asher_cli/ --ignore-missing-imports
+
+  test:
+    needs: lint
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv sync --dev
+      - run: uv run pytest tests/ -v --tb=short
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-snapshots-${{ matrix.os }}-${{ matrix.python-version }}
+          path: tests/snapshots/
+```
+
+### `.github/workflows/release.yml` — triggered on `v*` tag
+
+```yaml
+name: Release
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact: asher-linux
+            binary: dist/asher
+          - os: windows-latest
+            artifact: asher-windows
+            binary: dist/asher.exe
+          - os: macos-latest
+            artifact: asher-macos
+            binary: dist/asher
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv sync
+      - run: uv run pyinstaller --onefile --name asher asher_cli/__main__.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.binary }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # needed for git-cliff changelog
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+      - name: Generate changelog
+        run: |
+          pip install git-cliff
+          git cliff --latest --strip header -o RELEASE_NOTES.md
+      - uses: softprops/action-gh-release@v2
+        with:
+          body_path: RELEASE_NOTES.md
+          files: artifacts/**/*
+```
+
+### `.github/workflows/dependency-update.yml` — Dependabot / Renovate
+
+Use Dependabot for automatic dependency PRs:
+
+```yaml
+# .github/dependabot.yml
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+    labels: ["dependencies"]
+    open-pull-requests-limit: 5
+```
+
+Or Renovate (more configurable, handles `uv.lock` better):
+
+```json
+// renovate.json
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:best-practices"],
+  "packageRules": [
+    {
+      "matchPackageNames": ["pylitterbot"],
+      "automerge": false,
+      "labels": ["pylitterbot", "dependencies"]
+    }
+  ]
+}
+```
+
+`pylitterbot` should never be auto-merged without manual review — the Whisker
+API is reverse-engineered and a minor version bump could change method names or
+response schemas.
+
+### Branch strategy
+
+```
+main          always releasable; protected, requires passing CI
+feature/*     new features; merge via PR with squash
+fix/*         bug fixes; merge via PR
+release/v*    optional stabilisation branch for larger releases
+```
+
+Protect `main`:
+- Require PR with at least 1 approval (or self-approval for a solo project)
+- Require all CI jobs to pass
+- Disallow force-push
+
+### PR template
+
+```markdown
+<!-- .github/pull_request_template.md -->
+## What
+<!-- one-line summary -->
+
+## Why
+<!-- motivation / issue link -->
+
+## Test plan
+- [ ] Ran `pytest tests/` locally — all green
+- [ ] Tested in terminal (ran `asher` and exercised changed commands)
+- [ ] Updated CHANGELOG.md under [Unreleased]
+- [ ] No new hard-coded `VERSION` strings (use `importlib.metadata`)
+```
+
+### Code quality gates
+
+| Tool | Purpose | Config file |
+|---|---|---|
+| `ruff` | Linting + formatting (replaces flake8, black, isort) | `pyproject.toml [tool.ruff]` |
+| `mypy` | Static type checking | `pyproject.toml [tool.mypy]` |
+| `pytest` | Test runner | `pyproject.toml [tool.pytest.ini_options]` |
+| `textual-snapshot` | TUI regression snapshots | `pyproject.toml [tool.pytest.ini_options]` |
+| Dependabot / Renovate | Dependency freshness | `.github/dependabot.yml` |
+
+Minimal `pyproject.toml` additions:
+
+```toml
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501"]  # line length handled by formatter
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+ignore_missing_imports = true   # pylitterbot has no stubs
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+```
+
+### Release checklist (manual steps)
+
+1. `uv run pytest` — all green
+2. `hatch version minor` (or patch/major)
+3. Update `CHANGELOG.md` — move `[Unreleased]` → `[x.y.z] — YYYY-MM-DD`
+4. `git add pyproject.toml CHANGELOG.md && git commit -m "release: vX.Y.Z"`
+5. `git tag -s vX.Y.Z -m "release: vX.Y.Z"`
+6. `git push origin main --tags`
+7. GitHub Actions builds binaries and creates the release automatically
+
+---
+
 ## Priority suggestion
 
 Ranked by user-visible impact vs. implementation effort:
 
-1. **Cat panel status badges** (§16) — high visibility, low effort, one widget update call
-2. **Architecture refactor** (§17) — extract helpers + widgets first; enables everything else to be tested
-3. **WebSocket subscription** (§5) — biggest UX win, removes 30 s staleness entirely
-4. **Token persistence** (§12) — skip re-login on every run, faster startup
-5. **Fault monitoring** (§8) — safety alerts, low effort (read existing properties)
-6. **`/robot` and `/pet` slash commands** (§1, §13) — useful for multi-robot/cat households
-7. **Status color-coding** (§10) — map `LitterBoxStatus` to colours in status bar + cat panel badges
-8. **`insight` command** (§2) — fun stats, one API call
-9. **`wait-time`, `power`, `rename` commands** (§2) — two-line wiring jobs each
-10. **Sleep schedule viewer** (§7) — read-only first, config wizard later
-11. **`pyproject.toml` + `pipx`** (§14) — makes the tool installable anywhere
-12. **Unit tests for helpers + mock-based command tests** (§15) — CI safety net
-13. **LR5 extras** (§3) — privacy, volume, camera — detect model, add conditionally
-14. **Feeder robot support** (§4) — snack, gravity, meal size commands
-15. **Tab-completion for slash commands** (§13) — discoverability
-16. **Config persistence** (`config.json`, §12) — quality-of-life
-17. **Weight sparkline in cat panel** (§6) — delightful but non-essential
-18. **PyInstaller binary** (§14) — for non-developer users, after tests pass
+### Foundation (do these first — everything else builds on them)
+
+1. **`pyproject.toml` + `importlib.metadata` version** (§18) — single source of truth, unlocks packaging and CI
+2. **Architecture refactor** (§17) — extract helpers + widgets; makes the codebase testable before adding more features
+3. **Lint + test CI** (§19 `ci.yml`) — `ruff` + `mypy` + `pytest` gate on every PR; free confidence net
+
+### High-value features (biggest user-visible wins)
+
+4. **Cat panel status badges** (§16) — lock, sleep, night light, wait time under the art; high visibility, one-afternoon job
+5. **WebSocket subscription** (§5) — replace 30 s polling with real-time push updates
+6. **Token persistence** (§12) — skip password re-entry on every run
+7. **Fault monitoring** (§8) — safety alerts; just read properties already on the robot object
+8. **Status color-coding** (§10) — `LitterBoxStatus` → colour in status bar and cat badges
+
+### Commands & slash system
+
+9. **`/robot` and `/pet` slash commands** (§1, §13) — robot/pet switcher
+10. **`wait-time`, `power`, `rename`, `insight` commands** (§2) — each is a two-line wiring job
+11. **Sleep schedule viewer** (§7) — read-only first, config wizard later
+12. **Tab-completion for slash commands** (§13) — overlay dropdown on `/` keypress
+
+### Release pipeline
+
+13. **Versioning discipline** (§18) — tag convention, `hatch version`, `CHANGELOG.md`
+14. **Release CI** (§19 `release.yml`) — auto-build binaries + GitHub Release on `v*` tag
+15. **Dependabot / Renovate** (§19) — automated dependency PRs, `pylitterbot` pinned to manual review
+
+### Device & platform expansion
+
+16. **LR5 extras** (§3) — privacy, volume, camera, night-light colour — detect model first
+17. **Feeder robot support** (§4) — snack, gravity, meal size commands
+18. **Multi-robot tab view** (§10) — `TabbedContent` widget when `len(robots) > 1`
+
+### Polish & stretch
+
+19. **Config persistence** (`config.json`, §12) — runtime settings survive restarts
+20. **`pipx` install + standalone binary** (§14) — for non-developer users
+21. **Weight sparkline in cat panel** (§6) — 7-day ASCII chart; delightful but non-essential
+22. **Desktop / sound notifications** (§11) — `plyer` on drawer full or faults
+23. **Dark/light theme toggle** (§11) — CSS variable swap; nice-to-have but not critical
+24. **Startup Animation** (§9) — cute but adds friction to quick status checks; could be opt-in
+```
+
+

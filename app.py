@@ -25,80 +25,45 @@ VERSION  = "1.0.0"
 # ── ASCII cats ────────────────────────────────────────────────────────────────
 
 CATS: dict[str, list[str] | str] = {
-    "idle": (
-        "  /\\_____/\\\n"
-        " /  o   o  \\\n"
-        "( ==  ^  == )\n"
-        " )         (\n"
-        "(           )\n"
-        " \\  |___|  /\n"
-        "  \\_______/"
-    ),
-    "happy": (
-        "  /\\_____/\\\n"
-        " /  ^   ^  \\\n"
-        "( ==  ω  == )\n"
-        " )   ~~~   (\n"
-        "(  ♪  ♫  ♪  )\n"
-        " \\  |___|  /\n"
-        "  \\_______/"
-    ),
-    "sleeping": (
-        "  /\\_____/\\\n"
-        " /  -   -  \\\n"
-        "( == zZ Z == )\n"
-        " )  ~~~~~~ (\n"
-        "(  ~~~~~~~~)\n"
-        " \\  |___|  /\n"
-        "  \\_______/"
-    ),
+    "idle": r"""_._     _,-'""`-._
+(,-.`._,'(       |\`-/|
+    `-.-' \ )-`( , o o)
+          `-    \`_`"'-""",
+
+    "happy": r"""_._     _,-'""`-._
+(,-.`._,'(       |\`-/|
+    `-.-' \ )-`( , ^ ^)
+          `-    \`_`"'-""",
+
+    "sleeping": r"""_._     _,-'""`-._
+(,-.`._,'(       |\`-/|
+    `-.-' \ )-`( , - -)  z
+          `-    \`_`"'- zZ""",
+
     "cleaning": [
-        (
-            "  /\\_____/\\\n"
-            " /  o   o  \\\n"
-            "( = spin ⟳ = )\n"
-            " ) ~ ~ ~ ~ (\n"
-            "(  whirrrr )\n"
-            " \\  |___|  /\n"
-            "  \\_______/"
-        ),
-        (
-            "  /\\_____/\\\n"
-            " /  @   @  \\\n"
-            "( = ⟳ spin = )\n"
-            " ) ~ ~ ~ ~ (\n"
-            "(  whirrrr )\n"
-            " \\  |___|  /\n"
-            "  \\_______/"
-        ),
-        (
-            "  /\\_____/\\\n"
-            " /  o   o  \\\n"
-            "( == ⟳ ⟳ == )\n"
-            " ) ~ ~ ~ ~ (\n"
-            "( whirrrr~ )\n"
-            " \\  |___|  /\n"
-            "  \\_______/"
-        ),
+        r"""_._     _,-'""`-._
+(,-.`._,'(       |\`-/|
+    `-.-' \ )-`( , @ o)
+          `-    \`_`"'-""",
+        r"""_._     _,-'""`-._
+(,-.`._,'(       |\`-/|
+    `-.-' \ )-`( , o @)
+          `-    \`_`"'-""",
+        r"""_._     _,-'""`-._
+(,-.`._,'(       |\`-/|
+    `-.-' \ )-`( , * *)
+          `-    \`_`"'-""",
     ],
-    "error": (
-        "  /\\_____/\\\n"
-        " /  x   x  \\\n"
-        "( ==  !  == )\n"
-        " )   ???   (\n"
-        "(   !!!!   )\n"
-        " \\  |___|  /\n"
-        "  \\_______/"
-    ),
-    "full": (
-        "  /\\_____/\\\n"
-        " /  o   o  \\\n"
-        "( == !!  == )\n"
-        " )  FULL!  (\n"
-        "(  ░░░░░░  )\n"
-        " \\  |___|  /\n"
-        "  \\_______/"
-    ),
+
+    "error": r"""_._     _,-'""`-._
+(,-.`._,'(       |\`-/|
+    `-.-' \ )-`( , x x)
+          `-    \`_`"'-""",
+
+    "full": r"""_._     _,-'""`-._
+(,-.`._,'(       |\`-/|
+    `-.-' \ )-`( , ! !)
+          `-    \`_`"'-""",
 }
 
 # ── CSS ───────────────────────────────────────────────────────────────────────
@@ -149,27 +114,27 @@ Screen {
 
 /* ── Cat panel ── */
 #cat-panel {
-    width: 24;
+    width: 30;
     background: #0d1117;
     border-left: solid #21262d;
     align: center middle;
-    padding: 1;
+    padding: 1 2;
     height: 1fr;
     layout: vertical;
 }
 
 #cat-art {
     color: #58a6ff;
-    text-align: center;
-    width: 22;
-    content-align: center middle;
+    text-align: left;
+    width: 26;
+    content-align: left middle;
 }
 
 #cat-label {
     color: #484f58;
     text-style: italic;
-    text-align: center;
-    width: 22;
+    text-align: left;
+    width: 26;
     padding-top: 1;
     height: 3;
 }
@@ -488,6 +453,19 @@ class AsherApp(App):
         t.append(raw, style="#e6edf3")
         log.write(t)
 
+        cmd = raw.split()[0].lower()
+
+        # handle sync-safe commands here so they never run inside a @work worker
+        if cmd in ("quit", "exit", "q"):
+            self.exit()
+            return
+        if cmd == "help":
+            self._show_help()
+            return
+        if cmd == "clear":
+            log.clear()
+            return
+
         self._run_cmd(raw)
 
     def on_key(self, event) -> None:
@@ -518,18 +496,6 @@ class AsherApp(App):
         parts = raw.strip().split()
         cmd   = parts[0].lower() if parts else ""
         args  = parts[1:] if len(parts) > 1 else []
-
-        if cmd in ("quit", "exit", "q"):
-            self.exit()
-            return
-
-        if cmd == "help":
-            self._show_help()
-            return
-
-        if cmd == "clear":
-            self.query_one("#log", RichLog).clear()
-            return
 
         if self._robot is None:
             self._log_err("Not connected. Check .env credentials and restart.")
