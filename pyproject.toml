@@ -36,6 +36,7 @@ dev = [
     "mypy>=1.10",
     "bump-my-version>=0.24",
     "poethepoet>=0.27",
+    "textual-dev>=1.0",
 ]
 
 [tool.poe.tasks]
@@ -44,6 +45,7 @@ fmt    = "ruff format --check ."
 types  = "mypy asher/ --ignore-missing-imports"
 test   = "pytest tests/ -v --tb=short"
 fix    = "ruff check --fix ."
+dev    = "textual run --dev asher/__main__.py"
 check.sequence = ["lint", "fmt", "types", "test"]
 check.help = "run all CI checks locally"
 

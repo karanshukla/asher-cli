@@ -40,32 +40,13 @@ uv tool install asher-cli
 asher
 ```
 
-### Run from source (with uv)
+### Run from source
 
 ```bash
 git clone https://github.com/karanshukla/asher-cli
 cd asher-cli
 uv sync
 uv run asher
-```
-
-### Dev setup (with uv)
-
-```bash
-# Setup (installs all deps including dev group)
-uv sync
-git config core.hooksPath .githooks   # run lint + type checks before every push
-
-# Run commands
-uv run poe check   # ruff + mypy + pytest (same as CI)
-uv run poe fix     # auto-fix ruff issues
-uv run poe test    # tests only
-uv run poe types   # mypy only
-
-# Or run directly
-uv run pytest tests/ --cov=asher
-uv run ruff check .
-uv run mypy asher/
 ```
 
 ## Credentials
@@ -150,10 +131,43 @@ python -m pip install pipx
 python -m pipx install asher-cli
 ```
 
-## Testing
+## Dev Setup
+
+### 1. Clone and install
 
 ```bash
-uv run pytest
+git clone https://github.com/karanshukla/asher-cli
+cd asher-cli
+uv sync                                        # installs all deps including the dev group
+git config core.hooksPath .githooks            # lint + type checks run before every push
+```
+
+### 2. Run with hot reload
+
+Textual supports CSS hot reload via its devtools. Changes to `.tcss` or inline `CSS` strings are picked up without restarting:
+
+```bash
+uv run poe dev
+# equivalent to: textual run --dev asher/__main__.py
+```
+
+> **Note:** Python code changes still require a restart (`Ctrl+C` then re-run).
+
+### 3. Run tests
+
+```bash
+uv run poe test                  # run all tests
+uv run pytest tests/ --cov=asher # with coverage report
+```
+
+### 4. Lint, format, type-check
+
+```bash
+uv run poe fix     # auto-fix ruff issues
+uv run poe lint    # check only (no fixes)
+uv run poe fmt     # check formatting
+uv run poe types   # mypy
+uv run poe check   # run all of the above + tests (same as CI)
 ```
 
 CI runs on Python 3.10 / 3.11 / 3.12 across Ubuntu, Windows, and macOS on every push.
