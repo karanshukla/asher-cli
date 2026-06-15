@@ -10,7 +10,4 @@ uv run ruff format --check .
 echo "► mypy"
 uv run mypy asher/ --ignore-missing-imports
 
-echo "► pytest"
-uv run pytest tests/ -v --tb=short
-
 echo "✓ all checks passed"

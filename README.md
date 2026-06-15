@@ -17,39 +17,26 @@ A Claude Code-style terminal dashboard for monitoring and controlling Litter Rob
 
 ## Install
 
-### With `uv` (recommended)
-
-```bash
-# macOS / Linux
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Windows (PowerShell)
-powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-
-# Or via Homebrew (macOS/Linux)
-brew install uv
-```
-
-Then install from PyPI:
-
-```bash
-uv tool install asher-cli
-asher
-```
-
-### With pipx
+### With pipx (recommended)
 
 ```bash
 pipx install asher-cli
 asher
 ```
 
-`pipx` installs the CLI into an isolated environment and puts `asher` on your PATH automatically.
+`pipx` installs the CLI into an isolated environment and puts `asher` on your PATH automatically. Install `pipx` with `pip install pipx` if you don't have it.
 
-### With plain pip
+### With pip
 
 ```bash
 pip install asher-cli
+asher
+```
+
+### With uv
+
+```bash
+uv tool install asher-cli
 asher
 ```
 
@@ -67,7 +54,7 @@ uv run asher
 ```bash
 # Setup (installs all deps including dev group)
 uv sync
-git config core.hooksPath .githooks   # run lint + tests before every push
+git config core.hooksPath .githooks   # run lint + type checks before every push
 
 # Run commands
 uv run poe check   # ruff + mypy + pytest (same as CI)
