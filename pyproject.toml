@@ -31,6 +31,7 @@ asher = "asher.__main__:main"
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
+    "pytest-cov>=5.0",
     "ruff>=0.4",
     "mypy>=1.10",
     "bump-my-version>=0.24",
@@ -97,3 +98,12 @@ replace = 'version = "{new_version}"'
 asyncio_mode = "auto"
 testpaths = ["tests"]
 python_files = ["test*.py"]
+
+# ── Coverage ──────────────────────────────────────────────────────────────────
+
+[tool.coverage.run]
+source = ["asher"]
+omit = ["asher/__main__.py"]
+
+[tool.coverage.report]
+show_missing = true
