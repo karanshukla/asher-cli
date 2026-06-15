@@ -79,6 +79,7 @@ class TestTs:
         result = ts()
         plain = result.plain
         import re
+
         pattern = r"\[\d{2}:\d{2}:\d{2}\] "
         assert re.search(pattern, plain) is not None
 

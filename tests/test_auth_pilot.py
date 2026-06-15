@@ -8,8 +8,9 @@ from textual.app import App
 from asher.auth import LoginScreen
 
 
-class TestApp(App):
+class LoginTestApp(App):
     """Minimal app for testing LoginScreen."""
+
     CSS = ""
 
     def on_mount(self) -> None:
@@ -22,7 +23,7 @@ class TestApp(App):
 @pytest.mark.asyncio
 async def test_login_screen_composes():
     """Test that LoginScreen mounts all expected widgets."""
-    app = TestApp()
+    app = LoginTestApp()
     async with app.run_test() as pilot:
         # Wait for mount
         await pilot.pause()
@@ -37,7 +38,7 @@ async def test_login_screen_composes():
 @pytest.mark.asyncio
 async def test_email_input_focus_on_mount():
     """Test that email input is focused on mount."""
-    app = TestApp()
+    app = LoginTestApp()
     async with app.run_test() as pilot:
         await pilot.pause()
         screen = app.screen
@@ -48,7 +49,7 @@ async def test_email_input_focus_on_mount():
 @pytest.mark.asyncio
 async def test_password_input_is_password_field():
     """Test that password input has password flag set."""
-    app = TestApp()
+    app = LoginTestApp()
     async with app.run_test() as pilot:
         await pilot.pause()
         screen = app.screen
@@ -59,13 +60,14 @@ async def test_password_input_is_password_field():
 @pytest.mark.asyncio
 async def test_submit_with_credentials_exits_app():
     """Test that submitting credentials dismisses screen and exits app."""
-    app = TestApp()
+    app = LoginTestApp()
     async with app.run_test() as pilot:
         await pilot.pause()
-        screen = app.screen
         # Enter email and password
         await pilot.click("#email-input")
-        await pilot.press("t", "e", "s", "t", "@", "e", "x", "a", "m", "p", "l", "e", ".", "c", "o", "m")
+        await pilot.press(
+            "t", "e", "s", "t", "@", "e", "x", "a", "m", "p", "l", "e", ".", "c", "o", "m"
+        )
 
         await pilot.click("#password-input")
         await pilot.press("s", "e", "c", "r", "e", "t", "1", "2", "3")
@@ -80,7 +82,7 @@ async def test_submit_with_credentials_exits_app():
 @pytest.mark.asyncio
 async def test_empty_credentials_shows_error():
     """Test that empty email/password shows error message."""
-    app = TestApp()
+    app = LoginTestApp()
     async with app.run_test() as pilot:
         await pilot.pause()
         screen = app.screen

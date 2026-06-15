@@ -17,41 +17,68 @@ A Claude Code-style terminal dashboard for monitoring and controlling Litter Rob
 
 ## Install
 
+### With `uv` (recommended)
+
+```bash
+# macOS / Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Windows (PowerShell)
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+# Or via Homebrew (macOS/Linux)
+brew install uv
+```
+
+Then install from PyPI:
+
+```bash
+uv tool install asher-cli
+asher
+```
+
+### With pipx
+
 ```bash
 pipx install asher-cli
 asher
 ```
 
-`pipx` installs the CLI into an isolated environment and puts `asher` on your PATH automatically. Install `pipx` with `pip install pipx` if you don't have it.
+`pipx` installs the CLI into an isolated environment and puts `asher` on your PATH automatically.
 
-Or with plain pip (ensure Python's `Scripts` folder is on your PATH):
+### With plain pip
 
 ```bash
 pip install asher-cli
 asher
 ```
 
-Or run from source:
+### Run from source (with uv)
 
 ```bash
 git clone https://github.com/karanshukla/asher-cli
 cd asher-cli
-pip install -e .
-asher
+uv sync
+uv run asher
 ```
 
-### Dev setup
+### Dev setup (with uv)
 
 ```bash
-uv sync --dev
+# Setup (installs all deps including dev group)
+uv sync
 git config core.hooksPath .githooks   # run lint + tests before every push
-```
 
-```bash
+# Run commands
 uv run poe check   # ruff + mypy + pytest (same as CI)
 uv run poe fix     # auto-fix ruff issues
 uv run poe test    # tests only
 uv run poe types   # mypy only
+
+# Or run directly
+uv run pytest tests/ --cov=asher
+uv run ruff check .
+uv run mypy asher/
 ```
 
 ## Credentials

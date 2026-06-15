@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import pytest
-
 from asher.auth import LoginScreen
 
 
 class TestLoginScreenStructure:
     def test_login_screen_is_modal_screen(self):
         from textual.screen import ModalScreen
+
         assert issubclass(LoginScreen, ModalScreen)
 
     def test_has_css_defined(self):

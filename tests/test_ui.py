@@ -2,11 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
-
-import pytest
-
-from asher.ui import UIMixin, _CSS, _SPINNER, VERSION
+from asher.ui import _CSS, _SPINNER, VERSION, UIMixin
 
 
 class TestVersion:
@@ -24,7 +20,7 @@ class TestSpinner:
 
     def test_spinner_has_expected_frames(self):
         expected_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
-        assert _SPINNER == expected_frames
+        assert expected_frames == _SPINNER
 
     def test_spinner_has_ten_frames(self):
         assert len(_SPINNER) == 10

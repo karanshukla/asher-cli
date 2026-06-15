@@ -107,3 +107,4 @@ omit = ["asher/__main__.py"]
 
 [tool.coverage.report]
 show_missing = true
+

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -34,8 +34,9 @@ class TestUpdateLastCatSeen:
         mixin._last_cat_seen = None
 
         import asyncio
+
         coro = MonitoringMixin._update_last_cat_seen(mixin)
-        result = asyncio.run(coro)
+        asyncio.run(coro)
         assert mixin._last_cat_seen is None
 
     @pytest.mark.asyncio

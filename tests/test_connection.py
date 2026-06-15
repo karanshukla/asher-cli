@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from asher.connection import (
     _keyring_available,
     _keyring_delete,

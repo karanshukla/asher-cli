@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from asher.cats import CATS
 
 
@@ -48,9 +46,15 @@ class TestCatsStructure:
         for mode, art in CATS.items():
             if isinstance(art, list):
                 art = art[0]
-            assert "o" in art or "^" in art or "-" in art or "@" in art or "x" in art or "!" in art or "*" in art, (
-                f"Mode '{mode}' should contain cat face features"
-            )
+            assert (
+                "o" in art
+                or "^" in art
+                or "-" in art
+                or "@" in art
+                or "x" in art
+                or "!" in art
+                or "*" in art
+            ), f"Mode '{mode}' should contain cat face features"
 
     def test_happy_has_eyes(self):
         assert "^ ^" in CATS["happy"]

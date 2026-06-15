@@ -6,7 +6,6 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from textual.app import App
 
 from asher.app import AsherApp
 
@@ -162,38 +161,42 @@ async def test_night_light_on_command(connected_app):
 @pytest.mark.asyncio
 async def test_command_shows_error_when_not_connected():
     """Test that commands show error when no robot is connected."""
-    with patch("asher.connection._keyring_available", return_value=False):
-        with patch("os.getenv", return_value=""):
-            app = AsherApp()
-            async with app.run_test() as pilot:
-                await pilot.pause()
-                log = app.query_one("#log")
-                initial_content = str(log.lines)
-                # Try clean command without connection
-                await pilot.click("#cmd-input")
-                await pilot.press("c", "l", "e", "a", "n")
-                await pilot.press("enter")
-                await pilot.pause()
-                # Should show not connected error
-                log_content = str(log.lines)
-                assert "Not connected" in log_content or initial_content != log_content
+    with (
+        patch("asher.connection._keyring_available", return_value=False),
+        patch("os.getenv", return_value=""),
+    ):
+        app = AsherApp()
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            log = app.query_one("#log")
+            initial_content = str(log.lines)
+            # Try clean command without connection
+            await pilot.click("#cmd-input")
+            await pilot.press("c", "l", "e", "a", "n")
+            await pilot.press("enter")
+            await pilot.pause()
+            # Should show not connected error
+            log_content = str(log.lines)
+            assert "Not connected" in log_content or initial_content != log_content
 
 
 @pytest.mark.asyncio
 async def test_slash_login_command_starts_login_flow():
     """Test that '/login' command starts login flow."""
-    with patch("asher.connection._keyring_available", return_value=False):
-        with patch("os.getenv", return_value=""):
-            app = AsherApp()
-            async with app.run_test() as pilot:
-                await pilot.pause()
-                # Type /login command
-                await pilot.click("#cmd-input")
-                await pilot.press("/", "l", "o", "g", "i", "n")
-                await pilot.press("enter")
-                await pilot.pause()
-                # Login state should be set
-                assert app._login_state == "awaiting_email"
+    with (
+        patch("asher.connection._keyring_available", return_value=False),
+        patch("os.getenv", return_value=""),
+    ):
+        app = AsherApp()
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            # Type /login command
+            await pilot.click("#cmd-input")
+            await pilot.press("/", "l", "o", "g", "i", "n")
+            await pilot.press("enter")
+            await pilot.pause()
+            # Login state should be set
+            assert app._login_state == "awaiting_email"
 
 
 @pytest.mark.asyncio
@@ -232,14 +235,16 @@ async def test_unknown_command_shows_warning(connected_app):
 @pytest.mark.asyncio
 async def test_slash_quit_exits_app():
     """Test that '/quit' command exits the app."""
-    with patch("asher.connection._keyring_available", return_value=False):
-        with patch("os.getenv", return_value=""):
-            app = AsherApp()
-            async with app.run_test() as pilot:
-                await pilot.pause()
-                # Type /quit command
-                await pilot.click("#cmd-input")
-                await pilot.press("/", "q", "u", "i", "t")
-                await pilot.press("enter")
-            # App should have exited
-            assert app._exit
+    with (
+        patch("asher.connection._keyring_available", return_value=False),
+        patch("os.getenv", return_value=""),
+    ):
+        app = AsherApp()
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            # Type /quit command
+            await pilot.click("#cmd-input")
+            await pilot.press("/", "q", "u", "i", "t")
+            await pilot.press("enter")
+        # App should have exited
+        assert app._exit
