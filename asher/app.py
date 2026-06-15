@@ -17,7 +17,7 @@ from .ui import UIMixin
 
 
 class AsherApp(UIMixin, ConnectionMixin, MonitoringMixin, CommandsMixin, App):  # type: ignore[type-arg]
-    CSS = UIMixin.CSS  # type: ignore[misc]  # must live in AsherApp.__dict__ so Textual gives it full user-CSS priority
+    CSS_PATH = "ui/style.tcss"
     BINDINGS = [
         Binding("ctrl+c", "quit", "Quit", priority=True),
         Binding("ctrl+l", "clear_log", "Clear log"),
@@ -34,6 +34,7 @@ class AsherApp(UIMixin, ConnectionMixin, MonitoringMixin, CommandsMixin, App):  
         self._cmd_history: list[str] = []
         self._hist_idx: int = -1
         from .login_flow import LoginFlow
+
         self._login = LoginFlow()
         self._last_cat_seen: Any = None
         self._is_loading: bool = True
@@ -47,7 +48,7 @@ class AsherApp(UIMixin, ConnectionMixin, MonitoringMixin, CommandsMixin, App):  
         self._show_loading_state()
         self._connect_worker()
         self.set_interval(30, self._poll_status_interval)
-        self.set_interval(0.9, self._tick_cat)
+        self.set_interval(0.12, self._tick_cat)
         # this doesn't work for some reason :(
         inp = self.query_one("#cmd-input", Input)
         inp.set_styles(self._INPUT_STYLES)
@@ -62,3 +63,4 @@ class AsherApp(UIMixin, ConnectionMixin, MonitoringMixin, CommandsMixin, App):  
         if self._account:
             with contextlib.suppress(Exception):
                 await self._account.disconnect()
+        print("meow")

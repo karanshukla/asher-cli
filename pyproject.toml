@@ -45,7 +45,7 @@ lint   = "ruff check ."
 fmt    = "ruff format --check ."
 types  = "mypy asher/ --ignore-missing-imports"
 test   = "pytest tests/ -v --tb=short"
-fix    = "ruff check --fix ."
+fix    = "ruff check --fix . && ruff format ."
 dev    = "textual run --dev asher/__main__.py"
 watch  = "watchfiles --filter python 'python -m asher' asher"
 check.sequence = ["lint", "fmt", "types", "test"]

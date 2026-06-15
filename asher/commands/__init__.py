@@ -20,6 +20,7 @@ _HINT_SIGNIN = "/login to sign in"
 
 # ── robot commands ──────────────────────────────────────────────────────────
 
+
 class CleanCommand(Command):
     name = "clean"
     description = "start a clean cycle"
@@ -199,6 +200,7 @@ class HistoryCommand(Command):
 
 # ── app commands (no robot required) ────────────────────────────────────────
 
+
 class HelpCommand(Command):
     name = "help"
     description = "show this message"
@@ -230,6 +232,7 @@ class QuitCommand(Command):
 
 # ── slash commands ──────────────────────────────────────────────────────────
 
+
 class LoginCommand(SlashCommand):
     name = "login"
     description = "sign in or switch accounts"
@@ -257,6 +260,7 @@ class LogoutCommand(SlashCommand):
         app._log_ok("Signed out.")
         app._log_info("Type /login to sign in.")
         app._set_cat("idle", "not signed in")
+        app._show_signed_out_state()
         app.query_one("#hint-bar", Static).update(_HINT_SIGNIN)
 
 
@@ -279,6 +283,7 @@ _registry.register(LogoutCommand())
 
 
 # ── mixin ───────────────────────────────────────────────────────────────────
+
 
 class CommandsMixin:
     # declared for type checkers; assigned in AsherApp.__init__

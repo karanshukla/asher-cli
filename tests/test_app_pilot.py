@@ -60,6 +60,7 @@ async def test_app_initial_state():
         assert app._cat_mode == "idle"
         assert app._cat_frame == 0
         from asher.login_flow import LoginState
+
         assert app._login.state is LoginState.IDLE
 
 

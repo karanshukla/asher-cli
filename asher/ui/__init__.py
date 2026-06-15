@@ -25,151 +25,10 @@ else:
     except PackageNotFoundError:
         VERSION = "dev"
 
-_CSS = """
-Screen {
-    background: #0d1117;
-    color: #c9d1d9;
-}
-
-/* ── Status bar ── */
-#status-bar {
-    background: #161b22;
-    height: 4;
-    border-bottom: solid #30363d;
-    dock: top;
-    padding: 0;
-    layout: vertical;
-}
-
-.srow {
-    height: 2;
-    layout: horizontal;
-    align: left middle;
-    padding: 0 2;
-}
-
-.srow:first-child {
-    border-bottom: solid #30363d;
-}
-
-.sep {
-    color: #30363d;
-    width: auto;
-    height: 1;
-    padding: 0 1;
-}
-
-.chunk {
-    width: auto;
-    padding: 0 2 0 0;
-    height: 1;
-}
-
-/* ── Main ── */
-#main-area {
-    layout: horizontal;
-    height: 1fr;
-}
-
-#log {
-    width: 1fr;
-    height: 1fr;
-    background: #0d1117;
-    padding: 1 2;
-    overflow-x: hidden;
-    scrollbar-background: #161b22;
-    scrollbar-color: #30363d;
-    scrollbar-color-hover: #58a6ff;
-}
-
-/* ── Cat panel ── */
-#cat-panel {
-    width: 30;
-    background: #0d1117;
-    border-left: solid #21262d;
-    align: center middle;
-    padding: 1 2;
-    height: 1fr;
-    layout: vertical;
-}
-
-#cat-art {
-    color: #58a6ff;
-    text-align: left;
-    width: 26;
-    content-align: left middle;
-}
-
-#cat-label {
-    color: #484f58;
-    text-style: italic;
-    text-align: left;
-    width: 26;
-    padding-top: 1;
-    height: 3;
-}
-
-/* ── Input area (outer dock + hint below the box) ── */
-#bottom-dock {
-    dock: bottom;
-    height: 4;
-    background: #161b22;
-    layout: vertical;
-    padding: 0 0 0 0;
-}
-
-#input-bar {
-    background: #161b22;
-    height: 3;
-    border-top: solid #30363d;
-    border-bottom: solid #30363d;
-    layout: vertical;
-    padding: 0 2;
-}
-
-#input-row {
-    layout: horizontal;
-    height: 1;
-    align: left middle;
-}
-
-#prompt {
-    color: #3fb950;
-    width: auto;
-    text-style: bold;
-    padding: 0 1 0 0;
-    height: 1;
-}
-
-#hint-bar {
-    color: #484f58;
-    height: 1;
-    padding: 0 2;
-}
-
-#cmd-input {
-    width: 1fr;
-    background: #161b22;
-    color: #e6edf3;
-    border: none;
-    height: 1;
-    padding: 0;
-}
-
-Input {
-    border: none;
-    background: #161b22;
-    padding: 0;
-}
-"""
-
-
 _SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 
 
 class UIMixin:
-    CSS: str = _CSS
-
     # declared for type checkers; assigned in AsherApp.__init__
     _cat_mode: str
     _cat_frame: int
@@ -220,6 +79,32 @@ class UIMixin:
         for wid in ("#robot-lbl", "#status-lbl", "#drawer-lbl", "#weight-lbl", "#clean-lbl"):
             self.query_one(wid, Static).update(dash)  # type: ignore[attr-defined]
 
+    def _show_signed_out_state(self) -> None:
+        self.query_one("#online-lbl", Static).update(  # type: ignore[attr-defined]
+            Text("not signed in", style="#484f58")
+        )
+
+        self.query_one("#robot-lbl", Static).update(  # type: ignore[attr-defined]
+            Text("—", style="#30363d")
+        )
+        self.query_one("#status-lbl", Static).update(  # type: ignore[attr-defined]
+            Text("[—]", style="#30363d")
+        )
+
+        drawer = Text()
+        drawer.append("Drawer ", style="#484f58")
+        drawer.append("—", style="#30363d")
+        self.query_one("#drawer-lbl", Static).update(drawer)  # type: ignore[attr-defined]
+
+        weight = Text()
+        weight.append("cat 🐱 ", style="#484f58")
+        weight.append("—", style="#30363d")
+        self.query_one("#weight-lbl", Static).update(weight)  # type: ignore[attr-defined]
+
+        self.query_one("#clean-lbl", Static).update(  # type: ignore[attr-defined]
+            Text("Last visit —", style="#484f58")
+        )
+
     def _show_welcome(self) -> None:
         log = self.query_one("#log", RichLog)  # type: ignore[attr-defined]
         log.write("")
@@ -252,6 +137,30 @@ class UIMixin:
             self.query_one("#online-lbl", Static).update(  # type: ignore[attr-defined]
                 Text(f"{_SPINNER[self._spinner_idx]} connecting…", style="#484f58")
             )
+
+            # shimmer placeholders
+            shimmer = _SPINNER[self._spinner_idx]
+            bar = Text()
+            bar.append("Drawer ", style="#484f58")
+            bar.append(f"{shimmer} —", style="#30363d")
+            self.query_one("#drawer-lbl", Static).update(bar)  # type: ignore[attr-defined]
+
+            wt = Text()
+            wt.append("cat 🐱 ", style="#484f58")
+            wt.append(f"{shimmer}", style="#30363d")
+            self.query_one("#weight-lbl", Static).update(wt)  # type: ignore[attr-defined]
+
+            self.query_one("#clean-lbl", Static).update(  # type: ignore[attr-defined]
+                Text(f"Last visit {shimmer}", style="#484f58")
+            )
+
+            self.query_one("#robot-lbl", Static).update(  # type: ignore[attr-defined]
+                Text(f"{shimmer}", style="#30363d")
+            )
+            self.query_one("#status-lbl", Static).update(  # type: ignore[attr-defined]
+                Text(f"[{shimmer}]", style="#30363d")
+            )
+
         cats = CATS.get(self._cat_mode, CATS["idle"])
         if not isinstance(cats, list):
             return

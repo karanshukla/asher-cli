@@ -81,6 +81,7 @@ class ConnectionMixin:
             from textual.widgets import Static  # noqa: PLC0415
 
             self._is_loading = False  # type: ignore[attr-defined]
+            self._show_signed_out_state()  # type: ignore[attr-defined]
             self._log_info("No saved credentials found.")  # type: ignore[attr-defined]
             self._log_info("Type /login to sign in.")  # type: ignore[attr-defined]
             self._set_cat("idle", "not signed in")  # type: ignore[attr-defined]
@@ -98,8 +99,11 @@ class ConnectionMixin:
             robots = list(self._account.robots)
 
             if not robots:
+                self._is_loading = False  # type: ignore[attr-defined]
+                self._show_signed_out_state()  # type: ignore[attr-defined]
                 self._log_err("No Litter Robots found on this account.")  # type: ignore[attr-defined]
                 self._set_cat("error", "no robots")  # type: ignore[attr-defined]
+                self._account = None
                 return
 
             self._robot = robots[0]
@@ -127,10 +131,16 @@ class ConnectionMixin:
 
         except ImportError:
             self._is_loading = False  # type: ignore[attr-defined]
+            self._show_signed_out_state()  # type: ignore[attr-defined]
             self._log_err("pylitterbot not installed. Run: pip install pylitterbot")  # type: ignore[attr-defined]
             self._set_cat("error", "missing dep")  # type: ignore[attr-defined]
         except Exception as exc:
             self._is_loading = False  # type: ignore[attr-defined]
+            self._show_signed_out_state()  # type: ignore[attr-defined]
             self._log_err(f"Connection failed: {exc}")  # type: ignore[attr-defined]
-            self._log_warn("Type '/logout' to clear saved credentials and try again.")  # type: ignore[attr-defined]
+            self._log_warn("Type '/login' to try again or '/logout' to clear credentials.")  # type: ignore[attr-defined]
             self._set_cat("error", "auth error")  # type: ignore[attr-defined]
+            with contextlib.suppress(Exception):
+                await self._account.disconnect()
+            self._account = None
+            self._robot = None

@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from asher.ui import _CSS, _SPINNER, VERSION, UIMixin
+from pathlib import Path
+
+from asher.ui import _SPINNER, VERSION, UIMixin
+
+_CSS_PATH = Path(__file__).parent.parent / "asher" / "ui" / "style.tcss"
+_CSS = _CSS_PATH.read_text()
 
 
 class TestVersion:
@@ -89,12 +94,17 @@ class TestCSS:
         assert ".chunk" in _CSS
 
 
-class TestUIMixinStructure:
-    def test_has_css_attribute(self):
-        assert hasattr(UIMixin, "CSS")
+class TestAppCSS:
+    def test_app_has_css_path(self):
+        from asher.app import AsherApp
 
-    def test_css_equals_module_css(self):
-        assert UIMixin.CSS == _CSS
+        assert hasattr(AsherApp, "CSS_PATH")
+
+    def test_css_path_points_to_existing_file(self):
+        from asher.app import AsherApp
+
+        css_path = Path(__file__).parent.parent / "asher" / AsherApp.CSS_PATH
+        assert css_path.exists()
 
 
 class TestUIMixinLoggingHelpers:
