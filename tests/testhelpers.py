@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from asher.helpers import drawer_bar, fmt_ago
+from asher.helpers import drawer_bar, fmt_ago, ts
 
 
 class TestFmtAgo:
@@ -62,3 +62,30 @@ class TestDrawerBar:
         text = drawer_bar(50)
         plain = text.plain
         assert plain.startswith("[") and plain.endswith("]")
+
+
+class TestTs:
+    def test_returns_text_object(self):
+        result = ts()
+        assert result.__class__.__name__ == "Text"
+
+    def test_contains_timestamp(self):
+        result = ts()
+        plain = result.plain
+        assert plain.startswith("[")
+        assert "]" in plain
+
+    def test_timestamp_format(self):
+        result = ts()
+        plain = result.plain
+        import re
+        pattern = r"\[\d{2}:\d{2}:\d{2}\] "
+        assert re.search(pattern, plain) is not None
+
+    def test_has_single_span(self):
+        result = ts()
+        assert len(result._spans) == 1
+
+    def test_span_style_is_gray(self):
+        result = ts()
+        assert result._spans[0].style == "#484f58"
