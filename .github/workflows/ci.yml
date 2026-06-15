@@ -19,13 +19,17 @@ jobs:
       - run: uv run ruff format --check .
       - run: uv run mypy asher/ --ignore-missing-imports
 
-  cve-scan:
+  dependency-audit:
     needs: lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: CVE Lite CLI
-        uses: OWASP/cve-lite-cli@v1.23.1
+      - uses: astral-sh/setup-uv@v3
+      - run: uv sync --dev
+      - name: Audit Python dependencies
+        uses: pypa/gh-action-pip-audit@v1.0.8
+        with:
+          virtual-environment: .venv
 
   test:
     needs: lint
