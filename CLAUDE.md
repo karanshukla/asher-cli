@@ -10,12 +10,22 @@ Terminal dashboard for Litter Robot (LR3/LR4/LR5) via the Whisker cloud API.
 - **python-dotenv** — credential loading (`.env` fallback)
 - **keyring>=24** — OS credential store (Windows Credential Manager / macOS Keychain / Linux Secret Service)
 
+## Tooling
+
+- **uv** — dependency management and task runner (`uv sync`, `uv run`)
+- **poethepoet** — task aliases via `uv run poe <task>`
+- **ruff** — linter and formatter
+- **mypy** — static type checking
+- **pytest + pytest-asyncio + pytest-cov** — tests
+- **textual-dev** — CSS hot reload devtools
+- **watchfiles** — Python auto-restart on file change
+
 ## Entry points
 
 ```
 python app.py          # compatibility shim (calls asher/__main__.py)
 python -m asher        # run as module
-asher                  # after: pip install -e .
+asher                  # after: uv sync && uv run asher  OR  pip install -e .
 ```
 
 ## Package structure
@@ -35,8 +45,16 @@ asher/
   slash-commands/   Convention doc + future slash-command registry
 
 tests/
-  conftest.py       shared fixtures (mock_robot, mock_account)
-  testhelpers.py    unit tests for helpers.py
+  testhelpers.py          unit tests for helpers.py
+  test_cats.py            CATS dict structure
+  test_auth.py            LoginScreen CSS / structure
+  test_auth_pilot.py      Textual Pilot integration tests for LoginScreen
+  test_app_pilot.py       Textual Pilot integration tests for AsherApp
+  test_commands_pilot.py  Textual Pilot integration tests for command dispatch
+  test_connection.py      keyring helper functions
+  test_connection_mixin.py ConnectionMixin structure
+  test_monitoring.py      MonitoringMixin async methods
+  test_ui.py              UIMixin constants, CSS, helper existence
 
 .github/workflows/
   ci.yml            ruff + mypy + pytest on every push/PR
@@ -132,6 +150,25 @@ pylitterbot auto-detects robot type. Any attribute/method missing on a given mod
 
 **Add a new cat state:** add entry to `CATS` dict in `asher/cats.py` (str for static, list[str] for animated), then call `_set_cat("name", "label")`.
 
-**Run tests:** `pytest tests/` (or `uv run pytest` if using uv).
-
 **File naming convention:** no underscores in filenames (except Python-required `__init__.py` and `__main__.py`).
+
+## Dev workflow
+
+```bash
+uv sync                  # install all deps (including dev group)
+uv run poe dev           # run with CSS hot reload (textual --dev)
+uv run poe watch         # run with Python auto-restart on file change (watchfiles)
+uv run poe test          # run test suite
+uv run poe check         # ruff + mypy + pytest (same as CI)
+uv run poe fix           # auto-fix ruff issues
+```
+
+Pre-push hook (`.githooks/pre-push`) runs: ruff check → ruff format --check → mypy. Tests are not in the hook — run them manually.
+
+## Testing notes
+
+- Pilot-based integration tests use `app.run_test()` with `await pilot.pause()` before querying widgets
+- Helper app wrappers for screens must **not** start with `Test` (pytest will try to collect them); use e.g. `LoginTestApp`
+- Mock external deps with `unittest.mock.AsyncMock` for async robot/account methods
+- `from pylitterbot import Account` is a local import inside `_connect_worker` — patch it at `pylitterbot.Account`, not `asher.connection.Account`
+- Coverage: ~76% overall; main gaps are async exception paths and `_connect_worker` auth flow
