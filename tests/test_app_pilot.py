@@ -59,7 +59,8 @@ async def test_app_initial_state():
         assert app._is_loading is True
         assert app._cat_mode == "idle"
         assert app._cat_frame == 0
-        assert app._login_state == ""
+        from asher.login_flow import LoginState
+        assert app._login.state is LoginState.IDLE
 
 
 @pytest.mark.asyncio

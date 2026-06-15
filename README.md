@@ -142,7 +142,21 @@ uv sync                                        # installs all deps including the
 git config core.hooksPath .githooks            # lint + type checks run before every push
 ```
 
-### 2. Run with hot reload
+### 2. Configure environment (optional)
+
+Copy `.env.example` to `.env` and fill in your credentials:
+
+```bash
+cp .env.example .env
+```
+
+```env
+LITTER_ROBOT_USER=your@email.com
+LITTER_ROBOT_PASSWORD=yourpassword
+ASHER_CLI_DEV_MODE=true    # sets version to "dev" instead of the installed package version
+```
+
+### 3. Run with hot reload
 
 **CSS hot reload** — Textual's devtools watch inline `CSS` strings and `.tcss` files and reload them in-place without restarting:
 
@@ -160,14 +174,14 @@ uv run poe watch
 
 You can combine both — run `poe watch` for Python changes and it will naturally pick up CSS changes too on restart.
 
-### 3. Run tests
+### 4. Run tests
 
 ```bash
 uv run poe test                  # run all tests
 uv run pytest tests/ --cov=asher # with coverage report
 ```
 
-### 4. Lint, format, type-check
+### 5. Lint, format, type-check
 
 ```bash
 uv run poe fix     # auto-fix ruff issues

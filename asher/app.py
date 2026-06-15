@@ -33,8 +33,8 @@ class AsherApp(UIMixin, ConnectionMixin, MonitoringMixin, CommandsMixin, App):  
         self._cat_frame: int = 0
         self._cmd_history: list[str] = []
         self._hist_idx: int = -1
-        self._login_state: str = ""  # "" | "awaiting_email" | "awaiting_password"
-        self._login_email: str = ""
+        from .login_flow import LoginFlow
+        self._login = LoginFlow()
         self._last_cat_seen: Any = None
         self._is_loading: bool = True
         self._spinner_idx: int = 0

@@ -196,7 +196,8 @@ async def test_slash_login_command_starts_login_flow():
             await pilot.press("enter")
             await pilot.pause()
             # Login state should be set
-            assert app._login_state == "awaiting_email"
+            from asher.login_flow import LoginState
+            assert app._login.state is LoginState.AWAITING_EMAIL
 
 
 @pytest.mark.asyncio

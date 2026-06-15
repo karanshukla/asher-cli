@@ -59,6 +59,9 @@ class ConnectionMixin:
 
     @work(exclusive=True)
     async def _connect_worker(self, *, email: str = "", password: str = "") -> None:
+        self._is_loading = True  # type: ignore[attr-defined]
+        self._show_loading_state()  # type: ignore[attr-defined]
+
         log = self.query_one("#log", RichLog)  # type: ignore[attr-defined]
 
         if not email or not password:
