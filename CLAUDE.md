@@ -52,8 +52,8 @@ Priority order on startup:
 
 `.env` variable names (for fallback):
 ```
-LITTER_ROBOT_USER=...      # or LR4_EMAIL
-LITTER_ROBOT_PASSWORD=...  # or LR4_PASSWORD
+LITTER_ROBOT_USER=...
+LITTER_ROBOT_PASSWORD=...
 ```
 
 Keyring service name: `asher-cli`, keys `email` and `password`.

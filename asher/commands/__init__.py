@@ -103,6 +103,9 @@ class CommandsMixin:
 
     def _start_login_flow(self) -> None:
         """Enter interactive login mode — prompts for email then password in the command bar."""
+        if self._account:
+            self._log_warn("Already signed in — use /logout to sign out first.")  # type: ignore[attr-defined]
+            return
         self._login_state = "awaiting_email"
         self._login_email = ""
         self._set_cat("idle", "sign in")  # type: ignore[attr-defined]
@@ -136,10 +139,11 @@ class CommandsMixin:
         self.query_one("#cmd-input", Input).password = False  # type: ignore[attr-defined]
         self.query_one("#cmd-input", Input).placeholder = "type a command  (help for list)…"  # type: ignore[attr-defined]
 
-        if _keyring_save(email, password):
+        saved = _keyring_save(email, password)
+        if saved:
             self._log_info("Credentials saved to keyring.")  # type: ignore[attr-defined]
         else:
-            self._log_warn("Could not save to keyring — you'll be prompted again next launch.")  # type: ignore[attr-defined]
+            self._log_warn("Keyring unavailable - signed in for this session only.")  # type: ignore[attr-defined]
 
         if self._account:
             with contextlib.suppress(Exception):
@@ -147,7 +151,8 @@ class CommandsMixin:
         self._account = None
         self._robot = None
         self._set_cat("idle", "connecting…")  # type: ignore[attr-defined]
-        self._connect_worker()  # type: ignore[attr-defined]
+        kwargs = {} if saved else {"email": email, "password": password}
+        self._connect_worker(**kwargs)  # type: ignore[attr-defined]
 
     # ── slash-command dispatch (app management) ───────────────────────────────
 
@@ -205,9 +210,12 @@ class CommandsMixin:
     async def _cmd_logout(self) -> None:
         from ..connection import _keyring_delete  # noqa: PLC0415
 
-        if self._account:
-            with contextlib.suppress(Exception):
-                await self._account.disconnect()
+        if not self._account:
+            self._log_warn("Not signed in.")  # type: ignore[attr-defined]
+            return
+
+        with contextlib.suppress(Exception):
+            await self._account.disconnect()
         self._account = None
         self._robot = None
         _keyring_delete()

@@ -1891,5 +1891,7 @@ Ranked by user-visible impact vs. implementation effort:
 22. **Desktop notifications** (§20) — `plyer` toasts + `winsound` bell on fault/cat-detected; `/notify on|off` command
 23. **Dark/light theme toggle** (§11) — CSS variable swap; nice-to-have but not critical
 24. **Startup animation** (§11) — cute but adds friction to quick status checks; could be opt-in
+25. **E2E test harness** (§15) — Textual Pilot tests for critical user flows; good for preventing regressions but requires maintenance
+26. **Refactor to be more clean code** - example: have a base command class, and have a property to determine whether its a slash command or not, instead of having two separate methods for slash and non-slash commands. This would reduce code duplication and make it easier to add new commands in the future.
 
 

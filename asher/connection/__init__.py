@@ -19,6 +19,14 @@ load_dotenv()
 _SERVICE = "asher-cli"
 
 
+def _keyring_available() -> bool:
+    try:
+        keyring.get_keyring()
+        return True
+    except Exception:
+        return False
+
+
 def _keyring_load() -> tuple[str, str]:
     try:
         email = keyring.get_password(_SERVICE, "email") or ""
@@ -50,14 +58,19 @@ class ConnectionMixin:
     _pets: list
 
     @work(exclusive=True)
-    async def _connect_worker(self) -> None:
+    async def _connect_worker(self, *, email: str = "", password: str = "") -> None:
         log = self.query_one("#log", RichLog)  # type: ignore[attr-defined]
 
-        email, password = _keyring_load()
+        if not email or not password:
+            if _keyring_available():
+                self._log_info("Keyring is available")  # type: ignore[attr-defined]
+                email, password = _keyring_load()
+            else:
+                self._log_warn("Keyring not available")  # type: ignore[attr-defined]
 
         if not email or not password:
-            env_email = os.getenv("LITTER_ROBOT_USER") or os.getenv("LR4_EMAIL") or ""
-            env_pass = os.getenv("LITTER_ROBOT_PASSWORD") or os.getenv("LR4_PASSWORD") or ""
+            env_email = os.getenv("LITTER_ROBOT_USER") or ""
+            env_pass = os.getenv("LITTER_ROBOT_PASSWORD") or ""
             email = email or env_email
             password = password or env_pass
 

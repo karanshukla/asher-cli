@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import os
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as pkg_version
 
+from dotenv import load_dotenv
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Container
@@ -13,10 +15,15 @@ from textual.widgets import Input, RichLog, Static
 from ..cats import CATS
 from ..helpers import ts
 
-try:
-    VERSION = pkg_version("asher-cli")
-except PackageNotFoundError:
+load_dotenv()
+
+if os.getenv("ASHER_CLI_DEV_MODE", "false").lower() == "true":
     VERSION = "dev"
+else:
+    try:
+        VERSION = pkg_version("asher-cli")
+    except PackageNotFoundError:
+        VERSION = "dev"
 
 _CSS = """
 Screen {
