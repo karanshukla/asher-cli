@@ -19,13 +19,6 @@ jobs:
       - run: uv run ruff format --check .
       - run: uv run mypy asher/ --ignore-missing-imports
 
-  cve-scan:
-    needs: lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: CVE Lite CLI
-        uses: OWASP/cve-lite-cli@v1.23.1
 
   test:
     needs: lint

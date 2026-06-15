@@ -1,0 +1,37 @@
+name: Dependency Audit
+
+on:
+  schedule:
+    - cron: "0 0 * * 1"  # every Monday at midnight UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv export --format requirements-txt > /tmp/requirements.txt
+      - name: Audit Python dependencies
+        uses: pypa/gh-action-pip-audit@v1.0.8
+        with:
+          inputs: /tmp/requirements.txt
+      - name: Upgrade lock file
+        run: uv lock --upgrade
+      - name: Open upgrade PR
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: "chore: weekly dependency upgrades"
+          title: "chore: weekly dependency upgrades"
+          body: |
+            Automated weekly dependency upgrade via `uv lock --upgrade`.
+
+            Upgrades packages to their latest versions within the constraints
+            defined in `pyproject.toml`. Review the lock file diff before merging.
+          branch: chore/weekly-dep-upgrades
+          delete-branch: true
+          add-paths: uv.lock
