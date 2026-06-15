@@ -1,0 +1,21 @@
+name: Dependency Audit
+
+on:
+  schedule:
+    - cron: "0 0 * * 1"  # every Monday at midnight UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv sync --dev
+      - name: Audit Python dependencies
+        uses: pypa/gh-action-pip-audit@v1.0.8
+        with:
+          virtual-environment: .venv
