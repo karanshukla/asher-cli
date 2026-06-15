@@ -144,14 +144,21 @@ git config core.hooksPath .githooks            # lint + type checks run before e
 
 ### 2. Run with hot reload
 
-Textual supports CSS hot reload via its devtools. Changes to `.tcss` or inline `CSS` strings are picked up without restarting:
+**CSS hot reload** — Textual's devtools watch inline `CSS` strings and `.tcss` files and reload them in-place without restarting:
 
 ```bash
 uv run poe dev
 # equivalent to: textual run --dev asher/__main__.py
 ```
 
-> **Note:** Python code changes still require a restart (`Ctrl+C` then re-run).
+**Python auto-restart** — true in-process reload isn't possible with Textual's event loop, but `watchfiles` will kill and relaunch the app whenever a `.py` file changes in `asher/`:
+
+```bash
+uv run poe watch
+# equivalent to: watchfiles --filter python 'python -m asher' asher
+```
+
+You can combine both — run `poe watch` for Python changes and it will naturally pick up CSS changes too on restart.
 
 ### 3. Run tests
 

@@ -37,6 +37,7 @@ dev = [
     "bump-my-version>=0.24",
     "poethepoet>=0.27",
     "textual-dev>=1.0",
+    "watchfiles>=0.21",
 ]
 
 [tool.poe.tasks]
@@ -46,6 +47,7 @@ types  = "mypy asher/ --ignore-missing-imports"
 test   = "pytest tests/ -v --tb=short"
 fix    = "ruff check --fix ."
 dev    = "textual run --dev asher/__main__.py"
+watch  = "watchfiles --filter python 'python -m asher' asher"
 check.sequence = ["lint", "fmt", "types", "test"]
 check.help = "run all CI checks locally"
 
