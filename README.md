@@ -1,5 +1,11 @@
 # Asher CLI
 
+[![PyPI](https://img.shields.io/pypi/v/asher-cli)](https://pypi.org/project/asher-cli/)
+[![Python](https://img.shields.io/pypi/pyversions/asher-cli)](https://pypi.org/project/asher-cli/)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![CI](https://github.com/karanshukla/asher-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/karanshukla/asher-cli/actions/workflows/ci.yml)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+
 A Claude Code-style terminal dashboard for monitoring and controlling Litter Robot via the Whisker cloud API.
 
 <img width="808" height="351" alt="image" src="https://github.com/user-attachments/assets/6599966f-837c-419c-8692-bfda3533e730" />
