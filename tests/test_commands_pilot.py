@@ -263,9 +263,7 @@ async def test_login_does_not_save_credentials_on_auth_failure():
         patch("asher.connection._keyring_save") as mock_keyring_save,
         patch("pylitterbot.Account") as MockAccount,
     ):
-        MockAccount.return_value.connect = AsyncMock(
-            side_effect=Exception("Invalid credentials")
-        )
+        MockAccount.return_value.connect = AsyncMock(side_effect=Exception("Invalid credentials"))
         MockAccount.return_value.disconnect = AsyncMock()
         app = AsherApp()
         async with app.run_test() as pilot:

@@ -62,4 +62,3 @@ class TestCatsStructure:
             frames = CATS[mode]
             unique = set(frames)
             assert len(unique) > 1, f"Mode '{mode}' should have varying frames"
-
