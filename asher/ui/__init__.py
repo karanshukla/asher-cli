@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Container
+from textual.css.query import NoMatches
 from textual.widgets import Input, RichLog, Static
 
 from ..cats import CATS
@@ -182,45 +183,48 @@ class UIMixin:
         self.query_one("#cat-fx", Static).update(Text(fx[0], style=color))  # type: ignore[attr-defined]
 
     def _tick_cat(self) -> None:
-        if self._is_loading:
-            self._spinner_idx = (self._spinner_idx + 1) % len(_SPINNER)
-            self.query_one("#online-lbl", Static).update(  # type: ignore[attr-defined]
-                Text(f"{_SPINNER[self._spinner_idx]} connecting…", style="#484f58")
-            )
+        try:
+            if self._is_loading:
+                self._spinner_idx = (self._spinner_idx + 1) % len(_SPINNER)
+                self.query_one("#online-lbl", Static).update(  # type: ignore[attr-defined]
+                    Text(f"{_SPINNER[self._spinner_idx]} connecting…", style="#484f58")
+                )
 
-            # shimmer placeholders
-            shimmer = _SPINNER[self._spinner_idx]
-            bar = Text()
-            bar.append("Drawer ", style="#484f58")
-            bar.append(f"{shimmer} —", style="#30363d")
-            self.query_one("#drawer-lbl", Static).update(bar)  # type: ignore[attr-defined]
+                # shimmer placeholders
+                shimmer = _SPINNER[self._spinner_idx]
+                bar = Text()
+                bar.append("Drawer ", style="#484f58")
+                bar.append(f"{shimmer} —", style="#30363d")
+                self.query_one("#drawer-lbl", Static).update(bar)  # type: ignore[attr-defined]
 
-            wt = Text()
-            wt.append("cat 🐱 ", style="#484f58")
-            wt.append(f"{shimmer}", style="#30363d")
-            self.query_one("#weight-lbl", Static).update(wt)  # type: ignore[attr-defined]
+                wt = Text()
+                wt.append("cat 🐱 ", style="#484f58")
+                wt.append(f"{shimmer}", style="#30363d")
+                self.query_one("#weight-lbl", Static).update(wt)  # type: ignore[attr-defined]
 
-            self.query_one("#clean-lbl", Static).update(  # type: ignore[attr-defined]
-                Text(f"Last visit {shimmer}", style="#484f58")
-            )
+                self.query_one("#clean-lbl", Static).update(  # type: ignore[attr-defined]
+                    Text(f"Last visit {shimmer}", style="#484f58")
+                )
 
-            self.query_one("#robot-lbl", Static).update(  # type: ignore[attr-defined]
-                Text(f"{shimmer}", style="#30363d")
-            )
-            self.query_one("#status-lbl", Static).update(  # type: ignore[attr-defined]
-                Text(f"[{shimmer}]", style="#30363d")
-            )
+                self.query_one("#robot-lbl", Static).update(  # type: ignore[attr-defined]
+                    Text(f"{shimmer}", style="#30363d")
+                )
+                self.query_one("#status-lbl", Static).update(  # type: ignore[attr-defined]
+                    Text(f"[{shimmer}]", style="#30363d")
+                )
 
-        cats = CATS.get(self._cat_mode, CATS["idle"])
-        self._cat_frame = (self._cat_frame + 1) % len(cats)
-        frame = cats[self._cat_frame]
-        palette = _CAT_PALETTES.get(self._cat_mode, ["#58a6ff"])
-        color = palette[self._cat_frame % len(palette)]
-        self.query_one("#cat-art", Static).update(Text(frame, style=color))  # type: ignore[attr-defined]
+            cats = CATS.get(self._cat_mode, CATS["idle"])
+            self._cat_frame = (self._cat_frame + 1) % len(cats)
+            frame = cats[self._cat_frame]
+            palette = _CAT_PALETTES.get(self._cat_mode, ["#58a6ff"])
+            color = palette[self._cat_frame % len(palette)]
+            self.query_one("#cat-art", Static).update(Text(frame, style=color))  # type: ignore[attr-defined]
 
-        fx = _CAT_FX.get(self._cat_mode, [""])
-        self._cat_fx_idx = (self._cat_fx_idx + 1) % len(fx)
-        self.query_one("#cat-fx", Static).update(Text(fx[self._cat_fx_idx], style=color))  # type: ignore[attr-defined]
+            fx = _CAT_FX.get(self._cat_mode, [""])
+            self._cat_fx_idx = (self._cat_fx_idx + 1) % len(fx)
+            self.query_one("#cat-fx", Static).update(Text(fx[self._cat_fx_idx], style=color))  # type: ignore[attr-defined]
+        except NoMatches:
+            pass
 
     def _log_ok(self, msg: str) -> None:
         t = ts()
