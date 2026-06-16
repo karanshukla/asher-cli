@@ -1,7 +1,7 @@
 # Asher CLI
 
 [![PyPI](https://img.shields.io/badge/PyPI-asher--cli-blue?logo=pypi&logoColor=white)](https://pypi.org/project/asher-cli/)
-![Version](https://img.shields.io/pypi/v/asher-cli?label=version)
+![PyPI - Version](https://img.shields.io/pypi/v/asher-cli?label=latest%20version)
 [![Python](https://img.shields.io/pypi/pyversions/asher-cli)](https://pypi.org/project/asher-cli/)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![CI](https://github.com/karanshukla/asher-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/karanshukla/asher-cli/actions/workflows/ci.yml)
