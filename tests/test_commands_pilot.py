@@ -37,6 +37,8 @@ def connected_app():
     app._account = MagicMock()
     app._account.disconnect = AsyncMock()
     app._pets = []
+    # Prevent on_mount's background _connect_worker from overwriting mocks
+    app._connect_worker = lambda **kwargs: None  # type: ignore[method-assign]
     return app
 
 
@@ -250,3 +252,41 @@ async def test_slash_quit_exits_app():
             await pilot.press("enter")
         # App should have exited
         assert app._exit
+
+
+@pytest.mark.asyncio
+async def test_login_does_not_save_credentials_on_auth_failure():
+    """Test that failed login does not persist credentials to the keyring."""
+    with (
+        patch("asher.connection._keyring_available", return_value=False),
+        patch("os.getenv", return_value=""),
+        patch("asher.connection._keyring_save") as mock_keyring_save,
+        patch("pylitterbot.Account") as MockAccount,
+    ):
+        MockAccount.return_value.connect = AsyncMock(
+            side_effect=Exception("Invalid credentials")
+        )
+        MockAccount.return_value.disconnect = AsyncMock()
+        app = AsherApp()
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            # Start login flow
+            await pilot.click("#cmd-input")
+            await pilot.press("/", "l", "o", "g", "i", "n")
+            await pilot.press("enter")
+            await pilot.pause()
+            # Enter email
+            await pilot.press(
+                "t", "e", "s", "t", "@", "e", "x", "a", "m", "p", "l", "e", ".", "c", "o", "m"
+            )
+            await pilot.press("enter")
+            await pilot.pause()
+            # Enter password
+            await pilot.press("w", "r", "o", "n", "g")
+            await pilot.press("enter")
+            # Allow background workers to finish
+            await pilot.pause()
+            await pilot.pause()
+            await pilot.pause()
+
+            mock_keyring_save.assert_not_called()

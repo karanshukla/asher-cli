@@ -31,6 +31,7 @@ class AsherApp(UIMixin, ConnectionMixin, MonitoringMixin, CommandsMixin, App):  
         self._pets: list = []
         self._cat_mode: str = "idle"
         self._cat_frame: int = 0
+        self._cat_fx_idx: int = 0
         self._cmd_history: list[str] = []
         self._hist_idx: int = -1
         from .login_flow import LoginFlow
@@ -48,7 +49,7 @@ class AsherApp(UIMixin, ConnectionMixin, MonitoringMixin, CommandsMixin, App):  
         self._show_loading_state()
         self._connect_worker()
         self.set_interval(30, self._poll_status_interval)
-        self.set_interval(0.12, self._tick_cat)
+        self.set_interval(0.4, self._tick_cat)
         # this doesn't work for some reason :(
         inp = self.query_one("#cmd-input", Input)
         inp.set_styles(self._INPUT_STYLES)

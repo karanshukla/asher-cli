@@ -27,11 +27,60 @@ else:
 
 _SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 
+_CAT_PALETTES: dict[str, list[str]] = {
+    "idle": ["#58a6ff", "#6cb0ff", "#7db8ff", "#6cb0ff"],
+    "happy": ["#3fb950", "#4bc45a", "#56cf64", "#4bc45a"],
+    "sleeping": ["#8b949e", "#9fa8b1", "#b0b8c1", "#9fa8b1"],
+    "cleaning": ["#58a6ff", "#6cb0ff", "#7db8ff", "#6cb0ff"],
+    "error": ["#f85149", "#ff7b72", "#f85149", "#ff7b72"],
+    "full": ["#d29922", "#e3b341", "#d29922", "#e3b341"],
+}
+
+_CAT_FX: dict[str, list[str]] = {
+    "idle": [
+        "✦✦  ···  ✦✦   ···   ✦✦  \n  ✦✦  ···  ✦✦   ···   ✦✦\n    ✦✦  ···  ✦✦   ···   ✦",
+        " ✦✦  ···  ✦✦   ···   ✦✦ \n   ✦✦  ···  ✦✦   ···   ✦✦\n      ✦✦  ···  ✦✦   ···  ",
+        "  ✦✦  ···  ✦✦   ···   ✦✦\n    ✦✦  ···  ✦✦   ···   ✦✦\n       ✦✦  ···  ✦✦   ··· ",
+        "   ✦✦  ···  ✦✦   ···   ✦✦\n     ✦✦  ···  ✦✦   ···   ✦\n        ✦✦  ···  ✦✦   ···",
+    ],
+    "happy": [
+        "♥♥   ♥♥   ♥♥   ♥♥      \n  ♥♥   ♥♥   ♥♥   ♥♥    \n    ♥♥   ♥♥   ♥♥   ♥♥  ",
+        " ♥♥   ♥♥   ♥♥   ♥♥     \n   ♥♥   ♥♥   ♥♥   ♥♥   \n     ♥♥   ♥♥   ♥♥   ♥♥ ",
+        "  ♥♥   ♥♥   ♥♥   ♥♥    \n    ♥♥   ♥♥   ♥♥   ♥♥  \n      ♥♥   ♥♥   ♥♥   ♥♥",
+        "   ♥♥   ♥♥   ♥♥   ♥♥   \n     ♥♥   ♥♥   ♥♥   ♥♥ \n       ♥♥   ♥♥   ♥♥   ♥♥",
+    ],
+    "sleeping": [
+        "☾☾   zZzZ   zZzZ       \n  ☾☾   zZzZ   zZzZ     \n    ☾☾   zZzZ   zZzZ   ",
+        " ☾☾   zZzZ   zZzZ      \n   ☾☾   zZzZ   zZzZ    \n     ☾☾   zZzZ   zZzZ  ",
+        "  ☾☾   zZzZ   zZzZ     \n    ☾☾   zZzZ   zZzZ   \n      ☾☾   zZzZ   zZzZ ",
+        "   ☾☾   zZzZ   zZzZ    \n     ☾☾   zZzZ   zZzZ  \n       ☾☾   zZzZ   zZzZ",
+    ],
+    "cleaning": [
+        "✨✨✨  ✨✨✨  ✨✨✨  ✨✨✨   \n  ✨✨✨  ✨✨✨  ✨✨✨  ✨✨✨ \n    ✨✨✨  ✨✨✨  ✨✨✨  ✨",
+        " ✨✨✨  ✨✨✨  ✨✨✨  ✨✨✨  \n   ✨✨✨  ✨✨✨  ✨✨✨  ✨✨✨\n     ✨✨✨  ✨✨✨  ✨✨✨  ✨",
+        "  ✨✨✨  ✨✨✨  ✨✨✨  ✨✨✨ \n    ✨✨✨  ✨✨✨  ✨✨✨  ✨✨✨\n      ✨✨✨  ✨✨✨  ✨✨✨  ",
+        "   ✨✨✨  ✨✨✨  ✨✨✨  ✨✨✨\n     ✨✨✨  ✨✨✨  ✨✨✨  ✨✨\n       ✨✨✨  ✨✨✨  ✨✨✨ ",
+    ],
+    "error": [
+        "⚡⚡   ⚡⚡   ⚡⚡   ⚡⚡     \n  ⚡⚡   ⚡⚡   ⚡⚡   ⚡⚡   \n    ⚡⚡   ⚡⚡   ⚡⚡   ⚡⚡ ",
+        " ⚡⚡   ⚡⚡   ⚡⚡   ⚡⚡    \n   ⚡⚡   ⚡⚡   ⚡⚡   ⚡⚡  \n     ⚡⚡   ⚡⚡   ⚡⚡   ⚡⚡",
+        "  ⚡⚡   ⚡⚡   ⚡⚡   ⚡⚡   \n    ⚡⚡   ⚡⚡   ⚡⚡   ⚡⚡ \n      ⚡⚡   ⚡⚡   ⚡⚡   ⚡",
+        "   ⚡⚡   ⚡⚡   ⚡⚡   ⚡⚡  \n     ⚡⚡   ⚡⚡   ⚡⚡   ⚡⚡\n       ⚡⚡   ⚡⚡   ⚡⚡   ",
+    ],
+    "full": [
+        "!!   !!   !!   !!       \n  !!   !!   !!   !!     \n    !!   !!   !!   !!   ",
+        " !!   !!   !!   !!      \n   !!   !!   !!   !!   \n     !!   !!   !!   !!  ",
+        "  !!   !!   !!   !!     \n    !!   !!   !!   !!  \n      !!   !!   !!   !!",
+        "   !!   !!   !!   !!    \n     !!   !!   !!   !! \n       !!   !!   !!   !!",
+    ],
+}
+
 
 class UIMixin:
     # declared for type checkers; assigned in AsherApp.__init__
     _cat_mode: str
     _cat_frame: int
+    _cat_fx_idx: int
     _is_loading: bool
     _spinner_idx: int
 
@@ -52,8 +101,8 @@ class UIMixin:
         with Container(id="main-area"):
             yield RichLog(id="log", highlight=True, markup=True, wrap=True, min_width=0)
             with Container(id="cat-panel"):
-                yield Static(CATS["idle"], id="cat-art")  # type: ignore[arg-type]
-                yield Static("idle", id="cat-label")
+                yield Static("", id="cat-fx")
+                yield Static(CATS["idle"][0], id="cat-art")  # type: ignore[arg-type]
 
         with Container(id="bottom-dock"):
             with Container(id="input-bar"), Container(id="input-row"):
@@ -123,13 +172,14 @@ class UIMixin:
     def _set_cat(self, mode: str, label: str = "") -> None:
         self._cat_mode = mode
         self._cat_frame = 0
+        self._cat_fx_idx = 0
         cats = CATS.get(mode, CATS["idle"])
-        frame = cats[0] if isinstance(cats, list) else cats
-        color = "#f85149" if mode == "error" else "#d29922" if mode == "full" else "#58a6ff"
+        frame = cats[0]
+        palette = _CAT_PALETTES.get(mode, ["#58a6ff"])
+        color = palette[0]
         self.query_one("#cat-art", Static).update(Text(frame, style=color))  # type: ignore[attr-defined]
-        self.query_one("#cat-label", Static).update(  # type: ignore[attr-defined]
-            Text(label or mode, style="italic #484f58")
-        )
+        fx = _CAT_FX.get(mode, [""])
+        self.query_one("#cat-fx", Static).update(Text(fx[0], style=color))  # type: ignore[attr-defined]
 
     def _tick_cat(self) -> None:
         if self._is_loading:
@@ -162,11 +212,15 @@ class UIMixin:
             )
 
         cats = CATS.get(self._cat_mode, CATS["idle"])
-        if not isinstance(cats, list):
-            return
         self._cat_frame = (self._cat_frame + 1) % len(cats)
         frame = cats[self._cat_frame]
-        self.query_one("#cat-art", Static).update(Text(frame, style="#58a6ff"))  # type: ignore[attr-defined]
+        palette = _CAT_PALETTES.get(self._cat_mode, ["#58a6ff"])
+        color = palette[self._cat_frame % len(palette)]
+        self.query_one("#cat-art", Static).update(Text(frame, style=color))  # type: ignore[attr-defined]
+
+        fx = _CAT_FX.get(self._cat_mode, [""])
+        self._cat_fx_idx = (self._cat_fx_idx + 1) % len(fx)
+        self.query_one("#cat-fx", Static).update(Text(fx[self._cat_fx_idx], style=color))  # type: ignore[attr-defined]
 
     def _log_ok(self, msg: str) -> None:
         t = ts()

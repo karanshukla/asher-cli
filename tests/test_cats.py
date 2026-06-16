@@ -13,34 +13,16 @@ class TestCatsStructure:
         expected_modes = {"idle", "happy", "sleeping", "cleaning", "error", "full"}
         assert set(CATS.keys()) == expected_modes
 
-    def test_idle_is_string(self):
-        assert isinstance(CATS["idle"], str)
-        assert len(CATS["idle"]) > 0
+    def test_all_modes_are_lists(self):
+        for mode, art in CATS.items():
+            assert isinstance(art, list), f"Mode '{mode}' should be a list of frames"
+            assert len(art) > 0, f"Mode '{mode}' should have at least one frame"
 
-    def test_happy_is_string(self):
-        assert isinstance(CATS["happy"], str)
-        assert len(CATS["happy"]) > 0
-
-    def test_sleeping_is_string(self):
-        assert isinstance(CATS["sleeping"], str)
-        assert len(CATS["sleeping"]) > 0
-
-    def test_error_is_string(self):
-        assert isinstance(CATS["error"], str)
-        assert len(CATS["error"]) > 0
-
-    def test_full_is_string(self):
-        assert isinstance(CATS["full"], str)
-        assert len(CATS["full"]) > 0
-
-    def test_cleaning_is_list(self):
-        assert isinstance(CATS["cleaning"], list)
-        assert len(CATS["cleaning"]) > 0
-
-    def test_cleaning_frames_are_strings(self):
-        for i, frame in enumerate(CATS["cleaning"]):
-            assert isinstance(frame, str), f"Frame {i} should be a string"
-            assert len(frame) > 0, f"Frame {i} should not be empty"
+    def test_all_frames_are_strings(self):
+        for mode, frames in CATS.items():
+            for i, frame in enumerate(frames):
+                assert isinstance(frame, str), f"Mode '{mode}' frame {i} should be a string"
+                assert len(frame) > 0, f"Mode '{mode}' frame {i} should not be empty"
 
     def test_all_art_contains_cat_features(self):
         for mode, art in CATS.items():
@@ -57,24 +39,27 @@ class TestCatsStructure:
             ), f"Mode '{mode}' should contain cat face features"
 
     def test_happy_has_eyes(self):
-        assert "^ ^" in CATS["happy"]
+        assert "^ ^" in CATS["happy"][0]
 
     def test_idle_has_eyes(self):
-        assert "o o" in CATS["idle"]
+        assert "o o" in CATS["idle"][0]
 
     def test_sleeping_has_eyes(self):
-        assert "- -" in CATS["sleeping"]
+        assert "- -" in CATS["sleeping"][0]
 
     def test_error_has_x_eyes(self):
-        assert "x x" in CATS["error"]
+        assert "x x" in CATS["error"][0]
 
     def test_full_has_exclamation_eyes(self):
-        assert "! !" in CATS["full"]
+        assert "! !" in CATS["full"][0]
 
-    def test_cleaning_animation_has_variation(self):
-        frames = CATS["cleaning"]
-        assert len(frames) >= 2
-        assert frames[0] != frames[1]
+    def test_all_animations_have_at_least_two_frames(self):
+        for mode, frames in CATS.items():
+            assert len(frames) >= 2, f"Mode '{mode}' should have at least 2 frames"
 
-    def test_sleeping_has_zZ_indicator(self):
-        assert "z" in CATS["sleeping"].lower()
+    def test_idle_and_cleaning_have_frame_variation(self):
+        for mode in ("idle", "cleaning"):
+            frames = CATS[mode]
+            unique = set(frames)
+            assert len(unique) > 1, f"Mode '{mode}' should have varying frames"
+

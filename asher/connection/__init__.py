@@ -58,7 +58,9 @@ class ConnectionMixin:
     _pets: list
 
     @work(exclusive=True)
-    async def _connect_worker(self, *, email: str = "", password: str = "") -> None:
+    async def _connect_worker(
+        self, *, email: str = "", password: str = "", save_to_keyring: bool = False
+    ) -> None:
         self._is_loading = True  # type: ignore[attr-defined]
         self._show_loading_state()  # type: ignore[attr-defined]
 
@@ -128,6 +130,12 @@ class ConnectionMixin:
             t.append(f" ({model})", style="#484f58")
             log.write(t)
             self._set_cat("happy", "connected!")  # type: ignore[attr-defined]
+
+            if save_to_keyring:
+                if _keyring_save(email, password):
+                    self._log_info("Credentials saved to keyring.")  # type: ignore[attr-defined]
+                else:
+                    self._log_warn("Keyring unavailable - credentials saved for this session only.")  # type: ignore[attr-defined]
 
         except ImportError:
             self._is_loading = False  # type: ignore[attr-defined]

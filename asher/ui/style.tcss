@@ -65,20 +65,19 @@ Screen {
     layout: vertical;
 }
 
-#cat-art {
-    color: #58a6ff;
-    text-align: left;
+#cat-fx {
     width: 26;
-    content-align: left middle;
+    height: 5;
+    color: #58a6ff;
+    text-align: center;
+    content-align: center middle;
 }
 
-#cat-label {
-    color: #484f58;
-    text-style: italic;
-    text-align: left;
+#cat-art {
+    color: #58a6ff;
+    text-align: center;
     width: 26;
-    padding-top: 1;
-    height: 3;
+    content-align: center middle;
 }
 
 /* ── Input area (outer dock + hint below the box) ── */

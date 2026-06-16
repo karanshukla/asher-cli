@@ -60,8 +60,8 @@ class TestCSS:
     def test_css_contains_cat_art(self):
         assert "#cat-art" in _CSS
 
-    def test_css_contains_cat_label(self):
-        assert "#cat-label" in _CSS
+    def test_css_contains_cat_fx(self):
+        assert "#cat-fx" in _CSS
 
     def test_css_contains_bottom_dock(self):
         assert "#bottom-dock" in _CSS

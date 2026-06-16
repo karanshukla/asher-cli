@@ -397,8 +397,6 @@ class CommandsMixin:
 
     @work
     async def _handle_login_password(self, password: str) -> None:
-        from ..connection import _keyring_save  # noqa: PLC0415
-
         email = self._login.complete()
 
         # Restore prompt and input to normal
@@ -407,20 +405,15 @@ class CommandsMixin:
         self.query_one("#cmd-input", Input).password = False  # type: ignore[attr-defined]
         self.query_one("#cmd-input", Input).placeholder = "type a command  (help for list)…"  # type: ignore[attr-defined]
 
-        saved = _keyring_save(email, password)
-        if saved:
-            self._log_info("Credentials saved to keyring.")  # type: ignore[attr-defined]
-        else:
-            self._log_warn("Keyring unavailable - signed in for this session only.")  # type: ignore[attr-defined]
-
         if self._account:
             with contextlib.suppress(Exception):
                 await self._account.disconnect()
         self._account = None
         self._robot = None
         self._set_cat("idle", "connecting…")  # type: ignore[attr-defined]
-        kwargs = {} if saved else {"email": email, "password": password}
-        self._connect_worker(**kwargs)  # type: ignore[attr-defined]
+        self._connect_worker(  # type: ignore[attr-defined]
+            email=email, password=password, save_to_keyring=True
+        )
 
     # ── command dispatch ────────────────────────────────────────────────────────
 
