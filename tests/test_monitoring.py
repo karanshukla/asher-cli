@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from pylitterbot.enums import LitterBoxStatus
 
 from asher.monitoring import MonitoringMixin
 
@@ -40,15 +41,13 @@ class TestUpdateLastCatSeen:
         assert mixin._last_cat_seen is None
 
     @pytest.mark.asyncio
-    async def test_finds_cat_event_with_weight(self):
+    async def test_finds_cat_detected_event(self):
         mixin = MagicMock()
         mixin._robot = MagicMock()
         mixin._last_cat_seen = None
 
         mock_act = MagicMock()
-        mock_act.weight = 5.5
-        mock_act.action = MagicMock()
-        mock_act.action.text = "Cycle Complete"
+        mock_act.action = LitterBoxStatus.CAT_DETECTED
         mock_ts = datetime.now(timezone.utc) - timedelta(hours=1)
         mock_act.timestamp = mock_ts
 
@@ -58,22 +57,19 @@ class TestUpdateLastCatSeen:
         assert mixin._last_cat_seen == mock_ts
 
     @pytest.mark.asyncio
-    async def test_finds_cat_event_by_action_text(self):
+    async def test_skips_non_cat_detected_events(self):
         mixin = MagicMock()
         mixin._robot = MagicMock()
         mixin._last_cat_seen = None
 
         mock_act = MagicMock()
-        mock_act.weight = None
-        mock_act.action = MagicMock()
-        mock_act.action.text = "Cat Detected"
-        mock_ts = datetime.now(timezone.utc) - timedelta(minutes=30)
-        mock_act.timestamp = mock_ts
+        mock_act.action = LitterBoxStatus.CLEAN_CYCLE_COMPLETE
+        mock_act.timestamp = datetime.now(timezone.utc) - timedelta(minutes=5)
 
         mixin._robot.get_activity_history = AsyncMock(return_value=[mock_act])
 
         await MonitoringMixin._update_last_cat_seen(mixin)
-        assert mixin._last_cat_seen == mock_ts
+        assert mixin._last_cat_seen is None
 
     @pytest.mark.asyncio
     async def test_handles_exception_gracefully(self):

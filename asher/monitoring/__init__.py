@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from pylitterbot.enums import LitterBoxStatus
 from rich.text import Text
 from textual import work
 from textual.widgets import Static
@@ -23,14 +24,9 @@ class MonitoringMixin:
         if self._robot is None:
             return
         try:
-            acts = await self._robot.get_activity_history(limit=10)
+            acts = await self._robot.get_activity_history(limit=50)
             for act in acts:
-                w = getattr(act, "weight", None)
-                action: Any = getattr(act, "action", None)
-                action_text = (
-                    action.text if hasattr(action, "text") else str(action or "")
-                ).lower()
-                if (w is not None and float(w) > 0) or "cat" in action_text:
+                if getattr(act, "action", None) == LitterBoxStatus.CAT_DETECTED:
                     ts_dt = getattr(act, "timestamp", None)
                     if ts_dt is not None:
                         self._last_cat_seen = ts_dt
@@ -47,11 +43,7 @@ class MonitoringMixin:
         name = getattr(r, "name", "—")
         online = getattr(r, "is_online", False)
         drawer = float(getattr(r, "waste_drawer_level", 0) or 0)
-        status = getattr(r, "status", None)
-        sleeping = getattr(r, "sleeping", False)
         last_seen = self._last_cat_seen or getattr(r, "last_seen", None)
-
-        status_str = status.value if status else ("Sleeping" if sleeping else "Ready")
 
         weight_val = "—"
         try:
@@ -71,9 +63,23 @@ class MonitoringMixin:
         else:
             online_lbl.update(Text("○ OFFLINE", style="bold #f85149"))
 
-        self.query_one("#status-lbl", Static).update(  # type: ignore[attr-defined]
-            Text(f"[{status_str}]", style="#8b949e")
-        )
+        nl_mode = getattr(r, "night_light_mode", None)
+        nl_enabled = getattr(r, "night_light_mode_enabled", False)
+        nl_brightness = getattr(r, "night_light_brightness", None)
+
+        mode_str = nl_mode.value.lower() if nl_mode is not None else ("on" if nl_enabled else "off")
+        if mode_str == "off":
+            nl_emoji, nl_color = "○", "#484f58"
+        elif mode_str == "auto":
+            nl_emoji, nl_color = "◐", "#58a6ff"
+        else:
+            nl_emoji, nl_color = "☀", "#d29922"
+
+        nl = Text()
+        nl.append(nl_emoji, style=nl_color)
+        if nl_brightness and mode_str != "off":
+            nl.append(f"  {nl_brightness}%", style="#484f58")
+        self.query_one("#nightlight-lbl", Static).update(nl)  # type: ignore[attr-defined]
 
         bar = drawer_bar(drawer)
         dt = Text()
@@ -81,6 +87,15 @@ class MonitoringMixin:
         dt.append_text(bar)
         dt.append(f" {drawer:.0f}%", style="#8b949e")
         self.query_one("#drawer-lbl", Static).update(dt)  # type: ignore[attr-defined]
+
+        litter_raw = getattr(r, "litter_level", None)
+        lt = Text()
+        lt.append("Litter ", style="#484f58")
+        if litter_raw is not None:
+            lt.append(f"{float(litter_raw):.0f}%", style="#8b949e")
+        else:
+            lt.append("—", style="#30363d")
+        self.query_one("#litter-lbl", Static).update(lt)  # type: ignore[attr-defined]
 
         visit_label = "Last visit" if self._last_cat_seen else "Last seen"
         self.query_one("#clean-lbl", Static).update(  # type: ignore[attr-defined]

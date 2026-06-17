@@ -125,8 +125,9 @@ async def test_status_bar_widgets_exist():
             assert app.query_one("#title-lbl")
             assert app.query_one("#robot-lbl")
             assert app.query_one("#online-lbl")
-            assert app.query_one("#status-lbl")
+            assert app.query_one("#nightlight-lbl")
             assert app.query_one("#drawer-lbl")
+            assert app.query_one("#litter-lbl")
             assert app.query_one("#weight-lbl")
             assert app.query_one("#clean-lbl")
 

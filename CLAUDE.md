@@ -92,9 +92,13 @@ Do not add robot-control commands as slash commands, and do not add app-manageme
 
 ## Architecture
 
+**Status bar philosophy:**
+- **Top row** — ambient/settings info (robot name, online badge, night light mode + brightness). Not time-critical.
+- **Second row** — important operational state and cat data (drawer %, litter %, cat weight, last visit). Could be subject to change
+
 ```
 AsherApp (textual.App)
-├── #status-bar          top dock — robot name, online badge, drawer bar, last seen, cat weight
+├── #status-bar          top dock — two rows (top: name/online/night-light; bottom: drawer/litter/weight/visit)
 ├── #main-area
 │   ├── #log             RichLog — scrollable event/command output
 │   └── #cat-panel       animated ASCII cat sidebar
@@ -129,7 +133,7 @@ pylitterbot auto-detects robot type. Any attribute/method missing on a given mod
 - `robot.refresh()`, `robot.start_cleaning()`
 - `robot.set_sleep_mode(bool)`, `robot.set_panel_lockout(bool)`
 - `robot.set_night_light_brightness(int)` or `robot.set_night_light_mode(NightLightMode)`
-- `robot.get_activity(limit=int)` → list of activity objects with `.timestamp`, `.weight`, `.action_value`
+- `robot.get_activity_history(limit=int)` → list of `Activity` objects with `.timestamp` and `.action` (`LitterBoxStatus` enum)
 
 ## Development notes
 

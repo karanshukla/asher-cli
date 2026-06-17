@@ -91,9 +91,11 @@ class UIMixin:
                 yield Static("", id="title-lbl", classes="chunk")
                 yield Static("", id="robot-lbl", classes="chunk")
                 yield Static("", id="online-lbl", classes="chunk")
-                yield Static("", id="status-lbl", classes="chunk")
+                yield Static("", id="nightlight-lbl", classes="chunk")
             with Container(classes="srow"):
                 yield Static("", id="drawer-lbl", classes="chunk")
+                yield Static("│", classes="sep")
+                yield Static("", id="litter-lbl", classes="chunk")
                 yield Static("│", classes="sep")
                 yield Static("", id="weight-lbl", classes="chunk")
                 yield Static("│", classes="sep")
@@ -126,7 +128,14 @@ class UIMixin:
             Text(f"{_SPINNER[0]} connecting…", style="#484f58")
         )
         dash = Text("—", style="#30363d")
-        for wid in ("#robot-lbl", "#status-lbl", "#drawer-lbl", "#weight-lbl", "#clean-lbl"):
+        for wid in (
+            "#robot-lbl",
+            "#nightlight-lbl",
+            "#drawer-lbl",
+            "#litter-lbl",
+            "#weight-lbl",
+            "#clean-lbl",
+        ):
             self.query_one(wid, Static).update(dash)  # type: ignore[attr-defined]
 
     def _show_signed_out_state(self) -> None:
@@ -137,14 +146,19 @@ class UIMixin:
         self.query_one("#robot-lbl", Static).update(  # type: ignore[attr-defined]
             Text("—", style="#30363d")
         )
-        self.query_one("#status-lbl", Static).update(  # type: ignore[attr-defined]
-            Text("[—]", style="#30363d")
+        self.query_one("#nightlight-lbl", Static).update(  # type: ignore[attr-defined]
+            Text("○", style="#484f58")
         )
 
         drawer = Text()
         drawer.append("Drawer ", style="#484f58")
         drawer.append("—", style="#30363d")
         self.query_one("#drawer-lbl", Static).update(drawer)  # type: ignore[attr-defined]
+
+        litter = Text()
+        litter.append("Litter ", style="#484f58")
+        litter.append("—", style="#30363d")
+        self.query_one("#litter-lbl", Static).update(litter)  # type: ignore[attr-defined]
 
         weight = Text()
         weight.append("cat 🐱 ", style="#484f58")
@@ -172,6 +186,7 @@ class UIMixin:
 
     def _set_cat(self, mode: str, label: str = "") -> None:
         self._cat_mode = mode
+        self._cat_label = label
         self._cat_frame = 0
         self._cat_fx_idx = 0
         cats = CATS.get(mode, CATS["idle"])
@@ -197,6 +212,11 @@ class UIMixin:
                 bar.append(f"{shimmer} —", style="#30363d")
                 self.query_one("#drawer-lbl", Static).update(bar)  # type: ignore[attr-defined]
 
+                lit = Text()
+                lit.append("Litter ", style="#484f58")
+                lit.append(f"{shimmer}", style="#30363d")
+                self.query_one("#litter-lbl", Static).update(lit)  # type: ignore[attr-defined]
+
                 wt = Text()
                 wt.append("cat 🐱 ", style="#484f58")
                 wt.append(f"{shimmer}", style="#30363d")
@@ -209,8 +229,8 @@ class UIMixin:
                 self.query_one("#robot-lbl", Static).update(  # type: ignore[attr-defined]
                     Text(f"{shimmer}", style="#30363d")
                 )
-                self.query_one("#status-lbl", Static).update(  # type: ignore[attr-defined]
-                    Text(f"[{shimmer}]", style="#30363d")
+                self.query_one("#nightlight-lbl", Static).update(  # type: ignore[attr-defined]
+                    Text(f"○ {shimmer}", style="#30363d")
                 )
 
             cats = CATS.get(self._cat_mode, CATS["idle"])

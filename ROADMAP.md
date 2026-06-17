@@ -309,6 +309,19 @@ sleep-schedule Mon 22:00 07:00   set Monday sleep window
 sleep-schedule disable    clear all days
 ```
 
+### Contextual sleep/wake toggle
+
+LR4 does not implement `set_sleep_mode` — calling it raises `NotImplementedError`.
+LR3 and LR5 both support it but with different signatures:
+
+- **LR3**: `set_sleep_mode(value: bool, sleep_time: time | None)`
+- **LR5**: `set_sleep_mode(value: bool, sleep_time: int | time | None, *, wake_time, day_of_week)`
+
+The `sleep` / `wake` commands should detect the robot model and dispatch accordingly:
+- LR3 → `set_sleep_mode(True/False)` (uses current time as sleep start)
+- LR5 → `set_sleep_mode(True/False)` (enables/disables all schedule days)
+- LR4 → explain schedule-based sleep and point to `sleep-schedule` command
+
 ---
 
 ## 8. Fault monitoring & alerts
@@ -611,6 +624,59 @@ HistoryScreen {
 
 This approach means `history 100` is just as usable as `history 10` — the
 events don't pollute the log and the user can scroll at their own pace.
+
+### Live cat presence indicator
+
+`robot.is_cat_detected` is already polled in `_refresh_status`, but there's no
+dedicated visual for "cat is inside right now" vs. "cat was detected in a fault".
+The distinction matters: fault detection (§8) is a safety event that halted a
+cycle; live presence is ambient state while a cat is using the box.
+
+**Status bar** — add a `🐱 IN` badge in the second row that appears while
+`is_cat_detected` is true and disappears when the cat leaves:
+
+```
+Drawer [████░░░░] 48%   Litter: Nominal   🐱 IN   Asher 9.1 lb   7m ago
+```
+
+**Cat panel** — switch the cat art to a `"present"` mode (new state, cat-in-box
+ASCII art or a distinct label like `"visiting…"`). Switch back to `idle` once
+`is_cat_detected` returns false.
+
+WebSocket (§5) makes this responsive — with 30 s polling you'll likely miss the
+entire visit. With real-time push the badge appears the moment the sensor trips.
+
+---
+
+### Real-time cycling indicator (requires WebSockets)
+
+`LitterBoxStatus.CLEAN_CYCLE` is already caught by the `[RDY]` status chip,
+but polling every 30 s means a full clean cycle (typically 2–4 min) can start
+and finish between polls, showing only `Ready` to the user the whole time.
+
+**What's needed:**
+- WebSocket subscription (§5) — `robot.subscribe()` fires `EVENT_UPDATE`
+  immediately when the status transitions to `CLEAN_CYCLE` or back to `READY`.
+- Animated status chip — while `status == CLEAN_CYCLE`, pulse the `[RDY]` chip
+  blue and add a spinner character (Textual's `LoadingIndicator` or a manual
+  `_tick` frame cycle):
+  ```
+  ◆ Asher CLI   Idiot Box   ● ONLINE   [⠙ CYCLING]
+  ```
+- Cat animation — switch to `"cleaning"` mode (already defined) the moment the
+  cycle starts; revert to `idle` on `READY`.
+- Elapsed time — show how long the current cycle has been running:
+  ```
+  [⠙ CYCLING  0:42]
+  ```
+  Track `_cycle_start: datetime | None` on the transition to `CLEAN_CYCLE`;
+  update the chip every second via a `set_interval(1, ...)` timer that's active
+  only while cycling.
+
+This is the primary reason to implement WebSocket (§5) — the cycling indicator
+is meaningless without it.
+
+---
 
 ### Timestamps in activity history
 The history output currently shows `mm/dd HH:MM`. Adding the year for older
@@ -1856,12 +1922,14 @@ Ranked by user-visible impact vs. implementation effort:
 ### High-value features (biggest user-visible wins)
 
 4. **Cat panel status badges** (§16) — lock, sleep, night light, wait time under the art; high visibility, one-afternoon job
-5. **WebSocket subscription** (§5) — replace 30 s polling with real-time push updates
-6. **Token persistence** (§12) — skip password re-entry on every run
-7. **Fault & safety monitoring** (§8) — cat detected, pinch, motor faults; banner + log transition + cat alert mode
-8. **Status color-coding** (§10) — `LitterBoxStatus` → colour in status bar and cat badges
-9. **Readable history events** (§10) — map raw pylitterbot strings to human labels with weight, pet name, and colour
-10. **History pager sub-view** (§10) — `push_screen(HistoryScreen)` with Page Up/Down and `q` to dismiss; events no longer dump into the main log
+5. **WebSocket subscription** (§5) — replace 30 s polling with real-time push updates; prerequisite for live cat presence and cycling indicator
+6. **Live cat presence indicator** (§10) — `🐱 IN` badge + `"present"` cat mode while `is_cat_detected` is true; requires WebSocket (§5) to be useful
+7. **Real-time cycling indicator** (§10) — animated `[⠙ CYCLING 0:42]` chip with elapsed time; requires WebSocket (§5)
+8. **Token persistence** (§12) — skip password re-entry on every run
+9. **Fault & safety monitoring** (§8) — cat detected, pinch, motor faults; banner + log transition + cat alert mode
+10. **Status color-coding** (§10) — `LitterBoxStatus` → colour in status bar and cat badges
+11. **Readable history events** (§10) — map raw pylitterbot strings to human labels with weight, pet name, and colour
+12. **History pager sub-view** (§10) — `push_screen(HistoryScreen)` with Page Up/Down and `q` to dismiss; events no longer dump into the main log
 
 ### Commands & slash system
 

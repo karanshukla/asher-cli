@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+from datetime import timezone
 from typing import Any
 
 from rich.text import Text
 from textual import work
 from textual.widgets import Input, RichLog, Static
+from tzlocal import get_localzone
 
 from ..helpers import ts
 from ..login_flow import LoginFlow, LoginState
@@ -118,6 +120,10 @@ class SleepCommand(Command):
             await app._robot.set_sleep_mode(True)
             app._log_ok("Sleep mode enabled")
             app._set_cat("sleeping", "sleeping…")
+        except NotImplementedError:
+            app._log_warn(
+                "Sleep scheduling is not supported as a simple toggle on this robot model."
+            )
         except Exception as exc:
             app._log_err(f"Failed: {exc}")
 
@@ -136,6 +142,10 @@ class WakeCommand(Command):
             await app._robot.set_sleep_mode(False)
             app._log_ok("Robot woken up")
             app._set_cat("happy", "awake!")
+        except NotImplementedError:
+            app._log_warn(
+                "Sleep scheduling is not supported as a simple toggle on this robot model."
+            )
         except Exception as exc:
             app._log_err(f"Failed: {exc}")
 
@@ -152,21 +162,53 @@ class NightLightCommand(Command):
 
     async def run(self, app: Any, args: list[str]) -> None:
         arg = args[0].lower() if args else ""
-        if arg not in ("on", "off"):
+        if arg not in ("on", "off", "auto"):
             app._log_warn("Usage: night-light on|off")
             return
         try:
-            if hasattr(app._robot, "set_night_light_brightness"):
-                await app._robot.set_night_light_brightness(100 if arg == "on" else 0)
-            elif hasattr(app._robot, "set_night_light_mode"):
+            if hasattr(app._robot, "set_night_light_mode"):
                 from pylitterbot.enums import NightLightMode  # noqa: PLC0415
 
-                mode = NightLightMode.ON if arg == "on" else NightLightMode.OFF
+                mode = {
+                    "on": NightLightMode.ON,
+                    "off": NightLightMode.OFF,
+                    "auto": NightLightMode.AUTO,
+                }[arg]
                 await app._robot.set_night_light_mode(mode)
+            elif arg == "on" and hasattr(app._robot, "set_night_light_brightness"):
+                await app._robot.set_night_light_brightness(100)
             else:
                 app._log_warn("Night light control not supported by this robot version.")
                 return
             app._log_ok(f"Night light {arg}")
+        except Exception as exc:
+            app._log_err(f"Failed: {exc}")
+
+
+class NightLightBrightnessCommand(Command):
+    name = "night-light-brightness"
+    aliases = ("nlb",)
+    description = "<25|50|100> set night light brightness"
+    requires_robot = True
+
+    @property
+    def display_name(self) -> str:
+        return "night-light-brightness"
+
+    async def run(self, app: Any, args: list[str]) -> None:
+        if not args or not args[0].isdigit():
+            app._log_warn("Usage: night-light-brightness <25|50|100>")
+            return
+        level = int(args[0])
+        if level not in (25, 50, 100):
+            app._log_warn(f"Invalid brightness {level} — must be 25, 50, or 100")
+            return
+        if not hasattr(app._robot, "set_night_light_brightness"):
+            app._log_warn("Night light brightness control not supported by this robot version.")
+            return
+        try:
+            await app._robot.set_night_light_brightness(level)
+            app._log_ok(f"Night light brightness set to {level}")
         except Exception as exc:
             app._log_err(f"Failed: {exc}")
 
@@ -187,7 +229,13 @@ class HistoryCommand(Command):
             app._log_info(f"Last {len(acts)} events:")
             for act in reversed(acts):
                 ts_dt = getattr(act, "timestamp", None)
-                ts_str = ts_dt.strftime("%m/%d %H:%M") if ts_dt else "?"
+                if ts_dt:
+                    if ts_dt.tzinfo is None:
+                        ts_dt = ts_dt.replace(tzinfo=timezone.utc)
+                    ts_dt = ts_dt.astimezone(get_localzone())
+                    ts_str = ts_dt.strftime("%m/%d %H:%M %Z")
+                else:
+                    ts_str = "?"
                 action = getattr(act, "action", "?")
                 action_str = action.text if hasattr(action, "text") else str(action)
                 t = Text()
@@ -203,6 +251,7 @@ class HistoryCommand(Command):
 
 class HelpCommand(Command):
     name = "help"
+    aliases = ("commands",)
     description = "show this message"
 
     async def run(self, app: Any, args: list[str]) -> None:
@@ -274,6 +323,7 @@ _registry.register(UnlockCommand())
 _registry.register(SleepCommand())
 _registry.register(WakeCommand())
 _registry.register(NightLightCommand())
+_registry.register(NightLightBrightnessCommand())
 _registry.register(HistoryCommand())
 _registry.register(HelpCommand())
 _registry.register(ClearCommand())
@@ -427,16 +477,20 @@ class CommandsMixin:
         log = self.query_one("#log", RichLog)  # type: ignore[attr-defined]
         log.write("")
         log.write(Text.from_markup("[bold #58a6ff]Robot commands[/]"))
+        seen: set[str] = set()
         for cmd in _registry.robot:
+            if cmd.display_name in seen:
+                continue
+            seen.add(cmd.display_name)
             t = Text()
-            t.append(f"  {cmd.help_name:<22}", style="#3fb950")
+            t.append(f"  {cmd.help_name:<24}", style="#3fb950")
             t.append(cmd.description, style="#8b949e")
             log.write(t)
         log.write("")
         log.write(Text.from_markup("[bold #58a6ff]Slash commands[/]  [#484f58](app management)[/]"))
         for cmd in _registry.slash:
             t = Text()
-            t.append(f"  {cmd.help_name:<22}", style="#d29922")
+            t.append(f"  {cmd.help_name:<24}", style="#d29922")
             t.append(cmd.description, style="#8b949e")
             log.write(t)
         log.write("")

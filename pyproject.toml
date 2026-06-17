@@ -22,6 +22,7 @@ dependencies = [
     "rich>=13.0.0",
     "python-dotenv>=1.0.0",
     "keyring>=24.0.0",
+    "tzlocal>=5.4",
 ]
 
 [project.scripts]
@@ -47,7 +48,7 @@ types  = "mypy asher/ --ignore-missing-imports"
 test   = "pytest tests/ -v --tb=short"
 fix.sequence = [{cmd = "ruff check --fix ."}, {cmd = "ruff format ."}]
 dev    = "textual run --dev asher/__main__.py"
-watch  = "watchfiles --filter python 'python -m asher' asher"
+watch  = "watchfiles --filter python 'uv run python -m asher' asher"
 check.sequence = ["lint", "fmt", "types", "test"]
 check.help = "run all CI checks locally"
 
