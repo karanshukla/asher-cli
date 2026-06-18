@@ -182,7 +182,7 @@ class UIMixin:
         self.query_one("#litter-lbl", Static).update(litter)  # type: ignore[attr-defined]
 
         weight = Text()
-        weight.append("cat 🐱 ", style="#484f58")
+        weight.append("cat ", style="#484f58")
         weight.append("—", style="#30363d")
         self.query_one("#weight-lbl", Static).update(weight)  # type: ignore[attr-defined]
 
