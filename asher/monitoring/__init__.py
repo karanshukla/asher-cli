@@ -1,4 +1,4 @@
-"""Robot status polling and refresh."""
+"""Robot status monitoring — WebSocket primary, polling fallback."""
 
 from __future__ import annotations
 
@@ -19,6 +19,26 @@ class MonitoringMixin:
     _cat_mode: str
     _last_cat_seen: Any
 
+    async def _start_monitoring(self) -> None:
+        """Subscribe to WebSocket push updates from the robot."""
+        from pylitterbot.robot import EVENT_UPDATE  # noqa: PLC0415
+
+        try:
+            self._robot.on(EVENT_UPDATE, self._on_robot_update)
+            await self._robot.subscribe()
+        except Exception:
+            pass
+
+    def _on_robot_update(self) -> None:
+        """Sync callback fired by pylitterbot when robot state changes via WebSocket."""
+        self._handle_ws_update()  # type: ignore[attr-defined]
+
+    @work(exclusive=True)
+    async def _handle_ws_update(self) -> None:
+        if self._robot is None:
+            return
+        await self._refresh_status()
+
     async def _update_last_cat_seen(self) -> None:
         """Cache the timestamp of the most recent cat-detection event from activity history."""
         if self._robot is None:
@@ -33,6 +53,18 @@ class MonitoringMixin:
                         return
         except Exception:
             pass
+
+    _MODEL_LABELS: dict[str, str] = {
+        "Litter-Robot 3": "LR3",
+        "Litter-Robot 4": "LR4",
+        "Litter-Robot 5": "LR5",
+        "Feeder-Robot": "Feeder",
+    }
+
+    @classmethod
+    def _robot_model_label(cls, robot: Any) -> str:
+        model = getattr(robot, "model", None) or type(robot).__name__
+        return cls._MODEL_LABELS.get(model, model)
 
     async def _refresh_status(self) -> None:
         r = self._robot
@@ -55,13 +87,32 @@ class MonitoringMixin:
 
         pet_name = self._pets[0].name if self._pets else None
 
-        self.query_one("#robot-lbl", Static).update(Text(name, style="bold #e6edf3"))  # type: ignore[attr-defined]
+        robot_txt = Text(name, style="bold #e6edf3")
+        robot_txt.append(f"  {self._robot_model_label(r)}", style="#484f58")
+        self.query_one("#robot-lbl", Static).update(robot_txt)  # type: ignore[attr-defined]
 
+        robot_status = getattr(r, "status", None)
         online_lbl = self.query_one("#online-lbl", Static)  # type: ignore[attr-defined]
-        if online:
-            online_lbl.update(Text("● ONLINE", style="bold #3fb950"))
-        else:
+        if not online:
             online_lbl.update(Text("○ OFFLINE", style="bold #f85149"))
+        elif robot_status is LitterBoxStatus.CAT_DETECTED:
+            online_lbl.update(Text("~ Cat inside", style="bold #3fb950"))
+        elif robot_status is LitterBoxStatus.CAT_SENSOR_TIMING:
+            online_lbl.update(Text("⏱ Cat delay", style="bold #d29922"))
+        elif robot_status in (LitterBoxStatus.CLEAN_CYCLE, LitterBoxStatus.EMPTY_CYCLE):
+            online_lbl.update(Text("⟳ Cycling", style="bold #58a6ff"))
+        elif robot_status is LitterBoxStatus.PAUSED:
+            online_lbl.update(Text("⏸ Paused", style="bold #d29922"))
+        elif robot_status is LitterBoxStatus.CLEAN_CYCLE_COMPLETE:
+            online_lbl.update(Text("✓ Cycle done", style="bold #3fb950"))
+        elif robot_status in (
+            LitterBoxStatus.DRAWER_FULL,
+            LitterBoxStatus.DRAWER_FULL_1,
+            LitterBoxStatus.DRAWER_FULL_2,
+        ):
+            online_lbl.update(Text("⚠ Drawer full", style="bold #f85149"))
+        else:
+            online_lbl.update(Text("● ONLINE", style="bold #3fb950"))
 
         nl_mode = getattr(r, "night_light_mode", None)
         nl_enabled = getattr(r, "night_light_mode_enabled", False)
@@ -73,7 +124,7 @@ class MonitoringMixin:
         elif mode_str == "auto":
             nl_emoji, nl_color = "◐", "#58a6ff"
         else:
-            nl_emoji, nl_color = "☀", "#d29922"
+            nl_emoji, nl_color = "*", "#d29922"
 
         nl = Text()
         nl.append(nl_emoji, style=nl_color)
@@ -105,7 +156,7 @@ class MonitoringMixin:
         wt_text = Text()
         if pet_name:
             wt_text.append(pet_name, style="#8b949e")
-            wt_text.append(" 🐱 ", style="#484f58")
+            wt_text.append(" / ", style="#484f58")
         else:
             wt_text.append("cat ", style="#484f58")
         wt_text.append(weight_val, style="#8b949e")

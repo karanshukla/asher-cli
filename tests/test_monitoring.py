@@ -19,6 +19,9 @@ class TestMonitoringMixinStructure:
         assert hasattr(MonitoringMixin, "_update_last_cat_seen")
         assert hasattr(MonitoringMixin, "_refresh_status")
         assert hasattr(MonitoringMixin, "_poll_status_interval")
+        assert hasattr(MonitoringMixin, "_start_monitoring")
+        assert hasattr(MonitoringMixin, "_on_robot_update")
+        assert hasattr(MonitoringMixin, "_handle_ws_update")
 
 
 class TestUpdateLastCatSeen:
@@ -107,6 +110,34 @@ class TestRefreshStatus:
 
         await MonitoringMixin._refresh_status(mixin)
         assert mixin._is_loading is False
+
+
+class TestStartMonitoring:
+    @pytest.mark.asyncio
+    async def test_registers_callback_and_subscribes(self):
+        mixin = MagicMock()
+        mixin._robot = MagicMock()
+        mixin._robot.subscribe = AsyncMock()
+
+        await MonitoringMixin._start_monitoring(mixin)
+
+        mixin._robot.on.assert_called_once()
+        mixin._robot.subscribe.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_swallows_subscribe_exception(self):
+        mixin = MagicMock()
+        mixin._robot = MagicMock()
+        mixin._robot.subscribe = AsyncMock(side_effect=Exception("ws error"))
+
+        await MonitoringMixin._start_monitoring(mixin)  # should not raise
+
+
+class TestOnRobotUpdate:
+    def test_calls_handle_ws_update(self):
+        mixin = MagicMock()
+        MonitoringMixin._on_robot_update(mixin)
+        mixin._handle_ws_update.assert_called_once()
 
 
 class TestPollStatusInterval:

@@ -20,7 +20,7 @@ Current state, missing functionality, and suggested additions — grounded in wh
 | Activity history (`get_activity_history`) | ✅ |
 | Cat animation panel with mode changes | ✅ |
 | Command history (↑/↓) | ✅ |
-| Auto-refresh every 30 s | ✅ |
+| WebSocket real-time updates (LR4 primary; poll fallback every 5 min for activity history) | ✅ |
 | LR4 / LR5 / LR3 polymorphic support | ✅ (getattr fallback) |
 | PyPI release workflow (`release.yml` — `release/*` branches) | ✅ |
 

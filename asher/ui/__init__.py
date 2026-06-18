@@ -13,6 +13,23 @@ from textual.containers import Container
 from textual.css.query import NoMatches
 from textual.widgets import Input, RichLog, Static
 
+
+class CmdInput(Input):
+    """Input with all focus borders and tints removed."""
+
+    DEFAULT_CSS = Input.DEFAULT_CSS + """
+    CmdInput {
+        border: none !important;
+        height: 1;
+        padding: 0;
+        background: #161b22;
+        &:focus {
+            border: none !important;
+            background-tint: 0%;
+        }
+    }
+    """
+
 from ..cats import CATS
 from ..helpers import ts
 
@@ -57,16 +74,16 @@ _CAT_FX: dict[str, list[str]] = {
         "   ☾☾   zZzZ   zZzZ    \n     ☾☾   zZzZ   zZzZ  \n       ☾☾   zZzZ   zZzZ",
     ],
     "cleaning": [
-        "✨✨✨  ✨✨✨  ✨✨✨  ✨✨✨   \n  ✨✨✨  ✨✨✨  ✨✨✨  ✨✨✨ \n    ✨✨✨  ✨✨✨  ✨✨✨  ✨",
-        " ✨✨✨  ✨✨✨  ✨✨✨  ✨✨✨  \n   ✨✨✨  ✨✨✨  ✨✨✨  ✨✨✨\n     ✨✨✨  ✨✨✨  ✨✨✨  ✨",
-        "  ✨✨✨  ✨✨✨  ✨✨✨  ✨✨✨ \n    ✨✨✨  ✨✨✨  ✨✨✨  ✨✨✨\n      ✨✨✨  ✨✨✨  ✨✨✨  ",
-        "   ✨✨✨  ✨✨✨  ✨✨✨  ✨✨✨\n     ✨✨✨  ✨✨✨  ✨✨✨  ✨✨\n       ✨✨✨  ✨✨✨  ✨✨✨ ",
+        "***  ***  ***  ***   \n  ***  ***  ***  *** \n    ***  ***  ***  *",
+        " ***  ***  ***  ***  \n   ***  ***  ***  ***\n     ***  ***  ***  *",
+        "  ***  ***  ***  *** \n    ***  ***  ***  ***\n      ***  ***  ***  ",
+        "   ***  ***  ***  ***\n     ***  ***  ***  **\n       ***  ***  *** ",
     ],
     "error": [
-        "⚡⚡   ⚡⚡   ⚡⚡   ⚡⚡     \n  ⚡⚡   ⚡⚡   ⚡⚡   ⚡⚡   \n    ⚡⚡   ⚡⚡   ⚡⚡   ⚡⚡ ",
-        " ⚡⚡   ⚡⚡   ⚡⚡   ⚡⚡    \n   ⚡⚡   ⚡⚡   ⚡⚡   ⚡⚡  \n     ⚡⚡   ⚡⚡   ⚡⚡   ⚡⚡",
-        "  ⚡⚡   ⚡⚡   ⚡⚡   ⚡⚡   \n    ⚡⚡   ⚡⚡   ⚡⚡   ⚡⚡ \n      ⚡⚡   ⚡⚡   ⚡⚡   ⚡",
-        "   ⚡⚡   ⚡⚡   ⚡⚡   ⚡⚡  \n     ⚡⚡   ⚡⚡   ⚡⚡   ⚡⚡\n       ⚡⚡   ⚡⚡   ⚡⚡   ",
+        "!!   !!   !!   !!     \n  !!   !!   !!   !!   \n    !!   !!   !!   !! ",
+        " !!   !!   !!   !!    \n   !!   !!   !!   !!  \n     !!   !!   !!   !!",
+        "  !!   !!   !!   !!   \n    !!   !!   !!   !! \n      !!   !!   !!   !",
+        "   !!   !!   !!   !!  \n     !!   !!   !!   !!\n       !!   !!   !!   ",
     ],
     "full": [
         "!!   !!   !!   !!       \n  !!   !!   !!   !!     \n    !!   !!   !!   !!   ",
@@ -110,7 +127,7 @@ class UIMixin:
         with Container(id="bottom-dock"):
             with Container(id="input-bar"), Container(id="input-row"):
                 yield Static(">", id="prompt")
-                yield Input(placeholder="type a command  (help for list)…", id="cmd-input")
+                yield CmdInput(placeholder="type a command  (help for list)…", id="cmd-input")
             yield Static(
                 "help · clean · status · history · /login · /logout · quit",
                 id="hint-bar",

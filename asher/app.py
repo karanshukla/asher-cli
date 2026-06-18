@@ -5,7 +5,6 @@ from __future__ import annotations
 import contextlib
 from typing import Any
 
-from textual import events
 from textual.app import App
 from textual.binding import Binding
 from textual.widgets import Input
@@ -41,26 +40,19 @@ class AsherApp(UIMixin, ConnectionMixin, MonitoringMixin, CommandsMixin, App):  
         self._is_loading: bool = True
         self._spinner_idx: int = 0
 
-    _INPUT_STYLES = "border: none; background: #161b22; outline: none;"
-
     def on_mount(self) -> None:
         self._refresh_title()
         self._show_welcome()
         self._show_loading_state()
         self._connect_worker()
-        self.set_interval(30, self._poll_status_interval)
+        self.set_interval(300, self._poll_status_interval)
         self.set_interval(0.4, self._tick_cat)
-        # this doesn't work for some reason :(
-        inp = self.query_one("#cmd-input", Input)
-        inp.set_styles(self._INPUT_STYLES)
-        inp.focus()
-
-    def on_focus(self, _event: events.Focus) -> None:
-        focused = self.focused
-        if focused is not None and getattr(focused, "id", None) == "cmd-input":
-            focused.set_styles(self._INPUT_STYLES)  # type: ignore[attr-defined]
+        self.query_one("#cmd-input", Input).focus()
 
     async def on_unmount(self) -> None:
+        if self._robot:
+            with contextlib.suppress(Exception):
+                await self._robot.unsubscribe()
         if self._account:
             with contextlib.suppress(Exception):
                 await self._account.disconnect()

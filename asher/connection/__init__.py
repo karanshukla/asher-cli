@@ -109,6 +109,7 @@ class ConnectionMixin:
                 return
 
             self._robot = robots[0]
+            await self._start_monitoring()  # type: ignore[attr-defined]
             if len(robots) > 1:
                 self._log_info(  # type: ignore[attr-defined]
                     f"{len(robots)} robots found — using '{getattr(robots[0], 'name', 'robot #1')}'"

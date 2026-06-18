@@ -7,6 +7,8 @@ import contextlib
 from datetime import timezone
 from typing import Any
 
+from pylitterbot.enums import LitterBoxStatus
+from pylitterbot.robot import EVENT_UPDATE
 from rich.text import Text
 from textual import work
 from textual.widgets import Input, RichLog, Static
@@ -15,6 +17,14 @@ from tzlocal import get_localzone
 from ..helpers import ts
 from ..login_flow import LoginFlow, LoginState
 from .base import Command, CommandRegistry, SlashCommand
+
+_CYCLING_STATUSES = frozenset({
+    LitterBoxStatus.CLEAN_CYCLE,
+    LitterBoxStatus.EMPTY_CYCLE,
+    LitterBoxStatus.PAUSED,
+    LitterBoxStatus.POWER_UP,
+    LitterBoxStatus.POWER_DOWN,
+})
 
 _HINT_DEFAULT = "help · clean · status · history · /login · /logout · quit"
 _HINT_SIGNIN = "/login to sign in"
@@ -30,16 +40,44 @@ class CleanCommand(Command):
 
     async def run(self, app: Any, args: list[str]) -> None:
         app._set_cat("cleaning", "cleaning…")
+
+        done: asyncio.Event = asyncio.Event()
+        seen_cycling = False
+
+        def _on_update() -> None:
+            nonlocal seen_cycling
+            status = getattr(app._robot, "status", None)
+            if status in _CYCLING_STATUSES:
+                seen_cycling = True
+            elif seen_cycling or status is LitterBoxStatus.CLEAN_CYCLE_COMPLETE:
+                done.set()
+
+        unsubscribe = app._robot.on(EVENT_UPDATE, _on_update)
         try:
             await app._robot.start_cleaning()
-            app._log_ok("Clean cycle started")
-            await asyncio.sleep(3)
-            await app._robot.refresh()
-            await app._refresh_status()
-            app._set_cat("happy", "all done!")
         except Exception as exc:
+            unsubscribe()
             app._log_err(f"Failed to start cleaning: {exc}")
             app._set_cat("error", "error")
+            return
+
+        app._log_ok("Clean cycle started")
+        timed_out = False
+        try:
+            await asyncio.wait_for(done.wait(), timeout=300)
+        except asyncio.TimeoutError:
+            timed_out = True
+        finally:
+            unsubscribe()
+
+        await app._robot.refresh()
+        await app._refresh_status()
+        if timed_out:
+            app._log_warn("Clean cycle timed out — status may not reflect completion")
+            app._set_cat("idle", "timed out")
+        else:
+            app._log_ok("Clean cycle complete")
+            app._set_cat("happy", "all done!")
 
 
 class StatusCommand(Command):
@@ -301,6 +339,9 @@ class LogoutCommand(SlashCommand):
             app._log_warn("Not signed in.")
             return
 
+        if app._robot:
+            with contextlib.suppress(Exception):
+                await app._robot.unsubscribe()
         with contextlib.suppress(Exception):
             await app._account.disconnect()
         app._account = None
@@ -455,6 +496,9 @@ class CommandsMixin:
         self.query_one("#cmd-input", Input).password = False  # type: ignore[attr-defined]
         self.query_one("#cmd-input", Input).placeholder = "type a command  (help for list)…"  # type: ignore[attr-defined]
 
+        if self._robot:
+            with contextlib.suppress(Exception):
+                await self._robot.unsubscribe()  # type: ignore[attr-defined]
         if self._account:
             with contextlib.suppress(Exception):
                 await self._account.disconnect()
