@@ -13,11 +13,18 @@ from textual.containers import Container
 from textual.css.query import NoMatches
 from textual.widgets import Input, RichLog, Static
 
+from ..cats import CATS
+from ..helpers import ts
+
+load_dotenv()
+
 
 class CmdInput(Input):
     """Input with all focus borders and tints removed."""
 
-    DEFAULT_CSS = Input.DEFAULT_CSS + """
+    DEFAULT_CSS = (
+        Input.DEFAULT_CSS
+        + """
     CmdInput {
         border: none !important;
         height: 1;
@@ -29,11 +36,8 @@ class CmdInput(Input):
         }
     }
     """
+    )
 
-from ..cats import CATS
-from ..helpers import ts
-
-load_dotenv()
 
 if os.getenv("ASHER_CLI_DEV_MODE", "false").lower() == "true":
     VERSION = "dev"

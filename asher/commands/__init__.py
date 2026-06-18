@@ -18,13 +18,15 @@ from ..helpers import ts
 from ..login_flow import LoginFlow, LoginState
 from .base import Command, CommandRegistry, SlashCommand
 
-_CYCLING_STATUSES = frozenset({
-    LitterBoxStatus.CLEAN_CYCLE,
-    LitterBoxStatus.EMPTY_CYCLE,
-    LitterBoxStatus.PAUSED,
-    LitterBoxStatus.POWER_UP,
-    LitterBoxStatus.POWER_DOWN,
-})
+_CYCLING_STATUSES = frozenset(
+    {
+        LitterBoxStatus.CLEAN_CYCLE,
+        LitterBoxStatus.EMPTY_CYCLE,
+        LitterBoxStatus.PAUSED,
+        LitterBoxStatus.POWER_UP,
+        LitterBoxStatus.POWER_DOWN,
+    }
+)
 
 _HINT_DEFAULT = "help · clean · status · history · /login · /logout · quit"
 _HINT_SIGNIN = "/login to sign in"
