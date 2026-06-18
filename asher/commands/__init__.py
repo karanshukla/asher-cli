@@ -5,7 +5,11 @@ from __future__ import annotations
 import asyncio
 import contextlib
 from datetime import timezone
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
+
+if TYPE_CHECKING:
+    from ..app import AsherApp
+    from ..robot_protocol import RobotProtocol
 
 from pylitterbot.enums import LitterBoxStatus
 from pylitterbot.robot import EVENT_UPDATE
@@ -14,7 +18,7 @@ from textual import work
 from textual.widgets import Input, RichLog, Static
 from tzlocal import get_localzone
 
-from ..helpers import ts
+from ..helpers import robot_model, ts
 from ..login_flow import LoginFlow, LoginState
 from .base import Command, CommandRegistry, SlashCommand
 
@@ -40,7 +44,8 @@ class CleanCommand(Command):
     description = "start a clean cycle"
     requires_robot = True
 
-    async def run(self, app: Any, args: list[str]) -> None:
+    async def run(self, app: AsherApp, args: list[str]) -> None:
+        assert app._robot is not None
         app._set_cat("cleaning", "cleaning…")
 
         done: asyncio.Event = asyncio.Event()
@@ -87,20 +92,21 @@ class StatusCommand(Command):
     description = "refresh and display full status"
     requires_robot = True
 
-    async def run(self, app: Any, args: list[str]) -> None:
+    async def run(self, app: AsherApp, args: list[str]) -> None:
+        assert app._robot is not None
         try:
             await app._robot.refresh()
             await app._refresh_status()
             r = app._robot
             rows = [
-                ("Name", getattr(r, "name", "—")),
-                ("Status", str(getattr(r, "status", "—"))),
-                ("Drawer", f"{getattr(r, 'waste_drawer_level', 0):.0f}%"),
-                ("Sleeping", "yes" if getattr(r, "sleeping", False) else "no"),
-                ("Locked", "yes" if getattr(r, "panel_lockout", False) else "no"),
-                ("Night light", "on" if getattr(r, "night_light_mode_enabled", False) else "off"),
-                ("Online", "yes" if getattr(r, "is_online", False) else "no"),
-                ("Serial", getattr(r, "serial", "—")),
+                ("Name", r.name),
+                ("Status", str(r.status)),
+                ("Drawer", f"{r.waste_drawer_level:.0f}%"),
+                ("Sleeping", "yes" if r.sleep_mode_enabled else "no"),
+                ("Locked", "yes" if r.panel_lock_enabled else "no"),
+                ("Night light", "on" if r.night_light_mode_enabled else "off"),
+                ("Online", "yes" if r.is_online else "no"),
+                ("Serial", r.serial),
             ]
             log = app.query_one("#log", RichLog)
             for k, v in rows:
@@ -121,7 +127,8 @@ class LockCommand(Command):
     def display_name(self) -> str:
         return "lock / unlock"
 
-    async def run(self, app: Any, args: list[str]) -> None:
+    async def run(self, app: AsherApp, args: list[str]) -> None:
+        assert app._robot is not None
         try:
             await app._robot.set_panel_lockout(True)
             app._log_ok("Panel locked")
@@ -138,7 +145,8 @@ class UnlockCommand(Command):
     def display_name(self) -> str:
         return "lock / unlock"
 
-    async def run(self, app: Any, args: list[str]) -> None:
+    async def run(self, app: AsherApp, args: list[str]) -> None:
+        assert app._robot is not None
         try:
             await app._robot.set_panel_lockout(False)
             app._log_ok("Panel unlocked")
@@ -155,7 +163,8 @@ class SleepCommand(Command):
     def display_name(self) -> str:
         return "sleep / wake"
 
-    async def run(self, app: Any, args: list[str]) -> None:
+    async def run(self, app: AsherApp, args: list[str]) -> None:
+        assert app._robot is not None
         try:
             await app._robot.set_sleep_mode(True)
             app._log_ok("Sleep mode enabled")
@@ -177,7 +186,8 @@ class WakeCommand(Command):
     def display_name(self) -> str:
         return "sleep / wake"
 
-    async def run(self, app: Any, args: list[str]) -> None:
+    async def run(self, app: AsherApp, args: list[str]) -> None:
+        assert app._robot is not None
         try:
             await app._robot.set_sleep_mode(False)
             app._log_ok("Robot woken up")
@@ -200,7 +210,8 @@ class NightLightCommand(Command):
     def display_name(self) -> str:
         return "night-light on|off"
 
-    async def run(self, app: Any, args: list[str]) -> None:
+    async def run(self, app: AsherApp, args: list[str]) -> None:
+        assert app._robot is not None
         arg = args[0].lower() if args else ""
         if arg not in ("on", "off", "auto"):
             app._log_warn("Usage: night-light on|off")
@@ -235,7 +246,8 @@ class NightLightBrightnessCommand(Command):
     def display_name(self) -> str:
         return "night-light-brightness"
 
-    async def run(self, app: Any, args: list[str]) -> None:
+    async def run(self, app: AsherApp, args: list[str]) -> None:
+        assert app._robot is not None
         if not args or not args[0].isdigit():
             app._log_warn("Usage: night-light-brightness <25|50|100>")
             return
@@ -259,7 +271,8 @@ class HistoryCommand(Command):
     description = "show recent activity log"
     requires_robot = True
 
-    async def run(self, app: Any, args: list[str]) -> None:
+    async def run(self, app: AsherApp, args: list[str]) -> None:
+        assert app._robot is not None
         try:
             acts = await app._robot.get_activity_history(limit=25)
             log = app.query_one("#log", RichLog)
@@ -294,7 +307,7 @@ class HelpCommand(Command):
     aliases = ("commands",)
     description = "show this message"
 
-    async def run(self, app: Any, args: list[str]) -> None:
+    async def run(self, app: AsherApp, args: list[str]) -> None:
         app._show_help()
 
 
@@ -302,7 +315,7 @@ class ClearCommand(Command):
     name = "clear"
     description = "clear the log"
 
-    async def run(self, app: Any, args: list[str]) -> None:
+    async def run(self, app: AsherApp, args: list[str]) -> None:
         app.query_one("#log", RichLog).clear()
 
 
@@ -315,7 +328,7 @@ class QuitCommand(Command):
     def display_name(self) -> str:
         return "quit / exit"
 
-    async def run(self, app: Any, args: list[str]) -> None:
+    async def run(self, app: AsherApp, args: list[str]) -> None:
         app.exit()
 
 
@@ -326,7 +339,7 @@ class LoginCommand(SlashCommand):
     name = "login"
     description = "sign in or switch accounts"
 
-    async def run(self, app: Any, args: list[str]) -> None:
+    async def run(self, app: AsherApp, args: list[str]) -> None:
         app._start_login_flow()
 
 
@@ -334,7 +347,7 @@ class LogoutCommand(SlashCommand):
     name = "logout"
     description = "sign out and re-enter credentials"
 
-    async def run(self, app: Any, args: list[str]) -> None:
+    async def run(self, app: AsherApp, args: list[str]) -> None:
         from ..connection import _keyring_delete  # noqa: PLC0415
 
         if not app._account:
@@ -356,6 +369,22 @@ class LogoutCommand(SlashCommand):
         app.query_one("#hint-bar", Static).update(_HINT_SIGNIN)
 
 
+class RobotsCommand(SlashCommand):
+    name = "robots"
+    description = "Show all robots on the account (/robot to switch )"
+
+    async def run(self, app: AsherApp, args: list[str]) -> None:
+        log = app.query_one("#log", RichLog)
+        for idx, robot in enumerate(app._account.robots):
+            active = robot is app._robot
+            t = ts()
+            t.append("  ● " if active else "    ", style="#3fb950" if active else "#484f58")
+            t.append(f"[{idx}] ", style="#484f58")
+            t.append(getattr(robot, "name", "—"), style="#e6edf3" if active else "#c9d1d9")
+            t.append(f"  {robot_model(robot)}", style="#484f58")
+            log.write(t)
+
+
 # ── registry ────────────────────────────────────────────────────────────────
 
 _registry = CommandRegistry()
@@ -373,6 +402,7 @@ _registry.register(ClearCommand())
 _registry.register(QuitCommand())
 _registry.register(LoginCommand())
 _registry.register(LogoutCommand())
+_registry.register(RobotsCommand())
 
 
 # ── mixin ───────────────────────────────────────────────────────────────────
@@ -380,7 +410,7 @@ _registry.register(LogoutCommand())
 
 class CommandsMixin:
     # declared for type checkers; assigned in AsherApp.__init__
-    _robot: Any
+    _robot: RobotProtocol | None
     _account: Any
     _cmd_history: list[str]
     _hist_idx: int
@@ -515,7 +545,7 @@ class CommandsMixin:
 
     @work
     async def _dispatch_command(self, command: Command, args: list[str]) -> None:
-        await command.run(self, args)
+        await command.run(cast("AsherApp", self), args)
 
     # ── help ────────────────────────────────────────────────────────────────────
 

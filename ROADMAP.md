@@ -43,6 +43,10 @@ The app already fetches all robots on connect — switching just needs
 `self._robot = robots[n]` and a status bar refresh. Useful for households with
 multiple units (e.g. LR4 + LR5).
 
+**Persist active robot selection** — save the chosen robot's serial number to
+keyring (or a local config file) so the app automatically selects the same robot
+on next launch, without requiring a manual switch every session.
+
 ### ~~`/auth`~~ → `/login` ✅ — update credentials without restart
 
 `/login` starts an inline credential entry flow directly in the command bar:
@@ -1961,5 +1965,7 @@ Ranked by user-visible impact vs. implementation effort:
 24. **Startup animation** (§11) — cute but adds friction to quick status checks; could be opt-in
 25. **E2E test harness** (§15) — Textual Pilot tests for critical user flows; good for preventing regressions but requires maintenance
 26. **Refactor to be more clean code** - example: have a base command class, and have a property to determine whether its a slash command or not, instead of having two separate methods for slash and non-slash commands. This would reduce code duplication and make it easier to add new commands in the future.
+27. **LR5/Evo Specific features** - depending on what is supported by pylitterbot, we could add features specific to the LR5 or Evo models, such as camera snapshots, night light color control.Same with feeder robot, litter robot hopper etc
+
 
 

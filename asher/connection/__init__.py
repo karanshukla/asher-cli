@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import contextlib
 import os
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from ..robot_protocol import RobotProtocol
 
 import keyring
 import keyring.errors
@@ -12,7 +15,7 @@ from dotenv import load_dotenv
 from textual import work
 from textual.widgets import RichLog
 
-from ..helpers import ts
+from ..helpers import robot_model, ts
 
 load_dotenv()
 
@@ -54,7 +57,8 @@ def _keyring_delete() -> None:
 class ConnectionMixin:
     # declared for type checkers; assigned in AsherApp.__init__
     _account: Any
-    _robot: Any
+    _robot: RobotProtocol | None
+    _robots: list[RobotProtocol]
     _pets: list
 
     @work(exclusive=True)
@@ -108,6 +112,8 @@ class ConnectionMixin:
                 self._account = None
                 return
 
+            self.robots = robots
+            # just go with the first robot to begin with
             self._robot = robots[0]
             await self._start_monitoring()  # type: ignore[attr-defined]
             if len(robots) > 1:
@@ -115,9 +121,8 @@ class ConnectionMixin:
                     f"{len(robots)} robots found — using '{getattr(robots[0], 'name', 'robot #1')}'"
                 )
                 for i, rb in enumerate(robots):
-                    model = type(rb).__name__
                     self._log_info(  # type: ignore[attr-defined]
-                        f"  [{i}] {getattr(rb, 'name', '?')} ({model}  serial={getattr(rb, 'serial', '?')})"
+                        f"  [{i}] {getattr(rb, 'name', '?')} ({robot_model(rb)}  serial={getattr(rb, 'serial', '?')})"
                     )
 
             await self._update_last_cat_seen()  # type: ignore[attr-defined]
@@ -126,9 +131,8 @@ class ConnectionMixin:
             t = ts()
             t.append("✓ Connected to ", style="#3fb950")
             name = getattr(self._robot, "name", "robot")
-            model = type(self._robot).__name__
             t.append(name, style="bold #e6edf3")
-            t.append(f" ({model})", style="#484f58")
+            t.append(f" ({robot_model(self._robot)})", style="#484f58")
             log.write(t)
             self._set_cat("happy", "connected!")  # type: ignore[attr-defined]
 

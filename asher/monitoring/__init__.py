@@ -2,27 +2,33 @@
 
 from __future__ import annotations
 
-from typing import Any
+from datetime import datetime
+from typing import TYPE_CHECKING
 
 from pylitterbot.enums import LitterBoxStatus
 from rich.text import Text
 from textual import work
 from textual.widgets import Static
 
-from ..helpers import drawer_bar, fmt_ago
+from ..helpers import drawer_bar, fmt_ago, robot_model
+
+if TYPE_CHECKING:
+    from ..robot_protocol import RobotProtocol
 
 
 class MonitoringMixin:
     # declared for type checkers; assigned in AsherApp.__init__
-    _robot: Any
+    _robot: RobotProtocol | None
     _pets: list
     _cat_mode: str
-    _last_cat_seen: Any
+    _last_cat_seen: datetime | None
 
     async def _start_monitoring(self) -> None:
         """Subscribe to WebSocket push updates from the robot."""
         from pylitterbot.robot import EVENT_UPDATE  # noqa: PLC0415
 
+        if self._robot is None:
+            return
         try:
             self._robot.on(EVENT_UPDATE, self._on_robot_update)
             await self._robot.subscribe()
@@ -54,18 +60,6 @@ class MonitoringMixin:
         except Exception:
             pass
 
-    _MODEL_LABELS: dict[str, str] = {
-        "Litter-Robot 3": "LR3",
-        "Litter-Robot 4": "LR4",
-        "Litter-Robot 5": "LR5",
-        "Feeder-Robot": "Feeder",
-    }
-
-    @classmethod
-    def _robot_model_label(cls, robot: Any) -> str:
-        model = getattr(robot, "model", None) or type(robot).__name__
-        return cls._MODEL_LABELS.get(model, model)
-
     async def _refresh_status(self) -> None:
         r = self._robot
         if r is None:
@@ -88,7 +82,7 @@ class MonitoringMixin:
         pet_name = self._pets[0].name if self._pets else None
 
         robot_txt = Text(name, style="bold #e6edf3")
-        robot_txt.append(f"  {self._robot_model_label(r)}", style="#484f58")
+        robot_txt.append(f"  {robot_model(r)}", style="#484f58")
         self.query_one("#robot-lbl", Static).update(robot_txt)  # type: ignore[attr-defined]
 
         robot_status = getattr(r, "status", None)
@@ -124,7 +118,7 @@ class MonitoringMixin:
         elif mode_str == "auto":
             nl_emoji, nl_color = "◐", "#58a6ff"
         else:
-            nl_emoji, nl_color = "*", "#d29922"
+            nl_emoji, nl_color = "☀", "#d29922"
 
         nl = Text()
         nl.append(nl_emoji, style=nl_color)

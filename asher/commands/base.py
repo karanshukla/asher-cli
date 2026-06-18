@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..app import AsherApp
 
 
 class Command(ABC):
@@ -40,7 +43,7 @@ class Command(ABC):
         return self.display_name
 
     @abstractmethod
-    async def run(self, app: Any, args: list[str]) -> None:
+    async def run(self, app: AsherApp, args: list[str]) -> None:
         """Execute the command."""
 
 

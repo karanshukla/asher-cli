@@ -6,14 +6,7 @@ from datetime import datetime, timezone
 
 from rich.text import Text
 
-STATUS_COLORS: dict[str, str] = {
-    "Ready": "#3fb950",  # green
-    "Cycling": "#58a6ff",  # blue
-    "Cat Detected": "#d29922",  # amber
-    "Drawer Full": "#f85149",  # red
-    "Offline": "#f85149",  # red
-    "Sleeping": "#484f58",  # muted
-}
+from .constants import ROBOT_MODELS
 
 
 def fmt_ago(dt: datetime | None) -> str:
@@ -46,3 +39,7 @@ def ts() -> Text:
     t = Text()
     t.append(f"[{datetime.now().strftime('%H:%M:%S')}] ", style="#484f58")
     return t
+
+
+def robot_model(robot: object) -> str:
+    return ROBOT_MODELS.get(type(robot).__name__, type(robot).__name__)
