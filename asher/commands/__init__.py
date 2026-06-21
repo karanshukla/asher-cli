@@ -80,7 +80,7 @@ class CleanCommand(Command):
         await app._robot.refresh()
         await app._refresh_status()
         if timed_out:
-            app._log_warn("Clean cycle timed out — status may not reflect completion")
+            app._log_warn("Clean cycle timed out - status may not reflect completion")
             app._set_cat("idle", "timed out")
         else:
             app._log_ok("Clean cycle complete")
@@ -120,7 +120,7 @@ class StatusCommand(Command):
 
 class LockCommand(Command):
     name = "lock"
-    description = "toggle panel lockout"
+    description = "lock the panel"
     requires_robot = True
 
     @property
@@ -128,17 +128,18 @@ class LockCommand(Command):
         return "lock / unlock"
 
     async def run(self, app: AsherApp, args: list[str]) -> None:
-        assert app._robot is not None
-        try:
-            await app._robot.set_panel_lockout(True)
-            app._log_ok("Panel locked")
-        except Exception as exc:
-            app._log_err(f"Failed: {exc}")
+        assert app._adapter is not None
+        ok, msg = await app._adapter.set_panel_lockout(True)
+        if ok:
+            app.query_one("#lock-lbl", Static).update(Text("⊘ Locked", style="bold #d29922"))
+            app._log_ok(msg)
+        else:
+            app._log_err(msg)
 
 
 class UnlockCommand(Command):
     name = "unlock"
-    description = "toggle panel lockout"
+    description = "unlock the panel"
     requires_robot = True
 
     @property
@@ -146,17 +147,18 @@ class UnlockCommand(Command):
         return "lock / unlock"
 
     async def run(self, app: AsherApp, args: list[str]) -> None:
-        assert app._robot is not None
-        try:
-            await app._robot.set_panel_lockout(False)
-            app._log_ok("Panel unlocked")
-        except Exception as exc:
-            app._log_err(f"Failed: {exc}")
+        assert app._adapter is not None
+        ok, msg = await app._adapter.set_panel_lockout(False)
+        if ok:
+            app.query_one("#lock-lbl", Static).update(Text("□ Unlocked", style="#484f58"))
+            app._log_ok(msg)
+        else:
+            app._log_err(msg)
 
 
 class SleepCommand(Command):
     name = "sleep"
-    description = "toggle sleep mode"
+    description = "enable sleep mode"
     requires_robot = True
 
     @property
@@ -164,22 +166,21 @@ class SleepCommand(Command):
         return "sleep / wake"
 
     async def run(self, app: AsherApp, args: list[str]) -> None:
-        assert app._robot is not None
-        try:
-            await app._robot.set_sleep_mode(True)
-            app._log_ok("Sleep mode enabled")
-            app._set_cat("sleeping", "sleeping…")
-        except NotImplementedError:
-            app._log_warn(
-                "Sleep scheduling is not supported as a simple toggle on this robot model."
-            )
-        except Exception as exc:
-            app._log_err(f"Failed: {exc}")
+        assert app._adapter is not None
+        ok, msg = await app._adapter.set_sleep(True)
+        if ok:
+            app._log_ok(msg)
+            app._set_cat("sleeping", "sleeping...")
+            await asyncio.sleep(2)
+            await app._robot.refresh()  # type: ignore[union-attr]
+            await app._refresh_status()
+        else:
+            app._log_warn(msg)
 
 
 class WakeCommand(Command):
     name = "wake"
-    description = "toggle sleep mode"
+    description = "disable sleep mode"
     requires_robot = True
 
     @property
@@ -187,59 +188,52 @@ class WakeCommand(Command):
         return "sleep / wake"
 
     async def run(self, app: AsherApp, args: list[str]) -> None:
-        assert app._robot is not None
-        try:
-            await app._robot.set_sleep_mode(False)
-            app._log_ok("Robot woken up")
+        assert app._adapter is not None
+        ok, msg = await app._adapter.set_sleep(False)
+        if ok:
+            app._log_ok(msg)
             app._set_cat("happy", "awake!")
-        except NotImplementedError:
-            app._log_warn(
-                "Sleep scheduling is not supported as a simple toggle on this robot model."
-            )
-        except Exception as exc:
-            app._log_err(f"Failed: {exc}")
+            await asyncio.sleep(2)
+            await app._robot.refresh()  # type: ignore[union-attr]
+            await app._refresh_status()
+        else:
+            app._log_warn(msg)
 
 
 class NightLightCommand(Command):
     name = "night-light"
     aliases = ("nightlight", "nl")
-    description = "toggle night light"
+    description = "set night light mode"
     requires_robot = True
 
     @property
     def display_name(self) -> str:
-        return "night-light on|off"
+        return "night-light on|off|auto"
 
     async def run(self, app: AsherApp, args: list[str]) -> None:
-        assert app._robot is not None
+        assert app._adapter is not None
         arg = args[0].lower() if args else ""
         if arg not in ("on", "off", "auto"):
-            app._log_warn("Usage: night-light on|off")
+            app._log_warn("Usage: night-light on|off|auto")
             return
-        try:
-            if hasattr(app._robot, "set_night_light_mode"):
-                from pylitterbot.enums import NightLightMode  # noqa: PLC0415
-
-                mode = {
-                    "on": NightLightMode.ON,
-                    "off": NightLightMode.OFF,
-                    "auto": NightLightMode.AUTO,
-                }[arg]
-                await app._robot.set_night_light_mode(mode)
-            elif arg == "on" and hasattr(app._robot, "set_night_light_brightness"):
-                await app._robot.set_night_light_brightness(100)
+        ok, msg = await app._adapter.set_night_light(arg)
+        if ok:
+            app._log_ok(msg)
+            if arg == "off":
+                nl = Text("○", style="#484f58")
+            elif arg == "auto":
+                nl = Text("◐", style="#58a6ff")
             else:
-                app._log_warn("Night light control not supported by this robot version.")
-                return
-            app._log_ok(f"Night light {arg}")
-        except Exception as exc:
-            app._log_err(f"Failed: {exc}")
+                nl = Text("☀", style="#d29922")
+            app.query_one("#nightlight-lbl", Static).update(nl)
+        else:
+            app._log_warn(msg)
 
 
 class NightLightBrightnessCommand(Command):
     name = "night-light-brightness"
     aliases = ("nlb",)
-    description = "<25|50|100> set night light brightness"
+    description = "<level> set night light brightness"
     requires_robot = True
 
     @property
@@ -247,22 +241,33 @@ class NightLightBrightnessCommand(Command):
         return "night-light-brightness"
 
     async def run(self, app: AsherApp, args: list[str]) -> None:
-        assert app._robot is not None
+        assert app._adapter is not None
         if not args or not args[0].isdigit():
-            app._log_warn("Usage: night-light-brightness <25|50|100>")
+            app._log_warn("Usage: night-light-brightness <level>")
             return
         level = int(args[0])
-        if level not in (25, 50, 100):
-            app._log_warn(f"Invalid brightness {level} — must be 25, 50, or 100")
-            return
-        if not hasattr(app._robot, "set_night_light_brightness"):
-            app._log_warn("Night light brightness control not supported by this robot version.")
-            return
-        try:
-            await app._robot.set_night_light_brightness(level)
-            app._log_ok(f"Night light brightness set to {level}")
-        except Exception as exc:
-            app._log_err(f"Failed: {exc}")
+        ok, msg = await app._adapter.set_night_light_brightness(level)
+        if ok:
+            app._log_ok(msg)
+            r = app._robot
+            nl_mode = getattr(r, "night_light_mode", None)
+            nl_enabled = getattr(r, "night_light_mode_enabled", False)
+            mode_str = (
+                nl_mode.value.lower() if nl_mode is not None else ("on" if nl_enabled else "off")
+            )
+            if mode_str == "off":
+                nl_emoji, nl_color = "○", "#484f58"
+            elif mode_str == "auto":
+                nl_emoji, nl_color = "◐", "#58a6ff"
+            else:
+                nl_emoji, nl_color = "☀", "#d29922"
+            nl = Text()
+            nl.append(nl_emoji, style=nl_color)
+            if mode_str != "off":
+                nl.append(f"  {level}%", style="#484f58")
+            app.query_one("#nightlight-lbl", Static).update(nl)
+        else:
+            app._log_warn(msg)
 
 
 class HistoryCommand(Command):
@@ -361,6 +366,7 @@ class LogoutCommand(SlashCommand):
             await app._account.disconnect()
         app._account = None
         app._robot = None
+        app._adapter = None
         _keyring_delete()
         app._log_ok("Signed out.")
         app._log_info("Type /login to sign in.")
@@ -371,18 +377,79 @@ class LogoutCommand(SlashCommand):
 
 class RobotsCommand(SlashCommand):
     name = "robots"
-    description = "Show all robots on the account (/robot to switch )"
+    description = "list all robots on the account"
 
-    async def run(self, app: AsherApp, args: list[str]) -> None:
+    async def run(self, app: AsherApp, args: list[str]) -> None:  # noqa: ARG002
+        robots = app._robots
+        if not robots:
+            app._log_warn("No robots loaded - use /login to connect first.")
+            return
         log = app.query_one("#log", RichLog)
-        for idx, robot in enumerate(app._account.robots):
+        for idx, robot in enumerate(robots):
             active = robot is app._robot
             t = ts()
             t.append("  ● " if active else "    ", style="#3fb950" if active else "#484f58")
             t.append(f"[{idx}] ", style="#484f58")
-            t.append(getattr(robot, "name", "—"), style="#e6edf3" if active else "#c9d1d9")
+            t.append(getattr(robot, "name", "-"), style="#e6edf3" if active else "#c9d1d9")
             t.append(f"  {robot_model(robot)}", style="#484f58")
             log.write(t)
+
+
+class RobotCommand(SlashCommand):
+    name = "robot"
+    description = "<index|name> switch active robot"
+
+    async def run(self, app: AsherApp, args: list[str]) -> None:
+        robots = app._robots
+        if not robots:
+            app._log_warn("No robots loaded - use /login to connect first.")
+            return
+
+        if not args:
+            app._log_info("Usage: /robot <index|name>  - use /robots to list")
+            return
+
+        target = " ".join(args)
+        robot = None
+        if target.isdigit():
+            idx = int(target)
+            if 0 <= idx < len(robots):
+                robot = robots[idx]
+            else:
+                app._log_warn(f"No robot at index {idx} - use /robots to list")
+                return
+        else:
+            tl = target.lower()
+            robot = next((rb for rb in robots if tl in getattr(rb, "name", "").lower()), None)
+            if robot is None:
+                app._log_warn(f"No robot matching '{target}' - use /robots to list")
+                return
+
+        if robot is app._robot:
+            app._log_info(f"Already using '{getattr(robot, 'name', '?')}'")
+            return
+
+        if app._robot is not None:
+            with contextlib.suppress(Exception):
+                await app._robot.unsubscribe()
+
+        app._robot = robot
+        from ..robot_adapters import make_adapter  # noqa: PLC0415
+
+        app._adapter = make_adapter(robot)
+        await app._start_monitoring()  # type: ignore[attr-defined]
+        await app._update_last_cat_seen()  # type: ignore[attr-defined]
+        await app._refresh_status()  # type: ignore[attr-defined]
+
+        name = getattr(robot, "name", "?")
+        app._log_ok(f"Switched to '{name}' ({robot_model(robot)})")
+        app._set_cat("happy", "connected!")  # type: ignore[attr-defined]
+
+        serial = getattr(robot, "serial", None)
+        if serial:
+            from ..connection import _keyring_save_robot  # noqa: PLC0415
+
+            _keyring_save_robot(serial)
 
 
 # ── registry ────────────────────────────────────────────────────────────────
@@ -403,6 +470,7 @@ _registry.register(QuitCommand())
 _registry.register(LoginCommand())
 _registry.register(LogoutCommand())
 _registry.register(RobotsCommand())
+_registry.register(RobotCommand())
 
 
 # ── mixin ───────────────────────────────────────────────────────────────────
@@ -441,7 +509,7 @@ class CommandsMixin:
             self._handle_login_password(raw)
             return
 
-        # Normal command — add to history and echo
+        # Normal command - add to history and echo
         self._cmd_history.insert(0, raw)
         self._hist_idx = -1
 
@@ -460,13 +528,13 @@ class CommandsMixin:
         command = _registry.get(cmd_name)
         if command is None:
             if raw_cmd.startswith("/"):
-                self._log_warn(f"Unknown slash command: '{raw}'  — try /login, /logout, /exit")  # type: ignore[attr-defined]
+                self._log_warn(f"Unknown slash command: '{raw}'  - try /login, /logout, /exit")  # type: ignore[attr-defined]
             else:
-                self._log_warn(f"Unknown command: '{cmd_name}'  — type 'help' for list")  # type: ignore[attr-defined]
+                self._log_warn(f"Unknown command: '{cmd_name}'  - type 'help' for list")  # type: ignore[attr-defined]
             return
 
         if command.requires_robot and self._robot is None:
-            self._log_err("Not connected — type '/login' to sign in.")  # type: ignore[attr-defined]
+            self._log_err("Not connected - type '/login' to sign in.")  # type: ignore[attr-defined]
             return
 
         self._dispatch_command(command, args)
@@ -497,9 +565,9 @@ class CommandsMixin:
     # ── inline login flow ─────────────────────────────────────────────────────
 
     def _start_login_flow(self) -> None:
-        """Enter interactive login mode — prompts for email then password in the command bar."""
+        """Enter interactive login mode - prompts for email then password in the command bar."""
         if self._account:
-            self._log_warn("Already signed in — use /logout to sign out first.")  # type: ignore[attr-defined]
+            self._log_warn("Already signed in - use /logout to sign out first.")  # type: ignore[attr-defined]
             return
         self._login.start()
         self._set_cat("idle", "sign in")  # type: ignore[attr-defined]

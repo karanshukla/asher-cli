@@ -19,8 +19,8 @@ def mock_robot():
     robot.waste_drawer_level = 50.0
     robot.status = MagicMock()
     robot.status.value = "Ready"
-    robot.sleeping = False
-    robot.panel_lockout = False
+    robot.sleep_mode_enabled = False
+    robot.panel_lock_enabled = False
     robot.night_light_mode_enabled = False
     robot.serial = "LR12345"
     robot.last_seen = datetime.now(timezone.utc)
@@ -126,6 +126,7 @@ async def test_status_bar_widgets_exist():
             assert app.query_one("#robot-lbl")
             assert app.query_one("#online-lbl")
             assert app.query_one("#nightlight-lbl")
+            assert app.query_one("#lock-lbl")
             assert app.query_one("#drawer-lbl")
             assert app.query_one("#litter-lbl")
             assert app.query_one("#weight-lbl")

@@ -17,11 +17,11 @@ A Claude Code-style terminal dashboard for monitoring and controlling Litter Rob
 - Live status bar — unit name, online/offline, drawer fill level, last activity, cat weight
 - Human-readable robot status — translates raw API states into plain English (`Ready`, `Cleaning`, `Cat Detected`, `Drawer Full`, etc.)
 - Scrollable activity log with timestamps
-- Commands: `clean`, `status`, `lock`, `unlock`, `sleep`, `wake`, `night-light`, `history`, `help`, `quit`
-- Slash commands for app management: `/login`, `/logout`, `/exit`
+- Commands: `clean`, `status`, `lock`, `unlock`, `sleep`, `wake`, `night-light on|off|auto`, `night-light-brightness`, `history`, `help`, `quit`
+- Slash commands for app management: `/login`, `/logout`, `/robots`, `/robot <index|name>`, `/exit`
 - Cat animation panel that reacts to robot state
 - Command history (↑/↓ arrows)
-- Auto-refreshes every 30 seconds
+- Real-time updates via WebSocket; 5-minute poll fallback
 
 ## Install
 
@@ -81,7 +81,8 @@ LITTER_ROBOT_PASSWORD=yourpassword
 | `info` | Full dump of all robot properties (serial, firmware, all settings) |
 | `lock` / `unlock` | Toggle panel lockout |
 | `sleep` / `wake` | Toggle sleep mode |
-| `night-light on\|off` | Toggle night light |
+| `night-light on\|off\|auto` | Set night light mode |
+| `night-light-brightness <level>` | Set brightness (LR5: 0-100; LR4: 25/50/100) |
 | `history` | Show last 25 activity events |
 | `clear` | Clear the log |
 | `help` | Show command list |
@@ -93,6 +94,8 @@ LITTER_ROBOT_PASSWORD=yourpassword
 |---|---|
 | `/login` | Sign in or switch accounts |
 | `/logout` | Sign out and clear saved credentials |
+| `/robots` | List all robots on the account |
+| `/robot <index\|name>` | Switch active robot (selection persists to keyring) |
 | `/exit` | Exit Asher CLI |
 
 **Keyboard shortcuts:** `Ctrl+L` clears the log, `Ctrl+C` quits.

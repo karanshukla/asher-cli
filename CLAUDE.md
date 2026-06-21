@@ -34,15 +34,21 @@ asher                  # after: uv sync && uv run asher  OR  pip install -e .
 asher/
   __init__.py
   app.py            AsherApp class (thin orchestrator — composes mixins)
-  auth.py           LoginScreen modal (ModalScreen[tuple[str,str]])
-  helpers.py        fmt_ago(), drawer_bar(), ts(), STATUS_COLORS  (pure, testable)
+  auth.py           LoginScreen modal (ModalScreen[tuple[str,str]]) — available, not primary flow
+  helpers.py        fmt_ago(), drawer_bar(), ts(), robot_model()  (pure, testable)
+  constants.py      STATUS_COLORS, ROBOT_MODELS
   cats.py           CATS dict (ASCII art)
+  login_flow.py     LoginFlow state machine — inline email/password prompt in command bar
+  robot_protocol.py RobotProtocol structural Protocol for pylitterbot robot objects
+  robot_adapters.py RobotAdapter ABC + LR3/LR4/LR5 subclasses + make_adapter() factory
   __main__.py       main() entry point
-  commands/         CommandsMixin — robot commands + slash-command dispatch
+  commands/
+    base.py         Command ABC, SlashCommand, CommandRegistry
+    __init__.py     CommandsMixin — all command classes + registry + dispatch
   connection/       ConnectionMixin — keyring auth, _connect_worker, keyring helpers
   monitoring/       MonitoringMixin — _poll_status_interval, _refresh_status
   ui/               UIMixin — CSS, compose(), log helpers, cat helpers
-  slash-commands/   Convention doc + future slash-command registry
+  slash-commands/   Convention doc
 
 tests/
   testhelpers.py          unit tests for helpers.py
@@ -66,7 +72,7 @@ Priority order on startup:
 
 1. **OS keyring** — set automatically after first interactive login
 2. **`.env` file** — fallback for existing users / CI
-3. **Interactive `LoginScreen`** — shown when no credentials found anywhere
+3. **Inline login flow** — shown when no credentials found anywhere (email → password prompt in command bar)
 
 `.env` variable names (for fallback):
 ```
@@ -80,10 +86,10 @@ Helper functions in `asher/connection/__init__.py`: `_keyring_load()`, `_keyring
 ## Command convention
 
 **Normal commands** (no prefix) — robot actions only:
-`clean`, `status`, `lock`, `unlock`, `sleep`, `wake`, `night-light on|off`, `history`, `clear`, `help`
+`clean`, `status`, `lock`, `unlock`, `sleep`, `wake`, `night-light on|off|auto`, `night-light-brightness <level>`, `history`, `clear`, `help`
 
 **Slash commands** (`/` prefix) — app management only:
-`/login`, `/logout`, `/exit`
+`/login`, `/logout`, `/exit`, `/robots`, `/robot <index|name>`
 
 **Special cases** (accepted both with and without `/`):
 `exit`, `quit`, `q` — exit the app
@@ -98,37 +104,40 @@ Do not add robot-control commands as slash commands, and do not add app-manageme
 
 ```
 AsherApp (textual.App)
-├── #status-bar          top dock — two rows (top: name/online/night-light; bottom: drawer/litter/weight/visit)
+├── #status-bar          top dock — two rows (top: name/online/night-light/lock; bottom: drawer/litter/weight/visit)
 ├── #main-area
 │   ├── #log             RichLog — scrollable event/command output
 │   └── #cat-panel       animated ASCII cat sidebar
-└── #input-bar           bottom dock — command prompt input
+└── #bottom-dock         bottom dock
+    ├── #input-bar / #input-row   command prompt ("> " label + CmdInput)
+    └── #hint-bar        shortcut hints / login flow prompts
 
-LoginScreen (ModalScreen) — shown on first run or after /login
+LoginScreen (ModalScreen) — available in auth.py but not the primary auth path
 ```
 
 ## Key methods
 
 | Method | Purpose |
 |---|---|
-| `_connect_worker()` | `@work` — resolve credentials (keyring → .env → LoginScreen), authenticate |
+| `_connect_worker()` | `@work` — resolve credentials (keyring → .env → inline login), authenticate |
 | `_refresh_status()` | update all header widgets from robot state |
-| `_poll_status_interval()` | `@work` — auto-refresh every 30s |
-| `_tick_cat()` | advances multi-frame cat animation every 0.9s |
-| `_run_cmd(raw)` | `@work` — parse and dispatch robot commands |
-| `_run_slash_cmd(raw)` | `@work` — parse and dispatch slash commands |
-| `_cmd_login()` | show LoginScreen, save creds, reconnect (no exit) |
-| `_cmd_logout()` | delete creds from keyring, exit |
+| `_poll_status_interval()` | `@work` — poll fallback every 300s (5 min); WebSocket is primary |
+| `_tick_cat()` | advances multi-frame cat animation every 0.4s |
+| `_dispatch_command(command, args)` | `@work` — calls `command.run(app, args)` from the registry |
+| `on_input_submitted()` | routes input to login flow or `_dispatch_command` via `CommandRegistry` |
+| `_start_login_flow()` | begin inline email/password prompt in command bar |
+| `_cmd_logout()` | delete creds from keyring, disconnect |
+| `make_adapter(robot)` | factory in `robot_adapters.py` — returns correct `RobotAdapter` subclass |
 | `_log_ok/err/warn/info()` | timestamped log helpers |
 
 ## Robot compatibility
 
-pylitterbot auto-detects robot type. Any attribute/method missing on a given model is caught by `getattr(..., default)` or `try/except`, so the UI degrades gracefully. Tested API surface:
+pylitterbot auto-detects robot type. Commands that differ per model are handled by `RobotAdapter` subclasses in `robot_adapters.py` — `make_adapter(robot)` returns the right one based on `type(robot).__name__`. Status-bar reads use `getattr(..., default)` for graceful degradation on older models. Tested API surface:
 
 - `robot.name`, `robot.serial`, `robot.is_online`
 - `robot.status` (LitterBoxStatus enum)
 - `robot.waste_drawer_level` (0–100)
-- `robot.sleeping`, `robot.panel_lockout`, `robot.night_light_mode_enabled`
+- `robot.sleep_mode_enabled`, `robot.panel_lock_enabled`, `robot.night_light_mode_enabled`
 - `robot.last_seen` (datetime)
 - `robot.refresh()`, `robot.start_cleaning()`
 - `robot.set_sleep_mode(bool)`, `robot.set_panel_lockout(bool)`
@@ -140,17 +149,23 @@ pylitterbot auto-detects robot type. Any attribute/method missing on a given mod
 - Textual and pylitterbot are both asyncio-native — compose cleanly with `@work` tasks
 - All command execution runs in `@work` async workers to keep the UI responsive
 - Cat modes: `idle`, `happy`, `cleaning` (animated), `sleeping`, `error`, `full`
-- `_cmd_nightlight` tries `set_night_light_brightness` first, falls back to `set_night_light_mode`
 - `VERSION` is read from `importlib.metadata.version("asher-cli")` — falls back to `"dev"` when running from source
-- `LoginScreen` uses `event.stop()` on `Input.Submitted` and `Button.Pressed` to prevent bubbling to the App's `on_input_submitted`
+- The primary login path is the inline flow in `login_flow.py` (`LoginFlow` state machine: `IDLE` → `AWAITING_EMAIL` → `AWAITING_PASSWORD`). `LoginScreen` (`auth.py`) still exists as a modal but is not used in the current main flow.
+- `LoginScreen` uses `event.stop()` on `Input.Submitted` and `Button.Pressed` to prevent bubbling to the App's `on_input_submitted` (relevant if re-activating the modal path)
+
+### IoT command timing — optimistic UI updates
+
+`sendLitterRobot4Command` (and equivalents) return as soon as the cloud **queues** the command, not when the robot applies it. Calling `robot.refresh()` immediately after gets stale data. The fix for toggle/mode commands (lock, unlock, night-light on/off/auto) is to **update the status bar widget directly** after a successful API call, without waiting for a refresh — the WebSocket subscription will confirm the final state later. Do **not** add `asyncio.sleep(N)` + `refresh()` + `_refresh_status()` for these commands.
+
+Commands that need a confirmed cloud state before showing a result (e.g. sleep/wake, where the state isn't known from the command arg alone) use `asyncio.sleep(2)` + `refresh()` + `_refresh_status()` as a best-effort workaround, accepting the risk of briefly stale display.
 
 ## Common tasks
 
-**Add a robot command:** add a branch in `_run_cmd()` in `asher/commands/__init__.py` and implement `_cmd_<name>()`.
+**Add a robot command:** create a class inheriting `Command` in `asher/commands/__init__.py`, implement `async def run(self, app, args)`, and call `_registry.register(MyCommand())`.
 
-**Add a slash command:** add a branch in `_run_slash_cmd()` in `asher/commands/__init__.py`, implement `_slash_<name>()`, and add to `slash_cmds` list in `_show_help()`. Document in `asher/slash-commands/__init__.py`.
+**Add a slash command:** create a class inheriting `SlashCommand` (sets `prefix = "/"`), implement `async def run(self, app, args)`, register it, and document in `asher/slash-commands/__init__.py`.
 
-**Change poll interval:** `self.set_interval(30, ...)` in `on_mount`.
+**Change poll interval:** `self.set_interval(300, ...)` in `on_mount`.
 
 **Add a new cat state:** add entry to `CATS` dict in `asher/cats.py` (str for static, list[str] for animated), then call `_set_cat("name", "label")`.
 

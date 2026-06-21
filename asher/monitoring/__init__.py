@@ -126,6 +126,14 @@ class MonitoringMixin:
             nl.append(f"  {nl_brightness}%", style="#484f58")
         self.query_one("#nightlight-lbl", Static).update(nl)  # type: ignore[attr-defined]
 
+        panel_locked = getattr(r, "panel_lock_enabled", False)
+        lock_text = Text()
+        if panel_locked:
+            lock_text.append("⊘ Locked", style="bold #d29922")
+        else:
+            lock_text.append("□ Unlocked", style="#484f58")
+        self.query_one("#lock-lbl", Static).update(lock_text)  # type: ignore[attr-defined]
+
         bar = drawer_bar(drawer)
         dt = Text()
         dt.append("Drawer ", style="#484f58")

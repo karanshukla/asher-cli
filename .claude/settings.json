@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv run *)",
+      "Bash(git *)",
+      "Bash(python -c ' *)",
+      "Bash(python *)",
+      "mcp__plugin_context7_context7__resolve-library-id",
+      "mcp__plugin_context7_context7__query-docs",
+      "mcp__plugin_github_github__*",
+      "WebSearch",
+      "WebFetch"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run ruff check --fix . --quiet; uv run ruff format . --quiet"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NonInteractive -ExecutionPolicy Bypass -File .claude/hooks/block-env.ps1"
+          }
+        ]
+      }
+    ]
+  }
+}

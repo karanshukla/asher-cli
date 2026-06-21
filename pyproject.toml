@@ -48,7 +48,7 @@ types  = "mypy asher/ --ignore-missing-imports"
 test   = "pytest tests/ -v --tb=short"
 fix.sequence = [{cmd = "ruff check --fix ."}, {cmd = "ruff format ."}]
 dev    = "textual run --dev asher/__main__.py"
-watch  = "watchfiles --filter python --ignore-paths asher/__pycache__ --sigint-timeout 3 'python watchrun.py' asher"
+watch  = "python watchrun.py"
 check.sequence = ["lint", "fmt", "types", "test"]
 check.help = "run all CI checks locally"
 

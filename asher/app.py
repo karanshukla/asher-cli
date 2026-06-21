@@ -12,6 +12,7 @@ from textual.widgets import Input
 from .commands import CommandsMixin
 from .connection import ConnectionMixin
 from .monitoring import MonitoringMixin
+from .robot_adapters import RobotAdapter
 from .robot_protocol import RobotProtocol
 from .ui import UIMixin
 
@@ -29,6 +30,7 @@ class AsherApp(UIMixin, ConnectionMixin, MonitoringMixin, CommandsMixin, App):  
         self._account: Any = None
         self._robots: list[RobotProtocol] = []
         self._robot: RobotProtocol | None = None
+        self._adapter: RobotAdapter | None = None
         self._pets: list = []
         self._cat_mode: str = "idle"
         self._cat_frame: int = 0

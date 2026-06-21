@@ -16,8 +16,8 @@ def mock_robot():
     r.waste_drawer_level = 42.0
     r.pet_weight = 9.1
     r.status.value = "Ready"
-    r.sleeping = False
-    r.panel_lockout = False
+    r.sleep_mode_enabled = False
+    r.panel_lock_enabled = False
     r.night_light_mode_enabled = False
     r.serial = "ABC123"
     r.last_seen = datetime.now(timezone.utc)

@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from asher.app import AsherApp
+from asher.robot_adapters import LR3Adapter
 
 
 @pytest.fixture
@@ -19,8 +20,8 @@ def connected_app():
     robot.waste_drawer_level = 50.0
     robot.status = MagicMock()
     robot.status.value = "Ready"
-    robot.sleeping = False
-    robot.panel_lockout = False
+    robot.sleep_mode_enabled = False
+    robot.panel_lock_enabled = False
     robot.night_light_mode_enabled = False
     robot.serial = "LR12345"
     robot.last_seen = datetime.now(timezone.utc)
@@ -29,11 +30,13 @@ def connected_app():
     robot.start_cleaning = AsyncMock(return_value=True)
     robot.set_panel_lockout = AsyncMock(return_value=True)
     robot.set_sleep_mode = AsyncMock(return_value=True)
-    robot.set_night_light_brightness = AsyncMock()
+    robot.set_night_light = AsyncMock(return_value=True)
+    robot.set_night_light_brightness = AsyncMock(return_value=True)
     robot.get_activity_history = AsyncMock(return_value=[])
 
     app = AsherApp()
     app._robot = robot
+    app._adapter = LR3Adapter(robot)
     app._account = MagicMock()
     app._account.disconnect = AsyncMock()
     app._pets = []

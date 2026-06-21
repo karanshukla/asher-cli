@@ -13,15 +13,16 @@ Current state, missing functionality, and suggested additions — grounded in wh
 | Connect & load robots | ✅ |
 | Status bar (name, online, drawer %, last seen, pet weight) | ✅ |
 | Pet name from Whisker account profile | ✅ |
-| Commands: clean, status, lock, unlock, sleep, wake, night-light, history, help, clear, quit | ✅ |
-| Slash commands: `/login`, `/logout`, `/exit`, `/help` | ✅ |
+| Commands: clean, status, lock, unlock, sleep, wake, night-light on/off/auto, night-light-brightness, history, help, clear, quit | ✅ |
+| Slash commands: `/login`, `/logout`, `/exit`, `/help`, `/robots`, `/robot <index\|name>` | ✅ |
 | Inline login flow (email → password in command bar, no restart) | ✅ |
 | `LoginScreen` modal (`auth.py`) — available for future use | ✅ |
 | Activity history (`get_activity_history`) | ✅ |
 | Cat animation panel with mode changes | ✅ |
 | Command history (↑/↓) | ✅ |
 | WebSocket real-time updates (LR4 primary; poll fallback every 5 min for activity history) | ✅ |
-| LR4 / LR5 / LR3 polymorphic support | ✅ (getattr fallback) |
+| LR4 / LR5 / LR3 polymorphic support via `RobotAdapter` pattern | ✅ |
+| Preferred robot persisted to keyring; auto-restored on next launch | ✅ |
 | PyPI release workflow (`release.yml` — `release/*` branches) | ✅ |
 
 ---
@@ -31,21 +32,19 @@ Current state, missing functionality, and suggested additions — grounded in wh
 Everything below would be `/command` style, similar to Claude Code, so they're
 visually distinct from robot-action commands.
 
-### `/robot` — switch active robot
+### ~~`/robot` — switch active robot~~ ✅
+
+Two separate commands are live:
 
 ```
-/robot            list all robots on the account
+/robots           list all robots on the account (with active indicator)
 /robot 0          switch to robot by index
-/robot "Asher 2"  switch to robot by name
+/robot "Asher 2"  switch to robot by (partial, case-insensitive) name
 ```
 
-The app already fetches all robots on connect — switching just needs
-`self._robot = robots[n]` and a status bar refresh. Useful for households with
-multiple units (e.g. LR4 + LR5).
-
-**Persist active robot selection** — save the chosen robot's serial number to
-keyring (or a local config file) so the app automatically selects the same robot
-on next launch, without requiring a manual switch every session.
+Switching unsubscribes WebSocket from the old robot, re-subscribes to the new
+one, and refreshes the status bar. The chosen robot's serial is saved to keyring
+and auto-restored on the next launch.
 
 ### ~~`/auth`~~ → `/login` ✅ — update credentials without restart
 
@@ -466,6 +465,45 @@ never shown. Could sit next to the drawer bar:
 ```
 Drawer [████░░░░] 48%   Litter: Nominal   Asher 🐱 9.1 lb
 ```
+
+### Status bar: WiFi indicator
+
+The Whisker API does not expose the WiFi network name (SSID) for any model, so
+"connected to MyNetwork" is not possible. What is available varies by model:
+
+| Model | Available | API |
+|---|---|---|
+| LR5 | `wifi_rssi` — integer RSSI in dBm (e.g. `-65`) | `robot.wifi_rssi` |
+| LR4 | `wifi_mode_status` — connection mode enum | `robot.wifi_mode_status` |
+| LR3 | nothing | — |
+
+**LR5 signal strength** can be rendered as a bar indicator in the top row:
+
+```
+  -40 dBm  ▂▄▆█  excellent
+  -65 dBm  ▂▄▆░  good
+  -80 dBm  ▂▄░░  weak
+  -90 dBm  ▂░░░  poor
+```
+
+Mapping: `>= -60` excellent, `>= -70` good, `>= -80` weak, `< -80` poor.
+
+**LR4 connection mode** (`WifiModeStatus` enum values):
+- `ROUTER_CONNECTED` — connected via home router
+- `HOTSPOT_CONNECTED` — connected via LR4's own hotspot (setup mode)
+- `ROUTER_WAITING` / `HOTSPOT_WAITING` — connecting
+- `ROUTER_FAULT` / `HOTSPOT_FAULT` — connection failed
+- `OFF` / `NONE` — WiFi disabled or unknown
+
+A minimal indicator for LR4 could just show a coloured dot:
+`● WiFi` (green for ROUTER_CONNECTED, amber for fault/waiting).
+
+**Implementation note:** Both properties are only present on their respective
+models — `wifi_rssi` via `LR5Adapter` (or `getattr(robot, "wifi_rssi", None)`),
+`wifi_mode_status` via `LR4Adapter`. Since SSID is unavailable, a tooltip or
+the `info` command output is the natural place to show full WiFi diagnostics.
+
+---
 
 ### Status bar: cycle counter
 `robot.cycle_count` and `robot.scoops_saved_count` (scoops saved vs. traditional
@@ -1926,9 +1964,9 @@ Ranked by user-visible impact vs. implementation effort:
 ### High-value features (biggest user-visible wins)
 
 4. **Cat panel status badges** (§16) — lock, sleep, night light, wait time under the art; high visibility, one-afternoon job
-5. **WebSocket subscription** (§5) — replace 30 s polling with real-time push updates; prerequisite for live cat presence and cycling indicator
-6. **Live cat presence indicator** (§10) — `🐱 IN` badge + `"present"` cat mode while `is_cat_detected` is true; requires WebSocket (§5) to be useful
-7. **Real-time cycling indicator** (§10) — animated `[⠙ CYCLING 0:42]` chip with elapsed time; requires WebSocket (§5)
+5. ~~**WebSocket subscription**~~ ✅ — real-time push updates live; 5-min poll fallback for activity history
+6. **Live cat presence indicator** (§10) — `🐱 IN` badge + `"present"` cat mode while `is_cat_detected` is true
+7. **Real-time cycling indicator** (§10) — animated `[⠙ CYCLING 0:42]` chip with elapsed time
 8. **Token persistence** (§12) — skip password re-entry on every run
 9. **Fault & safety monitoring** (§8) — cat detected, pinch, motor faults; banner + log transition + cat alert mode
 10. **Status color-coding** (§10) — `LitterBoxStatus` → colour in status bar and cat badges
@@ -1937,11 +1975,12 @@ Ranked by user-visible impact vs. implementation effort:
 
 ### Commands & slash system
 
-9. **`/robot` and `/pet` slash commands** (§1, §13) — robot/pet switcher; needs `/account` setup first
-10. **Tab-completion for slash commands** (§21) — Claude Code-style overlay dropdown on `/` keypress; single-source registry drives both dispatch and completion
-11. **`/version` command + model badge in status bar** (§22) — show Python/package versions in log; show `LR4`/`LR5` model next to robot name
-12. **`wait-time`, `power`, `rename`, `insight` commands** (§2) — each is a two-line wiring job
-13. **Sleep schedule viewer** (§7) — read-only first, config wizard later
+9. ~~**`/robot` and `/robots` slash commands**~~ ✅ — `/robots` lists, `/robot <idx|name>` switches, keyring-persisted
+10. **`/pet` slash command** (§1, §13) — pet switcher; needs `/account` setup first
+11. **Tab-completion for slash commands** (§21) — Claude Code-style overlay dropdown on `/` keypress; single-source registry drives both dispatch and completion
+12. **`/version` command + model badge in status bar** (§22) — show Python/package versions in log; show `LR4`/`LR5` model next to robot name
+13. **`wait-time`, `power`, `rename`, `insight` commands** (§2) — each is a two-line wiring job
+14. **Sleep schedule viewer** (§7) — read-only first, config wizard later
 
 ### Release pipeline
 

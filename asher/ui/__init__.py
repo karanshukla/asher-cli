@@ -113,6 +113,7 @@ class UIMixin:
                 yield Static("", id="robot-lbl", classes="chunk")
                 yield Static("", id="online-lbl", classes="chunk")
                 yield Static("", id="nightlight-lbl", classes="chunk")
+                yield Static("", id="lock-lbl", classes="chunk")
             with Container(classes="srow"):
                 yield Static("", id="drawer-lbl", classes="chunk")
                 yield Static("│", classes="sep")
@@ -152,6 +153,7 @@ class UIMixin:
         for wid in (
             "#robot-lbl",
             "#nightlight-lbl",
+            "#lock-lbl",
             "#drawer-lbl",
             "#litter-lbl",
             "#weight-lbl",
@@ -170,6 +172,7 @@ class UIMixin:
         self.query_one("#nightlight-lbl", Static).update(  # type: ignore[attr-defined]
             Text("○", style="#484f58")
         )
+        self.query_one("#lock-lbl", Static).update(Text("□", style="#484f58"))  # type: ignore[attr-defined]
 
         drawer = Text()
         drawer.append("Drawer ", style="#484f58")
@@ -252,6 +255,9 @@ class UIMixin:
                 )
                 self.query_one("#nightlight-lbl", Static).update(  # type: ignore[attr-defined]
                     Text(f"○ {shimmer}", style="#30363d")
+                )
+                self.query_one("#lock-lbl", Static).update(  # type: ignore[attr-defined]
+                    Text(f"{shimmer}", style="#30363d")
                 )
 
             cats = CATS.get(self._cat_mode, CATS["idle"])

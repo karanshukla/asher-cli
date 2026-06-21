@@ -77,10 +77,10 @@ class TestKeyringSave:
 
 
 class TestKeyringDelete:
-    def test_deletes_both_credentials(self):
+    def test_deletes_all_credentials(self):
         with patch("asher.connection.keyring.delete_password") as mock_delete:
             _keyring_delete()
-            assert mock_delete.call_count == 2
+            assert mock_delete.call_count == 3
 
     def test_uses_correct_service_and_keys(self):
         with patch("asher.connection.keyring.delete_password") as mock_delete:
@@ -88,6 +88,7 @@ class TestKeyringDelete:
             calls = mock_delete.call_args_list
             assert calls[0][0] == ("asher-cli", "email")
             assert calls[1][0] == ("asher-cli", "password")
+            assert calls[2][0] == ("asher-cli", "preferred_robot")
 
     def test_suppresses_exceptions(self):
         with patch("asher.connection.keyring.delete_password") as mock_delete:

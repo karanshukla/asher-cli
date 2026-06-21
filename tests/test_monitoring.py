@@ -101,7 +101,7 @@ class TestRefreshStatus:
         mixin._robot.waste_drawer_level = 50.0
         mixin._robot.status = MagicMock()
         mixin._robot.status.value = "Ready"
-        mixin._robot.sleeping = False
+        mixin._robot.sleep_mode_enabled = False
         mixin._last_cat_seen = None
         mixin._robot.last_seen = None
         mixin._robot.pet_weight = None

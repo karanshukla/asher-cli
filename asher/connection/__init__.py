@@ -7,6 +7,7 @@ import os
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from ..robot_adapters import RobotAdapter
     from ..robot_protocol import RobotProtocol
 
 import keyring
@@ -49,15 +50,28 @@ def _keyring_save(email: str, password: str) -> bool:
 
 
 def _keyring_delete() -> None:
-    for key in ("email", "password"):
+    for key in ("email", "password", "preferred_robot"):
         with contextlib.suppress(Exception):
             keyring.delete_password(_SERVICE, key)
+
+
+def _keyring_save_robot(serial: str) -> None:
+    with contextlib.suppress(Exception):
+        keyring.set_password(_SERVICE, "preferred_robot", serial)
+
+
+def _keyring_load_robot() -> str:
+    try:
+        return keyring.get_password(_SERVICE, "preferred_robot") or ""
+    except Exception:
+        return ""
 
 
 class ConnectionMixin:
     # declared for type checkers; assigned in AsherApp.__init__
     _account: Any
     _robot: RobotProtocol | None
+    _adapter: RobotAdapter | None
     _robots: list[RobotProtocol]
     _pets: list
 
@@ -112,9 +126,15 @@ class ConnectionMixin:
                 self._account = None
                 return
 
-            self.robots = robots
-            # just go with the first robot to begin with
-            self._robot = robots[0]
+            self._robots = robots
+            preferred_serial = _keyring_load_robot()
+            self._robot = next(
+                (rb for rb in robots if getattr(rb, "serial", None) == preferred_serial),
+                robots[0],
+            )
+            from ..robot_adapters import make_adapter  # noqa: PLC0415
+
+            self._adapter = make_adapter(self._robot)
             await self._start_monitoring()  # type: ignore[attr-defined]
             if len(robots) > 1:
                 self._log_info(  # type: ignore[attr-defined]
@@ -157,3 +177,4 @@ class ConnectionMixin:
                 await self._account.disconnect()
             self._account = None
             self._robot = None
+            self._adapter = None
