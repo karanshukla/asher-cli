@@ -169,6 +169,7 @@ async def test_clear_command_clears_log():
             await pilot.click("#cmd-input")
             await pilot.press("c", "l", "e", "a", "r")
             await pilot.press("enter")
+            await pilot.pause()
             # Log should be cleared
             assert len(log.lines) == 0
 
