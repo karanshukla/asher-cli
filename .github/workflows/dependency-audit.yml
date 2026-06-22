@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v3
-      - run: uv export --format requirements-txt > /tmp/requirements.txt
+      - run: uv export --format requirements-txt --no-emit-project > /tmp/requirements.txt
       - name: Audit Python dependencies
         uses: pypa/gh-action-pip-audit@v1.0.8
         with:
