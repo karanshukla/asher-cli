@@ -11,7 +11,8 @@ Current state, missing functionality, and suggested additions — grounded in wh
 |---|---|
 | Auth — keyring (primary) → `.env` fallback → `/login` prompt | ✅ |
 | Connect & load robots | ✅ |
-| Status bar (name, online, drawer %, last seen, pet weight) | ✅ |
+| Status bar top row — name + model, contextual online label (Cycling/Paused/Cat inside/Cycle done/Drawer full/Offline), night light mode + brightness, panel lock indicator | ✅ |
+| Status bar second row — drawer %, litter %, cat weight (with pet name), last visit | ✅ |
 | Pet name from Whisker account profile | ✅ |
 | Commands: clean, status, lock, unlock, sleep, wake, night-light on/off/auto, night-light-brightness, history, help, clear, quit | ✅ |
 | Slash commands: `/login`, `/logout`, `/exit`, `/help`, `/robots`, `/robot <index\|name>` | ✅ |
@@ -104,7 +105,125 @@ codes `pets[0]`. With multiple cats this matters.
 
 ---
 
-## 2. Missing robot commands
+## 2. History export to CSV
+
+Writes activity history to a CSV file and opens the containing folder in the OS file explorer.
+
+### Command syntax
+
+`export` is a bare robot command (no `/` prefix) — it queries the robot for history and produces a local file artifact.
+
+```
+export            export last 30 days (Whisker API maximum — good default)
+export 7          export last 7 days
+export 14         export last 14 days
+export month      alias for 30 days — explicit "I want everything Whisker will give me"
+```
+
+Whisker caps history at 30 days regardless of what you request — this is the hard ceiling.
+
+### CSV columns
+
+| Column | Source | Example |
+|---|---|---|
+| `timestamp` | `act.timestamp`, converted to local timezone, ISO 8601 | `2026-06-20T14:32:00+10:00` |
+| `event` | human label from `ACTION_LABELS` map (§11) | `Clean cycle complete` |
+| `raw_event` | `act.action.text` or `str(act.action)` | `Clean Cycle Complete` |
+| `weight_lb` | `act.weight` | `9.1` |
+| `pet_name` | resolved from `account.pets` by `pet_id` | `Asher` |
+| `robot_name` | `robot.name` | `Idiot Box` |
+| `robot_serial` | `robot.serial` | `LR4C012345` |
+
+Rows sorted ascending by timestamp (oldest first). Empty cells left blank — no `null` or `N/A`.
+
+### Output path
+
+Default: `~/Downloads/asher-<serial>-<YYYY-MM-DD>.csv`
+
+Example: `~/Downloads/asher-LR4C012345-2026-06-20.csv`
+
+`~/Downloads` is the standard export destination on Windows, macOS, and most Linux desktops. If it doesn't exist, fall back to `~/Documents/asher-cli/` (create if needed), then `~`.
+
+### Open folder after export
+
+After writing, open the containing directory in the OS file explorer:
+
+```python
+import subprocess, sys
+from pathlib import Path
+
+def _open_folder(path: Path) -> None:
+    if sys.platform == "win32":
+        subprocess.Popen(["explorer", "/select,", str(path)])
+    elif sys.platform == "darwin":
+        subprocess.Popen(["open", "-R", str(path)])
+    else:
+        subprocess.Popen(["xdg-open", str(path.parent)])
+```
+
+`explorer /select,<file>` highlights the specific file in Windows Explorer rather than just opening the folder — gives instant visual confirmation. `open -R` does the same in macOS Finder. Linux falls back to opening the parent directory with the default file manager.
+
+### Log output during export
+
+```
+  Fetching history (last 30 days)…
+  Writing asher-LR4C012345-2026-06-20.csv… 128 events
+  Saved → ~/Downloads/asher-LR4C012345-2026-06-20.csv
+  Opening folder…
+```
+
+Error cases:
+- No robot connected → `"No robot connected"` (same as other robot commands)
+- API failure → `"Failed to fetch history: <message>"`
+- Write failure → `"Failed to write CSV: <message>"` (e.g. permissions issue) + suggest fallback path
+
+### Data fetching
+
+`get_activity_history(limit=N)` doesn't accept a date range — it returns the most recent N events. To implement day-based filtering:
+
+1. Fetch with a high limit (e.g. `limit=500`) to ensure full coverage up to 30 days
+2. Filter client-side: keep only events where `act.timestamp >= now - timedelta(days=N)`
+
+For LR5, the richer `get_activities(limit, offset, activity_type)` (see §4) could be used for paginated export, but `get_activity_history` works for all models.
+
+### Implementation sketch
+
+Add `ExportCommand` in `asher/commands/__init__.py` inheriting `Command`:
+
+```python
+class ExportCommand(Command):
+    name = "export"
+    description = "export activity history to CSV"
+    requires_robot = True
+
+    async def run(self, app: AsherApp, args: list[str]) -> None:
+        # parse days arg
+        raw = args[0].lower() if args else "month"
+        if raw in ("month", "30"):
+            days = 30
+        else:
+            try:
+                days = max(1, min(30, int(raw)))
+            except ValueError:
+                app._log_warn(f"Unknown period '{raw}' — use a number of days or 'month'")
+                return
+
+        await _run_export(app, days)
+```
+
+`_run_export` is a module-level async function (not a method) to keep `ExportCommand.run` thin and the logic independently testable.
+
+### Naming note
+
+The `help` output should list `export` alongside other robot commands, with a note on accepted args:
+
+```
+  export [days|month]   export activity history to CSV (default: 30 days)
+```
+
+---
+
+## 3. Missing robot commands
 
 All of these are real `LitterRobot4` / `LitterRobot5` methods in pylitterbot
 that aren't wired up yet.
@@ -195,7 +314,7 @@ summary table:
 
 ---
 
-## 3. LR5-only features
+## 4. LR5-only features
 
 LR5 exposes additional capabilities that don't exist on LR4. The app should
 detect model type and show/hide these commands gracefully.
@@ -215,7 +334,7 @@ type (e.g. only weight events).
 
 ---
 
-## 4. Feeder Robot support
+## 5. Feeder Robot support
 
 `pylitterbot` fully supports the Feeder Robot. `account.robots` already includes
 it if one is on the account. Currently the app only acts on `robots[0]` which
@@ -234,7 +353,7 @@ meal-size <n>     → await robot.set_meal_insert_size(float)
 
 ---
 
-## 5. Real-time WebSocket updates (replace polling)
+## 6. Real-time WebSocket updates (replace polling)
 
 pylitterbot has first-class WebSocket support:
 
@@ -257,7 +376,7 @@ cloud sees it, and a cleaning cycle starting shows immediately in the status bar
 
 ---
 
-## 6. Pet features
+## 7. Pet features
 
 The `Pet` model in pylitterbot is surprisingly rich.
 
@@ -299,7 +418,7 @@ If weight ID misidentifies a cat, this corrects the record.
 
 ---
 
-## 7. Sleep schedule
+## 8. Sleep schedule
 
 `robot.sleep_schedule` returns a `SleepSchedule` with per-day `SleepScheduleDay`
 objects (day, sleep_time, wake_time, is_enabled). This is more granular than the
@@ -327,9 +446,9 @@ The `sleep` / `wake` commands should detect the robot model and dispatch accordi
 
 ---
 
-## 8. Fault monitoring & alerts
+## 9. Fault monitoring & alerts
 
-### 8a. Safety events (highest priority — surface immediately)
+### 9a. Safety events (highest priority — surface immediately)
 
 These indicate the robot stopped mid-cycle or refused to run for a safety reason.
 They're not hardware faults; they're expected protective states that the user
@@ -349,7 +468,7 @@ needs to act on.
 - Cat animation switched to `"alert"` mode (new state, blinking/urgent art)
 - Auto-dismiss the banner once the robot returns to `READY` on the next refresh
 
-### 8b. Hardware faults
+### 9b. Hardware faults
 
 These indicate a component failure that won't self-resolve. They persist until
 the user physically intervenes.
@@ -366,7 +485,7 @@ the user physically intervenes.
 | `is_waste_drawer_full` | Drawer full (boolean complement of `waste_drawer_level`) | all |
 | `is_drawer_removed` _(LR5)_ | Drawer physically removed mid-session | LR5 |
 
-### 8c. Surfacing strategy
+### 9c. Surfacing strategy
 
 **Banner widget** — a `FaultBanner` widget docked between the status bar and the
 main area. Hidden by default; appears when any fault is active.
@@ -430,13 +549,13 @@ def _refresh_faults(self, robot) -> None:
     self.prev_faults = current
 ```
 
-**Desktop notification** (see §11) — cat detected and pinch faults are good
+**Desktop notification** (see §22) — cat detected and pinch faults are good
 candidates for an OS-level `plyer` notification, since the user may not be
 watching the terminal.
 
 ---
 
-## 9. Config file persistence
+## 10. Config file persistence
 
 Currently all settings are read-only from `.env` and nothing the user sets at
 runtime persists across restarts (e.g. `/refresh 10`, `/cat color green`).
@@ -456,15 +575,11 @@ Load on startup, write on any `/config set` or `/cat` change.
 
 ---
 
-## 10. UI / UX gaps
+## 11. UI / UX gaps
 
-### Status bar: litter level
-`robot.litter_level` and `robot.litter_level_state` (Low / Nominal / High) are
-never shown. Could sit next to the drawer bar:
-
-```
-Drawer [████░░░░] 48%   Litter: Nominal   Asher 🐱 9.1 lb
-```
+### ~~Status bar: litter level~~ ✅
+`robot.litter_level` is shown in the second row of the status bar as `Litter N%`.
+`litter_level_state` (Low / Nominal / High) is not shown — numeric % is sufficient.
 
 ### Status bar: WiFi indicator
 
@@ -671,7 +786,7 @@ events don't pollute the log and the user can scroll at their own pace.
 
 `robot.is_cat_detected` is already polled in `_refresh_status`, but there's no
 dedicated visual for "cat is inside right now" vs. "cat was detected in a fault".
-The distinction matters: fault detection (§8) is a safety event that halted a
+The distinction matters: fault detection (§9) is a safety event that halted a
 cycle; live presence is ambient state while a cat is using the box.
 
 **Status bar** — add a `🐱 IN` badge in the second row that appears while
@@ -685,7 +800,7 @@ Drawer [████░░░░] 48%   Litter: Nominal   🐱 IN   Asher 9.1 lb
 ASCII art or a distinct label like `"visiting…"`). Switch back to `idle` once
 `is_cat_detected` returns false.
 
-WebSocket (§5) makes this responsive — with 30 s polling you'll likely miss the
+WebSocket (§6) makes this responsive — with 30 s polling you'll likely miss the
 entire visit. With real-time push the badge appears the moment the sensor trips.
 
 ---
@@ -697,7 +812,7 @@ but polling every 30 s means a full clean cycle (typically 2–4 min) can start
 and finish between polls, showing only `Ready` to the user the whole time.
 
 **What's needed:**
-- WebSocket subscription (§5) — `robot.subscribe()` fires `EVENT_UPDATE`
+- WebSocket subscription (§6) — `robot.subscribe()` fires `EVENT_UPDATE`
   immediately when the status transitions to `CLEAN_CYCLE` or back to `READY`.
 - Animated status chip — while `status == CLEAN_CYCLE`, pulse the `[RDY]` chip
   blue and add a spinner character (Textual's `LoadingIndicator` or a manual
@@ -715,7 +830,7 @@ and finish between polls, showing only `Ready` to the user the whole time.
   update the chip every second via a `set_interval(1, ...)` timer that's active
   only while cycling.
 
-This is the primary reason to implement WebSocket (§5) — the cycling indicator
+This is the primary reason to implement WebSocket (§6) — the cycling indicator
 is meaningless without it.
 
 ---
@@ -734,12 +849,12 @@ only cat visits, only cleans, etc.
 
 ---
 
-## 11. Stretch / nice-to-have
+## 12. Stretch / nice-to-have
 
 | Idea | Notes |
 |---|---|
-| Desktop notifications | `plyer` / `winotify` toasts + `winsound` bell — see §20 |
-| Export to CSV | `history export` → writes activity to `.csv` |
+| Desktop notifications | `plyer` / `winotify` toasts + `winsound` bell — see §22 |
+| **Export to CSV** | `export [days\|month]` command — writes to `~/Downloads`, opens folder in OS explorer — see §2 |
 | Weight sparkline in cat panel | Replace idle cat with a 7-day weight chart |
 | Dark / light theme toggle | `/theme light` swaps colour palette |
 | Startup robot selection | If multiple robots, prompt on launch instead of defaulting to `[0]` |
@@ -748,7 +863,7 @@ only cat visits, only cleans, etc.
 
 ---
 
-## 12. Account management
+## 13. Account management
 
 ### Credential persistence ✅ — OS keyring
 
@@ -815,7 +930,7 @@ require storing a list of token files rather than one.
 
 ---
 
-## 13. Slash commands — full design spec
+## 14. Slash commands — full design spec
 
 Slash commands (`/foo`) are distinguished from robot-action commands (`clean`,
 `status`) by the leading `/`. They configure the app rather than send commands
@@ -851,8 +966,8 @@ else:
 | `/config set <key> <val>` | Change a setting | Write to `config.json` |
 | `/theme [dark\|light]` | Swap colour scheme | Swap Textual CSS variables |
 | `/log [n]` | Set max log lines to keep | `RichLog(max_lines=n)` |
-| `/export [path]` | Export last activity to CSV | Write `activity_export.csv` |
-| `/notify [on\|off\|test]` | Desktop notification settings | See §20 |
+| `export [days\|month]` | Export activity history to CSV | See §2 for full spec |
+| `/notify [on\|off\|test]` | Desktop notification settings | See §22 |
 
 ### Tab-completion
 
@@ -871,7 +986,7 @@ This could be built with a `ListView` widget overlaid at the bottom of the
 
 ---
 
-## 14. PyPI publishing — `pip install asher-cli`
+## 15. PyPI publishing — `pip install asher-cli`
 
 The goal: any Python user can run `pip install asher-cli` (or `pipx install asher-cli`)
 and immediately type `asher` in any terminal, with no manual venv or clone required.
@@ -968,7 +1083,7 @@ git tag v1.0.1                  # optional, for git history only
 
 ---
 
-## 15. Standalone binary — no Python required
+## 16. Standalone binary — no Python required
 
 ### Option A — `pipx` (simplest — wraps the PyPI package)
 
@@ -1038,7 +1153,7 @@ Run with `uv run app.py` — no venv setup needed, `uv` handles it.
 
 ---
 
-## 15. Testing
+## 17. Testing
 
 ### Unit tests ✅
 
@@ -1173,7 +1288,7 @@ tests/
 
 ---
 
-## 16. Cat panel — robot status badges underneath the art
+## 18. Cat panel — robot status badges underneath the art
 
 Currently the cat panel only shows the ASCII art and a single italic label
 (`connected`, `cleaning…`, etc.). The panel has room to show a compact set of
@@ -1256,12 +1371,12 @@ Status → colour mapping (`STATUS_COLORS`):
 
 The cat panel would also benefit from a **minimum height** so the status badges
 don't get squashed when the terminal is short. Consider making the panel
-collapsible (the `/cat off` slash command from §13) so users on small terminals
+collapsible (the `/cat off` slash command from §14) so users on small terminals
 can reclaim the space.
 
 ---
 
-## 17. Architecture refactor — modular structure
+## 19. Architecture refactor — modular structure
 
 `app.py` is currently a single ~560-line file. That works for now, but adding
 the features in this roadmap would push it past 1 000 lines quickly. A clean
@@ -1363,7 +1478,7 @@ Each step is independently mergeable — no big-bang rewrite needed.
 
 ---
 
-## 18. Versioning
+## 20. Versioning
 
 ### Single source of truth
 
@@ -1472,7 +1587,7 @@ git cliff --tag v1.1.0 -o CHANGELOG.md
 
 ---
 
-## 19. CI / CD pipeline
+## 21. CI / CD pipeline
 
 ### Workflow overview
 
@@ -1689,7 +1804,7 @@ testpaths = ["tests"]
 
 ---
 
-## 20. Desktop notifications
+## 22. Desktop notifications
 
 Yes, a CLI app can push OS-level toast notifications — the terminal doesn't need
 to be in focus. The approach depends on platform but `plyer` abstracts it cleanly.
@@ -1730,7 +1845,7 @@ PyInstaller packaging.
 ### When to notify
 
 Only notify on **state transitions** (fault appeared, not "fault is still
-active"). Wire into `_refresh_faults` from §8c:
+active"). Wire into `_refresh_faults` from §9c:
 
 ```python
 from plyer import notification as _notify
@@ -1783,7 +1898,7 @@ drawer-full and hardware faults.
 /notify test      fire a test notification immediately
 ```
 
-Persist the preference in `config.json` (§9):
+Persist the preference in `config.json` (§10):
 ```json
 { "notifications": true, "notification_sound": true }
 ```
@@ -1813,7 +1928,7 @@ cross-platform.
 
 ---
 
-## 21. Tab completion for slash commands
+## 23. Tab completion for slash commands
 
 Inspired by Claude Code's `/` menu — when the user types `/` into the command
 input, a completion overlay appears above the input bar listing all slash
@@ -1893,7 +2008,7 @@ truth for both dispatch and completion.
 
 ---
 
-## 22. Version display
+## 24. Version display
 
 `VERSION` is already read from `importlib.metadata` and shown in the title
 chip of the status bar:
@@ -1934,17 +2049,15 @@ async def _slash_version(self) -> None:
     self._log_info(f"textual {_v('textual')}")
 ```
 
-### Status bar title — model badge
+### ~~Status bar title — model badge~~ ✅
 
-Once the robot is connected, show its model type next to the name so the user
-knows at a glance which API surface is available:
+The `#robot-lbl` widget already shows the model type appended to the robot name:
 
 ```
-◆ Asher CLI v1.0.0   Idiot Box (LR4)   ● ONLINE   [Ready]
+◆ Asher CLI v1.0.0   Idiot Box  LR4   ● ONLINE   ⟳ Cycling
 ```
 
-`type(robot).__name__` already returns `"LitterRobot4"`, `"LitterRobot5"`, etc.
-Strip the `"LitterRobot"` prefix for display: `model = type(robot).__name__.replace("LitterRobot", "LR")`.
+Implemented via `robot_model(r)` in `asher/helpers.py`, called from `_refresh_status()` in `asher/monitoring/__init__.py`.
 
 ---
 
@@ -1960,51 +2073,55 @@ Ranked by user-visible impact vs. implementation effort:
 4. ~~**Keyring credential storage**~~ — `_keyring_load/save/delete`; credentials persist across restarts
 5. ~~**Slash command dispatch + `/login` `/logout` `/exit` `/help`**~~ — inline login flow, no restart needed
 6. ~~**PyPI release workflow**~~ — `release.yml` triggers on `release/*` branches; OIDC trusted publisher
+7. ~~**Status bar: litter level**~~ ✅ — `#litter-lbl` shown in second row
+8. ~~**Status bar: panel lock indicator**~~ ✅ — `#lock-lbl` shown in top row (`⊘ Locked` / `□ Unlocked`)
+9. ~~**Robot model badge in status bar**~~ ✅ — `robot_model(r)` appended to `#robot-lbl` (e.g. `Idiot Box  LR4`)
+10. ~~**Status color-coding**~~ ✅ — `#online-lbl` shows contextual colored labels: `~ Cat inside`, `⟳ Cycling`, `⏸ Paused`, `✓ Cycle done`, `⚠ Drawer full`, `○ OFFLINE`
 
 ### High-value features (biggest user-visible wins)
 
-4. **Cat panel status badges** (§16) — lock, sleep, night light, wait time under the art; high visibility, one-afternoon job
-5. ~~**WebSocket subscription**~~ ✅ — real-time push updates live; 5-min poll fallback for activity history
-6. **Live cat presence indicator** (§10) — `🐱 IN` badge + `"present"` cat mode while `is_cat_detected` is true
-7. **Real-time cycling indicator** (§10) — animated `[⠙ CYCLING 0:42]` chip with elapsed time
-8. **Token persistence** (§12) — skip password re-entry on every run
-9. **Fault & safety monitoring** (§8) — cat detected, pinch, motor faults; banner + log transition + cat alert mode
-10. **Status color-coding** (§10) — `LitterBoxStatus` → colour in status bar and cat badges
-11. **Readable history events** (§10) — map raw pylitterbot strings to human labels with weight, pet name, and colour
-12. **History pager sub-view** (§10) — `push_screen(HistoryScreen)` with Page Up/Down and `q` to dismiss; events no longer dump into the main log
+1. **History export to CSV** (§2) — `export [days|month]` command; writes to `~/Downloads`, opens folder in OS explorer
+2. **Cat panel status badges** (§18) — lock, sleep, night light, wait time under the art; high visibility, one-afternoon job
+3. ~~**WebSocket subscription**~~ ✅ — real-time push updates live; 5-min poll fallback for activity history
+4. **Real-time cycling indicator with elapsed time** (§11) — extend the existing `⟳ Cycling` label to show elapsed time: `⟳ Cycling 0:42`; needs a per-second tick timer active only during a cycle
+5. **Token persistence** (§13) — skip password re-entry on every run
+6. **Fault & safety monitoring** (§9) — cat detected, pinch, motor faults; banner + log transition + cat alert mode
+7. **Readable history events** (§11) — map raw pylitterbot strings to human labels with weight, pet name, and colour
+8. **History pager sub-view** (§11) — scrollable in-log display with pagination; `history 100` vs current hardcoded 25-event dump
 
 ### Commands & slash system
 
-9. ~~**`/robot` and `/robots` slash commands**~~ ✅ — `/robots` lists, `/robot <idx|name>` switches, keyring-persisted
-10. **`/pet` slash command** (§1, §13) — pet switcher; needs `/account` setup first
-11. **Tab-completion for slash commands** (§21) — Claude Code-style overlay dropdown on `/` keypress; single-source registry drives both dispatch and completion
-12. **`/version` command + model badge in status bar** (§22) — show Python/package versions in log; show `LR4`/`LR5` model next to robot name
-13. **`wait-time`, `power`, `rename`, `insight` commands** (§2) — each is a two-line wiring job
-14. **Sleep schedule viewer** (§7) — read-only first, config wizard later
+1. ~~**`/robot` and `/robots` slash commands**~~ ✅ — `/robots` lists, `/robot <idx|name>` switches, keyring-persisted
+2. **`export` command** (§2) — activity history to CSV
+3. **`/pet` slash command** (§1, §14) — pet switcher; needs `/account` setup first
+4. **Tab-completion for slash commands** (§23) — Claude Code-style overlay dropdown on `/` keypress; single-source registry drives both dispatch and completion
+5. **`/version` slash command** (§24) — print Python/package versions to log; model badge in status bar is already done
+6. **`wait-time`, `power`, `rename`, `insight` commands** (§3) — each is a two-line wiring job
+7. **Sleep schedule viewer** (§8) — read-only first, config wizard later
 
 ### Release pipeline
 
-13. ~~**PyPI publish**~~ (§14) ✅ — `release.yml` live; push `release/x.y.z` branch to publish
-14. **Versioning discipline** (§18) — `hatch version`, `CHANGELOG.md`, signed tags
-15. **Standalone binary** (§15) — PyInstaller `.exe` + macOS/Linux builds via CI matrix
-16. **Dependabot / Renovate** (§19) — automated dependency PRs, `pylitterbot` pinned to manual review
+1. ~~**PyPI publish**~~ (§15) ✅ — `release.yml` live; push `release/x.y.z` branch to publish
+2. ~~**CI/CD pipeline**~~ ✅ — lint + test + release workflows in `.github/workflows/`
+3. **Versioning discipline** (§20) — `hatch version`, `CHANGELOG.md`, signed tags
+4. **Standalone binary** (§16) — PyInstaller `.exe` + macOS/Linux builds via CI matrix
+5. **Dependabot / Renovate** (§21) — automated dependency PRs, `pylitterbot` pinned to manual review
 
 ### Device & platform expansion
 
-17. **LR5 extras** (§3) — privacy, volume, camera, night-light colour — detect model first
-18. **Feeder robot support** (§4) — snack, gravity, meal size commands
-19. **Multi-robot tab view** (§10) — `TabbedContent` widget when `len(robots) > 1`
+1. **LR5 extras** (§4) — privacy, volume, camera, night-light colour — detect model first
+2. **Feeder robot support** (§5) — snack, gravity, meal size commands
+3. **Multi-robot tab view** (§11) — `TabbedContent` widget when `len(robots) > 1`
 
 ### Polish & stretch
 
-20. **Config persistence** (`config.json`, §9) — runtime settings survive restarts
-21. **Weight sparkline in cat panel** (§6) — 7-day ASCII chart; delightful but non-essential
-22. **Desktop notifications** (§20) — `plyer` toasts + `winsound` bell on fault/cat-detected; `/notify on|off` command
-23. **Dark/light theme toggle** (§11) — CSS variable swap; nice-to-have but not critical
-24. **Startup animation** (§11) — cute but adds friction to quick status checks; could be opt-in
-25. **E2E test harness** (§15) — Textual Pilot tests for critical user flows; good for preventing regressions but requires maintenance
-26. **Refactor to be more clean code** - example: have a base command class, and have a property to determine whether its a slash command or not, instead of having two separate methods for slash and non-slash commands. This would reduce code duplication and make it easier to add new commands in the future.
-27. **LR5/Evo Specific features** - depending on what is supported by pylitterbot, we could add features specific to the LR5 or Evo models, such as camera snapshots, night light color control.Same with feeder robot, litter robot hopper etc
+1. **Config persistence** (`config.json`, §10) — runtime settings survive restarts
+2. **Weight sparkline in cat panel** (§7) — 7-day ASCII chart; delightful but non-essential
+3. **Desktop notifications** (§22) — `plyer` toasts + `winsound` bell on fault/cat-detected; `/notify on|off` command
+4. **Dark/light theme toggle** (§12) — CSS variable swap; nice-to-have but not critical
+5. **E2E test harness** (§17) — Textual Pilot tests for critical user flows; good for preventing regressions but requires maintenance
+6. **Refactor to be more clean code** — base command class with a property to distinguish slash vs bare commands; reduces duplication and makes adding commands easier
+7. **LR5/Evo specific features** — camera snapshots, night light color control, hopper management (whatever pylitterbot exposes)
 
 
 
