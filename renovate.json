@@ -1,6 +1,22 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:recommended"
+  "extends": ["config:recommended"],
+  "packageRules": [
+    {
+      "matchManagers": ["pep621"],
+      "enabled": false
+    },
+    {
+      "matchManagers": ["pep621"],
+      "matchPackageNames": ["pylitterbot"],
+      "enabled": true,
+      "schedule": ["before 9am on Monday"]
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "pinDigests": true,
+      "enabled": true,
+      "schedule": ["before 9am on Monday"]
+    }
   ]
 }
