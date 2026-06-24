@@ -20,7 +20,7 @@ jobs:
       - name: Extract version from branch name
         id: version
         run: echo "version=${GITHUB_REF_NAME#release/}" >> "$GITHUB_OUTPUT"
-      - uses: astral-sh/setup-uv@v3
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
       - run: uv build
       - uses: actions/upload-artifact@v4
         with:
