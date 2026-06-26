@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import contextlib
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from textual.timer import Timer
 
 from textual.app import App
 from textual.binding import Binding
@@ -43,13 +46,18 @@ class AsherApp(UIMixin, ConnectionMixin, MonitoringMixin, CommandsMixin, App):  
         self._last_cat_seen: Any = None
         self._is_loading: bool = True
         self._spinner_idx: int = 0
+        self._poll_interval: int = 300
+        self._poll_timer: Timer | None = None
+        self._cat_panel_visible: bool = True
+        self._cat_color: str | None = None
+        self._active_pet_idx: int = 0
 
     def on_mount(self) -> None:
         self._refresh_title()
         self._show_welcome()
         self._show_loading_state()
         self._connect_worker()
-        self.set_interval(300, self._poll_status_interval)
+        self._poll_timer = self.set_interval(300, self._poll_status_interval)
         self.set_interval(0.4, self._tick_cat)
         self.query_one("#cmd-input", Input).focus()
 
