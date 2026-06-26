@@ -15,7 +15,7 @@ Current state, missing functionality, and suggested additions — grounded in wh
 | Status bar second row — drawer %, litter %, cat weight (with pet name), last visit | ✅ |
 | Pet name from Whisker account profile | ✅ |
 | Commands: clean, status, lock, unlock, sleep, wake, night-light on/off/auto, night-light-brightness, history, export [days\|month], help, clear, quit | ✅ |
-| Slash commands: `/login`, `/logout`, `/exit`, `/help`, `/robots`, `/robot <index\|name>`, `/pet [index\|name]`, `/cat on\|off\|color <hex>`, `/refresh [seconds\|off]`, `/config` | ✅ |
+| Slash commands: `/login`, `/logout`, `/exit`, `/help`, `/robots`, `/robot <index\|name>`, `/pets`, `/pet <index\|name>`, `/cat on\|off\|color <hex>`, `/refresh [seconds\|off]`, `/config` | ✅ |
 | Inline login flow (email → password in command bar, no restart) | ✅ |
 | `LoginScreen` modal (`auth.py`) — available for future use | ✅ |
 | Activity history (`get_activity_history`) | ✅ |
@@ -959,7 +959,8 @@ else:
 | `/exit` ✅ | Exit the app | `self.exit()` |
 | `/help` ✅ | Show all commands | Two-section output: robot cmds + slash cmds |
 | `/robot [index\|name]` | List or switch active robot | `self._robot = robots[n]` + status refresh |
-| `/pet [index\|name]` | List or switch which pet shows in status bar | `self._active_pet = pets[n]` |
+| `/pets` | List all pets with index and active indicator | mirrors `/robots` |
+| `/pet <index\|name>` | Switch which pet shows in status bar | `self._active_pet_idx = n` |
 | `/account` | Show account info | `account.user_id`, email from keyring |
 | `/refresh [seconds\|off]` | Change poll interval | Cancel + recreate `set_interval` timer |
 | `/cat [on\|off]` | Show/hide cat panel | `add_class` / `remove_class` on `#cat-panel` |

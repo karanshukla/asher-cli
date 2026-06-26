@@ -208,7 +208,22 @@ async def test_config_shows_refresh_rate(connected_app):
 
 
 @pytest.mark.asyncio
-async def test_pet_no_args_lists_pets(app_with_pets):
+async def test_pets_command_lists_all_pets(app_with_pets):
+    async with app_with_pets.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#cmd-input")
+        for ch in "/pets":
+            await pilot.press(ch)
+        await pilot.press("enter")
+        await pilot.pause()
+
+        log_content = str(app_with_pets.query_one("#log").lines)
+        assert "Asher" in log_content
+        assert "Luna" in log_content
+
+
+@pytest.mark.asyncio
+async def test_pet_no_args_shows_usage(app_with_pets):
     async with app_with_pets.run_test() as pilot:
         await pilot.pause()
         await pilot.click("#cmd-input")
@@ -218,8 +233,7 @@ async def test_pet_no_args_lists_pets(app_with_pets):
         await pilot.pause()
 
         log_content = str(app_with_pets.query_one("#log").lines)
-        assert "Asher" in log_content
-        assert "Luna" in log_content
+        assert "Usage" in log_content
 
 
 @pytest.mark.asyncio

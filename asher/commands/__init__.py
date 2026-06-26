@@ -399,9 +399,29 @@ class RobotsCommand(SlashCommand):
             log.write(t)
 
 
+class PetsCommand(SlashCommand):
+    name = "pets"
+    description = "list all pets on the account"
+
+    async def run(self, app: AsherApp, args: list[str]) -> None:
+        pets = app._pets
+        if not pets:
+            app._log_warn("No pets found on this account.")
+            return
+        log = app.query_one("#log", RichLog)
+        active_idx = getattr(app, "_active_pet_idx", 0)
+        for idx, pet in enumerate(pets):
+            active = idx == active_idx
+            t = ts()
+            t.append("  ● " if active else "    ", style="#3fb950" if active else "#484f58")
+            t.append(f"[{idx}] ", style="#484f58")
+            t.append(getattr(pet, "name", "-"), style="#e6edf3" if active else "#c9d1d9")
+            log.write(t)
+
+
 class PetCommand(SlashCommand):
     name = "pet"
-    description = "list pets or switch active pet in status bar"
+    description = "<index|name> switch active pet in status bar"
 
     async def run(self, app: AsherApp, args: list[str]) -> None:
         pets = app._pets
@@ -410,15 +430,7 @@ class PetCommand(SlashCommand):
             return
 
         if not args:
-            log = app.query_one("#log", RichLog)
-            active_idx = getattr(app, "_active_pet_idx", 0)
-            for idx, pet in enumerate(pets):
-                active = idx == active_idx
-                t = ts()
-                t.append("  ● " if active else "    ", style="#3fb950" if active else "#484f58")
-                t.append(f"[{idx}] ", style="#484f58")
-                t.append(getattr(pet, "name", "-"), style="#e6edf3" if active else "#c9d1d9")
-                log.write(t)
+            app._log_info("Usage: /pet <index|name>  - use /pets to list")
             return
 
         target = args[0]
@@ -761,6 +773,7 @@ _registry.register(LoginCommand())
 _registry.register(LogoutCommand())
 _registry.register(RobotsCommand())
 _registry.register(RobotCommand())
+_registry.register(PetsCommand())
 _registry.register(PetCommand())
 _registry.register(CatCommand())
 _registry.register(RefreshCommand())
