@@ -110,12 +110,14 @@ LITTER_ROBOT_PASSWORD=yourpassword
 ## Releasing
 
 ```bash
-# bump version, commit, and tag in one step
+# bump version, commit, and tag in one step, then push with tags
 uv run bump-my-version bump patch    # 0.0.1 → 0.0.2
 uv run bump-my-version bump minor    # 0.0.2 → 0.1.0
 uv run bump-my-version bump major    # 0.1.0 → 1.0.0
 
-# then push the release branch to trigger PyPI publish
+git push && git push --tags
+
+# then push the release branch to trigger PyPI publish with the new semver
 git checkout -b release/0.0.2
 git push origin release/0.0.2
 ```
