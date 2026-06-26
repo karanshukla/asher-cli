@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-from datetime import timezone
+import csv
+import subprocess
+import sys
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
@@ -395,6 +399,166 @@ class RobotsCommand(SlashCommand):
             log.write(t)
 
 
+class PetCommand(SlashCommand):
+    name = "pet"
+    description = "list pets or switch active pet in status bar"
+
+    async def run(self, app: AsherApp, args: list[str]) -> None:
+        pets = app._pets
+        if not pets:
+            app._log_warn("No pets found on this account.")
+            return
+
+        if not args:
+            log = app.query_one("#log", RichLog)
+            active_idx = getattr(app, "_active_pet_idx", 0)
+            for idx, pet in enumerate(pets):
+                active = idx == active_idx
+                t = ts()
+                t.append("  ● " if active else "    ", style="#3fb950" if active else "#484f58")
+                t.append(f"[{idx}] ", style="#484f58")
+                t.append(getattr(pet, "name", "-"), style="#e6edf3" if active else "#c9d1d9")
+                log.write(t)
+            return
+
+        target = args[0]
+        if target.isdigit():
+            idx = int(target)
+            if 0 <= idx < len(pets):
+                app._active_pet_idx = idx
+                name = getattr(pets[idx], "name", str(idx))
+                app._log_ok(f"Showing pet: {name}")
+                await app._refresh_status()
+            else:
+                app._log_warn(f"No pet at index {idx} - use /pet to list")
+        else:
+            tl = target.lower()
+            match = next(
+                (i for i, p in enumerate(pets) if tl in getattr(p, "name", "").lower()), None
+            )
+            if match is None:
+                app._log_warn(f"No pet matching '{target}' - use /pet to list")
+                return
+            app._active_pet_idx = match
+            name = getattr(pets[match], "name", str(match))
+            app._log_ok(f"Showing pet: {name}")
+            await app._refresh_status()
+
+
+class CatCommand(SlashCommand):
+    name = "cat"
+    description = "on|off|color <hex>  configure the cat panel"
+
+    async def run(self, app: AsherApp, args: list[str]) -> None:
+        if not args:
+            app._log_info("Usage: /cat on|off|color <hex>")
+            return
+
+        sub = args[0].lower()
+        if sub == "off":
+            app.query_one("#cat-panel").display = False
+            app._cat_panel_visible = False
+            app._log_ok("Cat panel hidden")
+        elif sub == "on":
+            app.query_one("#cat-panel").display = True
+            app._cat_panel_visible = True
+            app._log_ok("Cat panel visible")
+        elif sub == "color":
+            if len(args) < 2:
+                app._log_warn("Usage: /cat color <hex>  e.g. /cat color #ff79c6")
+                return
+            color = args[1]
+            if not color.startswith("#"):
+                color = f"#{color}"
+            app._cat_color = color
+            app._set_cat(app._cat_mode, getattr(app, "_cat_label", ""))
+            app._log_ok(f"Cat color set to {color}")
+        elif sub == "reset":
+            app._cat_color = None
+            app._set_cat(app._cat_mode, getattr(app, "_cat_label", ""))
+            app._log_ok("Cat color reset to default")
+        else:
+            app._log_warn("Usage: /cat on|off|color <hex>")
+
+
+class RefreshCommand(SlashCommand):
+    name = "refresh"
+    description = "<seconds|off>  change auto-refresh interval"
+
+    async def run(self, app: AsherApp, args: list[str]) -> None:
+        poll_timer = getattr(app, "_poll_timer", None)
+
+        if not args:
+            interval = getattr(app, "_poll_interval", 300)
+            if interval == 0:
+                app._log_info("Auto-refresh is off")
+            else:
+                app._log_info(f"Auto-refresh interval: {interval}s")
+            return
+
+        raw = args[0].lower()
+        if raw == "off":
+            if poll_timer is not None:
+                poll_timer.stop()
+                app._poll_timer = None
+            app._poll_interval = 0
+            app._log_ok("Auto-refresh disabled")
+            return
+
+        try:
+            seconds = max(10, int(raw))
+        except ValueError:
+            app._log_warn("Usage: /refresh <seconds|off>  (minimum 10s)")
+            return
+
+        if poll_timer is not None:
+            poll_timer.stop()
+        app._poll_timer = app.set_interval(seconds, app._poll_status_interval)
+        app._poll_interval = seconds
+        app._log_ok(f"Auto-refresh set to every {seconds}s")
+
+
+class ConfigCommand(SlashCommand):
+    name = "config"
+    description = "show current runtime configuration"
+
+    async def run(self, app: AsherApp, args: list[str]) -> None:
+        log = app.query_one("#log", RichLog)
+
+        robot = app._robot
+        robot_name = getattr(robot, "name", "—") if robot else "not connected"
+        robot_info = f"{robot_name} ({robot_model(robot)})" if robot else robot_name
+
+        interval = getattr(app, "_poll_interval", 300)
+        refresh_str = f"{interval}s" if interval else "off"
+
+        cat_visible = getattr(app, "_cat_panel_visible", True)
+        cat_color = getattr(app, "_cat_color", None) or "#58a6ff (default)"
+
+        pets = app._pets
+        active_pet_idx = getattr(app, "_active_pet_idx", 0)
+        if pets and active_pet_idx < len(pets):
+            pet_str = f"{getattr(pets[active_pet_idx], 'name', '?')} (index {active_pet_idx})"
+        elif pets:
+            pet_str = f"{getattr(pets[0], 'name', '?')} (index 0)"
+        else:
+            pet_str = "none"
+
+        rows = [
+            ("robot", robot_info),
+            ("refresh", refresh_str),
+            ("cat panel", f"{'on' if cat_visible else 'off'}  {cat_color}"),
+            ("active pet", pet_str),
+        ]
+        log.write("")
+        for k, v in rows:
+            t = Text()
+            t.append(f"  {k:<14}", style="#484f58")
+            t.append(v, style="#c9d1d9")
+            log.write(t)
+        log.write("")
+
+
 class RobotCommand(SlashCommand):
     name = "robot"
     description = "<index|name> switch active robot"
@@ -452,6 +616,131 @@ class RobotCommand(SlashCommand):
             _keyring_save_robot(serial)
 
 
+_ACTION_LABELS: dict[str, tuple[str, str]] = {
+    "ready": ("Ready", "#484f58"),
+    "litter robot is ready.": ("Ready", "#484f58"),
+    "clean cycle complete": ("Clean cycle complete", "#3fb950"),
+    "clean cycle in progress": ("Cleaning…", "#58a6ff"),
+    "cat detected": ("Cat detected", "#d29922"),
+    "cat sensor interrupted": ("Cat sensor tripped", "#d29922"),
+    "drawer full": ("Drawer full — empty now", "#f85149"),
+    "drawer full cleared": ("Drawer emptied", "#3fb950"),
+    "sleep mode on": ("Sleep mode on", "#484f58"),
+    "sleep mode off": ("Sleep mode off", "#484f58"),
+    "panel locked": ("Panel locked", "#484f58"),
+    "panel unlocked": ("Panel unlocked", "#484f58"),
+    "offline": ("Offline", "#f85149"),
+    "power off": ("Powered off", "#f85149"),
+    "power on": ("Powered on", "#3fb950"),
+    "motor fault": ("Motor fault", "#f85149"),
+    "pinch detect": ("Pinch detected", "#f85149"),
+    "timing fault": ("Timing fault", "#d29922"),
+}
+
+
+def _open_folder(path: Path) -> None:
+    if sys.platform == "win32":
+        subprocess.Popen(["explorer", "/select,", str(path)])
+    elif sys.platform == "darwin":
+        subprocess.Popen(["open", "-R", str(path)])
+    else:
+        subprocess.Popen(["xdg-open", str(path.parent)])
+
+
+async def _run_export(app: AsherApp, days: int) -> None:
+    assert app._robot is not None
+    app._log_info(f"Fetching history (last {days} days)…")
+    try:
+        acts = await app._robot.get_activity_history(limit=500)
+    except Exception as exc:
+        app._log_err(f"Failed to fetch history: {exc}")
+        return
+
+    cutoff = datetime.now(tz=timezone.utc) - timedelta(days=days)
+    filtered = []
+    for act in acts:
+        ts_dt = getattr(act, "timestamp", None)
+        if ts_dt is None:
+            continue
+        if ts_dt.tzinfo is None:
+            ts_dt = ts_dt.replace(tzinfo=timezone.utc)
+        if ts_dt >= cutoff:
+            filtered.append((act, ts_dt))
+    filtered.sort(key=lambda x: x[1])
+
+    serial = getattr(app._robot, "serial", "unknown")
+    robot_name = getattr(app._robot, "name", "—")
+    date_str = datetime.now().strftime("%Y-%m-%d")
+    filename = f"asher-{serial}-{date_str}.csv"
+
+    downloads = Path.home() / "Downloads"
+    if downloads.exists():
+        dest = downloads / filename
+    else:
+        fallback = Path.home() / "Documents" / "asher-cli"
+        fallback.mkdir(parents=True, exist_ok=True)
+        dest = fallback / filename
+
+    app._log_info(f"Writing {filename}… {len(filtered)} events")
+    try:
+        with dest.open("w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(
+                [
+                    "timestamp",
+                    "event",
+                    "raw_event",
+                    "weight_lb",
+                    "pet_name",
+                    "robot_name",
+                    "robot_serial",
+                ]
+            )
+            from tzlocal import get_localzone  # noqa: PLC0415
+
+            local_tz = get_localzone()
+            for act, ts_dt in filtered:
+                local_dt = ts_dt.astimezone(local_tz)
+                iso_ts = local_dt.isoformat()
+                action: Any = getattr(act, "action", None)
+                raw_str = (action.text if hasattr(action, "text") else str(action)).strip()
+                label, _ = _ACTION_LABELS.get(raw_str.lower(), (raw_str, ""))
+                weight = getattr(act, "weight", None)
+                weight_str = f"{float(weight):.1f}" if weight is not None else ""
+                pet_id = getattr(act, "pet_id", None)
+                pet_name = next(
+                    (getattr(p, "name", "") for p in app._pets if getattr(p, "id", None) == pet_id),
+                    "",
+                )
+                writer.writerow([iso_ts, label, raw_str, weight_str, pet_name, robot_name, serial])
+    except Exception as exc:
+        app._log_err(f"Failed to write CSV: {exc}")
+        app._log_info(f"Try: {Path.home() / filename}")
+        return
+
+    app._log_ok(f"Saved → {dest}")
+    app._log_info("Opening folder…")
+    _open_folder(dest)
+
+
+class ExportCommand(Command):
+    name = "export"
+    description = "[days|month]  export activity history to CSV (default: 30 days)"
+    requires_robot = True
+
+    async def run(self, app: AsherApp, args: list[str]) -> None:
+        raw = args[0].lower() if args else "month"
+        if raw in ("month", "30"):
+            days = 30
+        else:
+            try:
+                days = max(1, min(30, int(raw)))
+            except ValueError:
+                app._log_warn(f"Unknown period '{raw}' — use a number of days or 'month'")
+                return
+        await _run_export(app, days)
+
+
 # ── registry ────────────────────────────────────────────────────────────────
 
 _registry = CommandRegistry()
@@ -464,6 +753,7 @@ _registry.register(WakeCommand())
 _registry.register(NightLightCommand())
 _registry.register(NightLightBrightnessCommand())
 _registry.register(HistoryCommand())
+_registry.register(ExportCommand())
 _registry.register(HelpCommand())
 _registry.register(ClearCommand())
 _registry.register(QuitCommand())
@@ -471,6 +761,10 @@ _registry.register(LoginCommand())
 _registry.register(LogoutCommand())
 _registry.register(RobotsCommand())
 _registry.register(RobotCommand())
+_registry.register(PetCommand())
+_registry.register(CatCommand())
+_registry.register(RefreshCommand())
+_registry.register(ConfigCommand())
 
 
 # ── mixin ───────────────────────────────────────────────────────────────────

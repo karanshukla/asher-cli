@@ -79,7 +79,13 @@ class MonitoringMixin:
         except Exception:
             pass
 
-        pet_name = self._pets[0].name if self._pets else None
+        active_pet_idx = getattr(self, "_active_pet_idx", 0)
+        pet = (
+            self._pets[active_pet_idx]
+            if self._pets and active_pet_idx < len(self._pets)
+            else (self._pets[0] if self._pets else None)
+        )
+        pet_name = pet.name if pet else None
 
         robot_txt = Text(name, style="bold #e6edf3")
         robot_txt.append(f"  {robot_model(r)}", style="#484f58")

@@ -216,7 +216,7 @@ class UIMixin:
         cats = CATS.get(mode, CATS["idle"])
         frame = cats[0]
         palette = _CAT_PALETTES.get(mode, ["#58a6ff"])
-        color = palette[0]
+        color = getattr(self, "_cat_color", None) or palette[0]
         self.query_one("#cat-art", Static).update(Text(frame, style=color))  # type: ignore[attr-defined]
         fx = _CAT_FX.get(mode, [""])
         self.query_one("#cat-fx", Static).update(Text(fx[0], style=color))  # type: ignore[attr-defined]
@@ -264,7 +264,7 @@ class UIMixin:
             self._cat_frame = (self._cat_frame + 1) % len(cats)
             frame = cats[self._cat_frame]
             palette = _CAT_PALETTES.get(self._cat_mode, ["#58a6ff"])
-            color = palette[self._cat_frame % len(palette)]
+            color = getattr(self, "_cat_color", None) or palette[self._cat_frame % len(palette)]
             self.query_one("#cat-art", Static).update(Text(frame, style=color))  # type: ignore[attr-defined]
 
             fx = _CAT_FX.get(self._cat_mode, [""])
