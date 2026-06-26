@@ -17,8 +17,8 @@ A Claude Code-style terminal dashboard for monitoring and controlling Litter Rob
 - Live status bar — unit name, online/offline, drawer fill level, last activity, cat weight
 - Human-readable robot status — translates raw API states into plain English (`Ready`, `Cleaning`, `Cat Detected`, `Drawer Full`, etc.)
 - Scrollable activity log with timestamps
-- Commands: `clean`, `status`, `lock`, `unlock`, `sleep`, `wake`, `night-light on|off|auto`, `night-light-brightness`, `history`, `help`, `quit`
-- Slash commands for app management: `/login`, `/logout`, `/robots`, `/robot <index|name>`, `/exit`
+- Commands: `clean`, `status`, `lock`, `unlock`, `sleep`, `wake`, `night-light on|off|auto`, `night-light-brightness`, `history`, `export [days|month]`, `help`, `quit`
+- Slash commands for app management: `/login`, `/logout`, `/robots`, `/robot <index|name>`, `/pet [index|name]`, `/cat on|off|color <hex>`, `/refresh [seconds|off]`, `/config`, `/exit`
 - Cat animation panel that reacts to robot state
 - Command history (↑/↓ arrows)
 - Real-time updates via WebSocket; 5-minute poll fallback
@@ -84,6 +84,7 @@ LITTER_ROBOT_PASSWORD=yourpassword
 | `night-light on\|off\|auto` | Set night light mode |
 | `night-light-brightness <level>` | Set brightness (LR5: 0-100; LR4: 25/50/100) |
 | `history` | Show last 25 activity events |
+| `export [days\|month]` | Export activity history to CSV in `~/Downloads` (default: 30 days) |
 | `clear` | Clear the log |
 | `help` | Show command list |
 | `quit` | Exit |
@@ -96,6 +97,11 @@ LITTER_ROBOT_PASSWORD=yourpassword
 | `/logout` | Sign out and clear saved credentials |
 | `/robots` | List all robots on the account |
 | `/robot <index\|name>` | Switch active robot (selection persists to keyring) |
+| `/pet [index\|name]` | List pets or switch which pet's name/weight shows in the status bar |
+| `/cat on\|off` | Show or hide the cat animation panel |
+| `/cat color <hex>` | Change the cat art colour (e.g. `/cat color #ff79c6`); `/cat reset` to revert |
+| `/refresh [seconds\|off]` | Change the auto-poll interval or disable it (`/refresh 60`, `/refresh off`) |
+| `/config` | Show current runtime settings (robot, refresh rate, cat panel, active pet) |
 | `/exit` | Exit Asher CLI |
 
 **Keyboard shortcuts:** `Ctrl+L` clears the log, `Ctrl+C` quits.

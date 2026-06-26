@@ -14,8 +14,8 @@ Current state, missing functionality, and suggested additions — grounded in wh
 | Status bar top row — name + model, contextual online label (Cycling/Paused/Cat inside/Cycle done/Drawer full/Offline), night light mode + brightness, panel lock indicator | ✅ |
 | Status bar second row — drawer %, litter %, cat weight (with pet name), last visit | ✅ |
 | Pet name from Whisker account profile | ✅ |
-| Commands: clean, status, lock, unlock, sleep, wake, night-light on/off/auto, night-light-brightness, history, help, clear, quit | ✅ |
-| Slash commands: `/login`, `/logout`, `/exit`, `/help`, `/robots`, `/robot <index\|name>` | ✅ |
+| Commands: clean, status, lock, unlock, sleep, wake, night-light on/off/auto, night-light-brightness, history, export [days\|month], help, clear, quit | ✅ |
+| Slash commands: `/login`, `/logout`, `/exit`, `/help`, `/robots`, `/robot <index\|name>`, `/pet [index\|name]`, `/cat on\|off\|color <hex>`, `/refresh [seconds\|off]`, `/config` | ✅ |
 | Inline login flow (email → password in command bar, no restart) | ✅ |
 | `LoginScreen` modal (`auth.py`) — available for future use | ✅ |
 | Activity history (`get_activity_history`) | ✅ |
@@ -57,55 +57,58 @@ keyring and the connection is re-established — no restart needed.
 `/logout` disconnects, deletes credentials from keyring, and prompts
 `/login` to sign back in.
 
-### `/cat` — configure the cat animation
+### ~~`/cat` — configure the cat animation~~ ✅
 
 ```
-/cat off          hide the cat panel entirely (more log space)
-/cat on           show the cat panel
-/cat color blue   change the cat art colour (#58a6ff default)
-/cat style 2      pick an alternate ASCII art set
+/cat off              hide the cat panel entirely (more log space)
+/cat on               show the cat panel
+/cat color <hex>      change the cat art colour (#58a6ff default)
+/cat reset            revert to default palette colours
 ```
 
-The panel is currently a fixed 24-column sidebar. Toggling it requires adding
-`display: none` to `#cat-panel` via `add_class` / `remove_class`.
+Toggling sets `widget.display = False/True` directly. Colour override stored in
+`_cat_color` and applied in `_set_cat` / `_tick_cat` instead of the per-mode
+palette. `/cat style` (alternate art sets) is not yet implemented.
 
-### `/refresh` — change the poll interval
+### ~~`/refresh` — change the poll interval~~ ✅
 
 ```
 /refresh 10       poll every 10 s
 /refresh 60       poll every 60 s (lighter on API)
 /refresh off      disable auto-refresh (manual `status` only)
+/refresh          show current interval
 ```
 
-`self.set_interval` can't be changed after mount — needs to cancel the existing
-timer and create a new one, or gate the `_poll_status_interval` worker behind a
-configurable flag.
+Timer ref stored as `_poll_timer` in `AsherApp.__init__`; on change, old timer
+is stopped via `timer.stop()` and a new one created with `set_interval`.
+`_poll_interval` stores the current value for `/config` display.
 
-### `/config` — show current runtime config
+### ~~`/config` — show current runtime config~~ ✅
 
 ```
 /config
   robot          Idiot Box (LR4, index 0)
-  refresh        30 s
-  cat panel      on / blue
-  credentials    threeheadeddoggy@gmail.com (from .env)
+  refresh        300s
+  cat panel      on  #58a6ff (default)
+  active pet     Asher (index 0)
 ```
 
-Read-only dump of the app's current settings. No API call needed.
+Read-only dump of current runtime settings. No API call needed.
 
-### `/pet` — switch which pet's name/weight is shown
+### ~~`/pet` — switch which pet's name/weight is shown~~ ✅
 
 ```
 /pet              list pets on the account
 /pet 0            show Whisker pet at index 0 in the status bar
+/pet luna         switch by partial, case-insensitive name
 ```
 
-`account.pets` already contains all pet profiles. The status bar currently hard-
-codes `pets[0]`. With multiple cats this matters.
+`_active_pet_idx` stored on `AsherApp`; `_refresh_status` reads it instead of
+hard-coding `pets[0]`. Supports both index and name lookup.
 
 ---
 
-## 2. History export to CSV
+## ~~2. History export to CSV~~ ✅
 
 Writes activity history to a CSV file and opens the containing folder in the OS file explorer.
 
@@ -2092,12 +2095,13 @@ Ranked by user-visible impact vs. implementation effort:
 ### Commands & slash system
 
 1. ~~**`/robot` and `/robots` slash commands**~~ ✅ — `/robots` lists, `/robot <idx|name>` switches, keyring-persisted
-2. **`export` command** (§2) — activity history to CSV
-3. **`/pet` slash command** (§1, §14) — pet switcher; needs `/account` setup first
-4. **Tab-completion for slash commands** (§23) — Claude Code-style overlay dropdown on `/` keypress; single-source registry drives both dispatch and completion
-5. **`/version` slash command** (§24) — print Python/package versions to log; model badge in status bar is already done
-6. **`wait-time`, `power`, `rename`, `insight` commands** (§3) — each is a two-line wiring job
-7. **Sleep schedule viewer** (§8) — read-only first, config wizard later
+2. ~~**`export` command**~~ ✅ (§2) — activity history to CSV; writes to `~/Downloads`, opens folder in OS explorer
+3. ~~**`/pet` slash command**~~ ✅ (§1, §14) — `/pet` lists, `/pet <idx|name>` switches; `_active_pet_idx` persists for session
+4. ~~**`/cat`, `/refresh`, `/config` slash commands**~~ ✅ (§1) — cat panel toggle + colour, poll interval control, runtime config dump
+5. **Tab-completion for slash commands** (§23) — Claude Code-style overlay dropdown on `/` keypress; single-source registry drives both dispatch and completion
+6. **`/version` slash command** (§24) — print Python/package versions to log; model badge in status bar is already done
+7. **`wait-time`, `power`, `rename`, `insight` commands** (§3) — each is a two-line wiring job
+8. **Sleep schedule viewer** (§8) — read-only first, config wizard later
 
 ### Release pipeline
 
