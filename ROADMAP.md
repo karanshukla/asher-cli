@@ -15,7 +15,8 @@ Current state, missing functionality, and suggested additions — grounded in wh
 | Status bar second row — drawer %, litter %, cat weight (with pet name), last visit | ✅ |
 | Pet name from Whisker account profile | ✅ |
 | Commands: clean, status, lock, unlock, sleep, wake, night-light on/off/auto, night-light-brightness, history, export [days\|month], help, clear, quit | ✅ |
-| Slash commands: `/login`, `/logout`, `/exit`, `/help`, `/robots`, `/robot <index\|name>`, `/pets`, `/pet <index\|name>`, `/cat on\|off\|color <hex>`, `/refresh [seconds\|off]`, `/config` | ✅ |
+| Slash commands: `/login`, `/logout`, `/exit`, `/help`, `/robots`, `/robot <index\|name>`, `/pets`, `/pet <index\|name>`, `/cat on\|off\|color <hex>`, `/refresh [seconds\|off]`, `/config`, `/mcp on\|off\|status` | ✅ |
+| MCP bridge — keyring-backed `pylitterbot[mcp]` launcher, auto-installs the extra, writes/removes the Claude Desktop config entry (incl. Windows MSIX path) | ✅ |
 | Inline login flow (email → password in command bar, no restart) | ✅ |
 | `LoginScreen` modal (`auth.py`) — available for future use | ✅ |
 | Activity history (`get_activity_history`) | ✅ |
@@ -2065,6 +2066,109 @@ Implemented via `robot_model(r)` in `asher/helpers.py`, called from `_refresh_st
 
 ---
 
+## 25. Headless CLI export — automate history without the TUI or MCP
+
+`export [days|month]` (§2) already writes activity history to CSV, but only
+from *inside* the running interactive TUI — a human has to launch `asher`,
+wait for it to connect, and type the command. That's unusable from cron,
+Windows Task Scheduler, or a systemd timer. The MCP bridge (`/mcp`, shipped)
+solves automation for an AI assistant talking to the robot, but it doesn't
+help someone who just wants `asher --export 7` in a nightly script with no
+Claude Desktop involved at all.
+
+### Command syntax
+
+```
+asher --export 7                        export last 7 days to the default path
+asher --export 7 --output ~/hist.csv    explicit output path
+asher --export month --robot "Asher 2"  export 30 days for a specific robot
+```
+
+No flags → today's behavior unchanged: launches the interactive TUI. Any
+recognized flag → run headlessly and exit; the Textual `App` is never
+constructed, so this works over SSH, in a container, or from Task Scheduler
+with no terminal attached.
+
+### Entry point changes
+
+`asher/__main__.py` parses `sys.argv` with `argparse` *before* deciding
+whether to build `AsherApp`:
+
+```python
+def main() -> None:
+    args = _parse_args()
+    if args.export is not None:
+        sys.exit(asyncio.run(_run_headless_export(args)))
+    AsherApp().run()
+```
+
+### Decouple `_run_export` from Textual
+
+`_run_export(app, days)` in `asher/commands/__init__.py` currently logs via
+`app._log_info` / `_log_err` / `_log_ok` (RichLog writes) and always opens
+the output folder in the OS file explorer — neither makes sense headlessly
+(no widget tree, no desktop session on a server). Split the CSV-writing core
+out into a plain function both paths share:
+
+```python
+async def build_history_csv(
+    robot: RobotProtocol, pets: list, days: int, dest: Path,
+) -> None:
+    """Pure logic: fetch, filter, write. No Textual, no I/O side effects beyond dest."""
+    ...
+
+async def _run_export(app: AsherApp, days: int) -> None:
+    # existing TUI path: resolve dest via app, call build_history_csv,
+    # log via app._log_*, then _open_folder(dest)
+
+async def _run_headless_export(args: argparse.Namespace) -> int:
+    # connect via keyring -> .env (same priority as _connect_worker), no
+    # interactive login possible - print a clear error and exit 1 if missing
+    # resolve robot by --robot or keyring preferred_robot or robots[0]
+    # call build_history_csv, print plain text to stdout/stderr, no folder-open
+```
+
+### Credentials — same priority, no interactive fallback
+
+Headless mode can't prompt for a password. Priority stays keyring → `.env`,
+but if neither has credentials, print an actionable error and exit non-zero
+rather than starting the inline login flow (there's no command bar to type
+into). This mirrors the constraint already documented for the MCP bridge:
+a scheduled task's environment can't be assumed to match the project's
+working directory, so `.env` discovery should not rely on `find_dotenv()`'s
+upward directory search — same caveat as `asher/mcp_bridge.py`.
+
+### Exit codes (for shell scripting)
+
+| Code | Meaning |
+|---|---|
+| `0` | Export succeeded |
+| `1` | No credentials found (keyring or `.env`) |
+| `2` | Connection or API failure |
+| `3` | Failed to write the CSV (permissions, disk full) |
+| `4` | `--robot` selector matched no robot on the account |
+
+### Example automation
+
+```bash
+# crontab -e — nightly export at 03:00
+0 3 * * * /usr/bin/env asher --export 7 --output /home/me/litter-history.csv >> /var/log/asher-export.log 2>&1
+```
+
+```powershell
+# Windows Task Scheduler action
+asher.exe --export 7 --output C:\Users\me\litter-history.csv
+```
+
+### Testing
+
+No Textual `Pilot` needed — `build_history_csv` and `_run_headless_export`
+are plain async functions, testable the same way as `mcp_bridge.main()`
+(§ MCP bridge): mock `Account.connect`, mock `robot.get_activity_history`,
+assert on the written CSV content and the returned exit code.
+
+---
+
 ## Priority suggestion
 
 Ranked by user-visible impact vs. implementation effort:
@@ -2103,6 +2207,7 @@ Ranked by user-visible impact vs. implementation effort:
 6. **`/version` slash command** (§24) — print Python/package versions to log; model badge in status bar is already done
 7. **`wait-time`, `power`, `rename`, `insight` commands** (§3) — each is a two-line wiring job
 8. **Sleep schedule viewer** (§8) — read-only first, config wizard later
+9. **Headless CLI export** (§25) — `asher --export 7` for cron/Task Scheduler automation, no TUI or Claude Desktop needed
 
 ### Release pipeline
 

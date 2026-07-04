@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import csv
+import os
 import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
@@ -628,6 +629,102 @@ class RobotCommand(SlashCommand):
             _keyring_save_robot(serial)
 
 
+async def _ensure_mcp_extra(app: AsherApp) -> bool:
+    """Install pylitterbot's mcp extra if it isn't already available. Returns success."""
+    from importlib.metadata import version as pkg_version  # noqa: PLC0415
+
+    from ..mcp_config import mcp_extra_installed  # noqa: PLC0415
+
+    if mcp_extra_installed():
+        return True
+
+    pin = f"pylitterbot[mcp]=={pkg_version('pylitterbot')}"
+    app._log_info(f"Installing {pin}…")
+    proc = await asyncio.create_subprocess_exec(
+        sys.executable,
+        "-m",
+        "pip",
+        "install",
+        pin,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.STDOUT,
+    )
+    output = (await proc.communicate())[0].decode(errors="replace")
+    if proc.returncode == 0:
+        app._log_ok("Installed pylitterbot[mcp].")
+        return True
+
+    app._log_err("Failed to install pylitterbot[mcp]:")
+    for line in output.splitlines()[-10:]:
+        app._log_err(f"  {line}")
+    app._log_info(f"Try manually: {sys.executable} -m pip install '{pin}'")
+    return False
+
+
+class McpCommand(SlashCommand):
+    name = "mcp"
+    description = "on|off|status  Litter-Robot MCP server for Claude Desktop"
+
+    async def run(self, app: AsherApp, args: list[str]) -> None:
+        from ..mcp_config import mcp_status, set_mcp_enabled  # noqa: PLC0415
+
+        sub = args[0].lower() if args else "status"
+        if sub not in ("on", "off", "status"):
+            app._log_warn("Usage: /mcp on|off|status")
+            return
+
+        if sub == "status":
+            from ..connection import _keyring_load  # noqa: PLC0415
+
+            email, password = _keyring_load()
+            has_keyring_creds = bool(email and password)
+            has_env_creds = bool(
+                os.getenv("LITTER_ROBOT_USER") and os.getenv("LITTER_ROBOT_PASSWORD")
+            )
+            if has_keyring_creds:
+                app._log_info("Credentials: present in keyring")
+            elif has_env_creds:
+                app._log_info("Credentials: present in .env (will be copied to keyring on /mcp on)")
+            else:
+                app._log_info("Credentials: missing - use /login first")
+            for path, enabled in mcp_status():
+                state = "enabled " if enabled else "disabled"
+                found = "found" if path.exists() else "not found"
+                app._log_info(f"  [{state}, {found}]  {path}")
+            return
+
+        if sub == "on":
+            from ..connection import _keyring_load, _keyring_save  # noqa: PLC0415
+
+            email, password = _keyring_load()
+            if not email or not password:
+                env_email = os.getenv("LITTER_ROBOT_USER") or ""
+                env_password = os.getenv("LITTER_ROBOT_PASSWORD") or ""
+                if env_email and env_password and _keyring_save(env_email, env_password):
+                    app._log_info("Copied .env credentials into the OS keyring for MCP use.")
+                    email, password = env_email, env_password
+
+            if not email or not password:
+                app._log_err(
+                    "No credentials in keyring or .env - use /login first, "
+                    "or set LITTER_ROBOT_USER/LITTER_ROBOT_PASSWORD."
+                )
+                return
+            if not await _ensure_mcp_extra(app):
+                return
+            touched = set_mcp_enabled(True)
+        else:
+            touched = set_mcp_enabled(False)
+
+        verb = "enabled" if sub == "on" else "disabled"
+        if touched:
+            for path in touched:
+                app._log_ok(f"MCP server '{verb}' in {path}")
+            app._log_info("Restart Claude Desktop to apply this change.")
+        else:
+            app._log_info(f"MCP server was already {verb}")
+
+
 _ACTION_LABELS: dict[str, tuple[str, str]] = {
     "ready": ("Ready", "#484f58"),
     "litter robot is ready.": ("Ready", "#484f58"),
@@ -778,6 +875,7 @@ _registry.register(PetCommand())
 _registry.register(CatCommand())
 _registry.register(RefreshCommand())
 _registry.register(ConfigCommand())
+_registry.register(McpCommand())
 
 
 # ── mixin ───────────────────────────────────────────────────────────────────

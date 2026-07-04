@@ -41,6 +41,8 @@ asher/
   login_flow.py     LoginFlow state machine — inline email/password prompt in command bar
   robot_protocol.py RobotProtocol structural Protocol for pylitterbot robot objects
   robot_adapters.py RobotAdapter ABC + LR3/LR4/LR5 subclasses + make_adapter() factory
+  mcp_config.py     Claude Desktop config read/write for the /mcp slash command
+  mcp_bridge.py     asher-mcp-launch console script — keyring-backed pylitterbot MCP launcher
   __main__.py       main() entry point
   commands/
     base.py         Command ABC, SlashCommand, CommandRegistry
@@ -61,6 +63,9 @@ tests/
   test_connection_mixin.py ConnectionMixin structure
   test_monitoring.py      MonitoringMixin async methods
   test_ui.py              UIMixin constants, CSS, helper existence
+  test_mcp_config.py      Claude Desktop config read/write
+  test_mcp_bridge.py      mcp_bridge launcher credential/subprocess handling
+  test_mcp_command.py     /mcp slash command dispatch
 
 .github/workflows/
   ci.yml            ruff + mypy + pytest on every push/PR
@@ -83,13 +88,23 @@ LITTER_ROBOT_PASSWORD=...
 Keyring service name: `asher-cli`, keys `email` and `password`.
 Helper functions in `asher/connection/__init__.py`: `_keyring_load()`, `_keyring_save()`, `_keyring_delete()`.
 
+## MCP bridge (`/mcp`)
+
+pylitterbot ships an optional MCP server (`pip install pylitterbot[mcp]`, run via `python -m pylitterbot.mcp`) that lets an MCP client like Claude Desktop monitor/control the robot directly. Its own docs configure it with plaintext credentials in the client's JSON config — asher-cli avoids that:
+
+- `/mcp on|off|status` (in `asher/commands/__init__.py`, logic in `asher/mcp_config.py`) adds/removes an entry (named by `mcp_config._SERVER_NAME`) in every `claude_desktop_config.json` this OS's Claude Desktop might read (`mcp_config.config_paths()` — on Windows this includes both the standard installer path and any MSIX/Microsoft Store virtualized path). The entry's `command` is `sys.executable -m asher.mcp_bridge` — never the credentials themselves.
+- `/mcp on` also auto-installs pylitterbot's `mcp` extra via `sys.executable -m pip install "pylitterbot[mcp]==<installed version>"` if the `mcp` package isn't importable yet.
+- `asher/mcp_bridge.py` (console script `asher-mcp-launch`) is what Claude Desktop actually spawns. It reads email/password from the OS keyring at process start, sets them as `LITTER_ROBOT_USERNAME`/`LITTER_ROBOT_PASSWORD` (pylitterbot's expected names — note these differ from asher-cli's own `.env` var `LITTER_ROBOT_USER`) in that process's environment only, then execs `python -m pylitterbot.mcp`. No credentials ever touch the on-disk MCP config.
+- `/mcp on` requires keyring credentials. If none are found but `.env` fallback credentials are set, it copies them into the keyring automatically (since the bridge process can't reliably discover a project-relative `.env` — Claude Desktop controls its working directory, not asher-cli).
+- Requires the `mcp` extra: `uv sync --extra mcp` / `pip install asher-cli[mcp]`. Restart Claude Desktop after toggling for the change to take effect.
+
 ## Command convention
 
 **Normal commands** (no prefix) — robot actions only:
 `clean`, `status`, `lock`, `unlock`, `sleep`, `wake`, `night-light on|off|auto`, `night-light-brightness <level>`, `history`, `clear`, `help`
 
 **Slash commands** (`/` prefix) — app management only:
-`/login`, `/logout`, `/exit`, `/robots`, `/robot <index|name>`
+`/login`, `/logout`, `/exit`, `/robots`, `/robot <index|name>`, `/pets`, `/pet <index|name>`, `/cat on|off|color <hex>`, `/refresh <seconds|off>`, `/config`, `/mcp on|off|status`
 
 **Special cases** (accepted both with and without `/`):
 `exit`, `quit`, `q` — exit the app

@@ -25,8 +25,12 @@ dependencies = [
     "tzlocal>=5.4",
 ]
 
+[project.optional-dependencies]
+mcp = ["pylitterbot[mcp]==2025.5.0"]
+
 [project.scripts]
 asher = "asher.__main__:main"
+asher-mcp-launch = "asher.mcp_bridge:main"
 
 [dependency-groups]
 dev = [
