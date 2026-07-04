@@ -2169,6 +2169,89 @@ assert on the written CSV content and the returned exit code.
 
 ---
 
+## 26. Remote MCP connector — access the robot from claude.ai, mobile, Cowork
+
+The `/mcp` bridge (shipped) only works in Claude **Desktop**, because it's a
+local stdio server Desktop spawns as a subprocess on the same machine. To use
+it from claude.ai in a browser, the mobile app, or Cowork, it needs to become
+a **remote** MCP server: a service with a public HTTPS URL that Claude's
+cloud infrastructure calls directly, added via Settings → Connectors → Add
+custom connector. This is a materially bigger project than the local bridge,
+not an extension of it — different transport, different hosting model,
+different credential-storage threat model, and a real authentication layer.
+
+### Transport: no pylitterbot fork needed
+
+Checked directly against the latest pylitterbot (2025.6.0, ahead of the
+`2025.5.0` currently pinned): `pylitterbot.mcp.__init__.main()` still just
+calls `mcp.run()` with no arguments, which the underlying FastMCP object
+defaults to `stdio`-only. But `run()` itself already supports `transport=
+"sse"` and `transport="streamable-http"` — that's a capability of the `mcp`
+SDK FastMCP wraps, just not exposed through pylitterbot's own CLI. Since both
+`pylitterbot.mcp.server.mcp` (the FastMCP instance) and `pylitterbot.mcp.tools`
+(the tool registrations) are public and importable, a remote launcher can
+reuse them directly with no upstream patch:
+
+```python
+# asher/mcp_remote.py (sketch — not yet written)
+from pylitterbot.mcp.server import mcp
+import pylitterbot.mcp.tools  # noqa: F401 — registers the tools
+
+def main() -> None:
+    mcp.run(transport="streamable-http", host="0.0.0.0", port=8000)
+```
+
+### Hosting
+
+Needs a publicly reachable HTTPS endpoint — Claude's cloud calls the server
+directly, not through the user's machine (true even when using Claude
+Desktop for the local case, which is why local-only doesn't extend to other
+clients). Options: a small always-on VPS, Fly.io, Render, or a Cloudflare
+Worker (serverless, colder start but near-zero idle cost for a
+low-traffic personal tool). TLS termination and the public domain are the
+host's job either way.
+
+### Authentication — the actual hard part
+
+Anthropic's docs are explicit: OAuth is required for any connector touching
+private user data, and a personal litter box (control + activity history +
+pet data) clearly qualifies. The MCP spec mandates **OAuth 2.1 with PKCE**
+(S256), no implicit grant, exact redirect-URI matching. Claude supports three
+registration modes — Dynamic Client Registration, Client ID Metadata
+Documents, or Anthropic holding credentials directly — DCR or CIMD is the
+right choice for a self-hosted personal server. This means standing up (or
+reusing a library for) a minimal OAuth 2.1 authorization server in front of
+the MCP endpoint — there's no "just add a bearer token" shortcut available
+for this use case. This is the long pole, not the transport change above.
+
+### Credential storage moves off the local keyring
+
+The whole point of the local `/mcp` bridge (§ MCP bridge, shipped) was
+keeping Whisker credentials in the OS keyring, never on disk in plaintext.
+A remote server can't use the local keyring at all — it runs on a VPS/Fly.io/
+Cloudflare box, not the user's machine. Credentials would live as that host's
+own secret store instead (Fly.io secrets, Render env vars, Cloudflare Worker
+secrets) — a reasonable place for a secret, but a different threat model:
+now an internet-reachable service (behind the OAuth layer above) holds the
+credentials and can control a physical device, rather than a process a local
+user's OS session spawns on demand.
+
+### Why this is a separate, larger item
+
+- New transport code (small, sketched above)
+- Hosting: pick a platform, deploy, keep it patched and running
+- OAuth 2.1 authorization server: the real engineering cost
+- Credentials move from local keyring to cloud secrets — explicit tradeoff,
+  not a strict improvement
+- Ongoing hosting cost/maintenance vs. the local bridge's zero-infrastructure
+  design
+
+Reasonable to treat as an optional stretch goal, not a natural next step
+after the local bridge — evaluate whether cross-device access is worth the
+OAuth + hosting lift before starting.
+
+---
+
 ## Priority suggestion
 
 Ranked by user-visible impact vs. implementation effort:
@@ -2232,6 +2315,7 @@ Ranked by user-visible impact vs. implementation effort:
 5. **E2E test harness** (§17) — Textual Pilot tests for critical user flows; good for preventing regressions but requires maintenance
 6. **Refactor to be more clean code** — base command class with a property to distinguish slash vs bare commands; reduces duplication and makes adding commands easier
 7. **LR5/Evo specific features** — camera snapshots, night light color control, hopper management (whatever pylitterbot exposes)
+8. **Remote MCP connector** (§26) — access from claude.ai/mobile/Cowork, not just Desktop; requires hosting + an OAuth 2.1 authorization server, bigger lift than the local `/mcp` bridge and a different credential-storage tradeoff — evaluate demand before starting
 
 
 
