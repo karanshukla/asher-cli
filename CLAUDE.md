@@ -159,6 +159,10 @@ pylitterbot auto-detects robot type. Commands that differ per model are handled 
 - `robot.set_night_light_brightness(int)` or `robot.set_night_light_mode(NightLightMode)`
 - `robot.get_activity_history(limit=int)` → list of `Activity` objects with `.timestamp` and `.action` (`LitterBoxStatus` enum)
 
+## Code comments
+
+Don't add comments above functions or inline unless the WHY is genuinely non-obvious (a hidden constraint, a subtle invariant, a workaround for a specific bug). Well-named identifiers should make the WHAT self-evident. Before reaching for a comment, check whether the explanation can instead be expressed through abstraction or encapsulation — e.g. domain logic buried in a mixin or command handler should move to a self-commenting, domain-named method rather than being explained in a comment. Favor human-readable, domain-driven names and logical flow over prose explanations, while keeping code legible to agents working in this repo.
+
 ## Development notes
 
 - Textual and pylitterbot are both asyncio-native — compose cleanly with `@work` tasks
