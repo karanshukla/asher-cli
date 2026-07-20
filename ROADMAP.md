@@ -14,7 +14,7 @@ Current state, missing functionality, and suggested additions — grounded in wh
 | Status bar top row — name + model, contextual online label (Cycling/Paused/Cat inside/Cycle done/Drawer full/Offline), night light mode + brightness, panel lock indicator | ✅ |
 | Status bar second row — drawer %, litter %, cat weight (with pet name), last visit | ✅ |
 | Pet name from Whisker account profile | ✅ |
-| Commands: clean, status, info, lock, unlock, sleep, wake, night-light on/off/auto, night-light-brightness, wait-time, power on/off, rename, insight, history, export [days\|month], help, clear, quit | ✅ |
+| Commands: clean, status, info, lock, unlock, sleep, wake, night-light on/off/auto, night-light-brightness, wait-time, power on/off, rename, insight, privacy on/off, volume, camera-audio on/off, drawer-reset (LR5 extras via adapter; gracefully refused on LR3/LR4), history, export [days\|month], help, clear, quit | ✅ |
 | Slash commands: `/login`, `/logout`, `/exit`, `/help`, `/robots`, `/robot <index\|name>`, `/pets`, `/pet <index\|name>`, `/cat on\|off\|color <hex>`, `/refresh [seconds\|off]`, `/config`, `/mcp on\|off\|status` | ✅ |
 | MCP bridge — keyring-backed `pylitterbot[mcp]` launcher, auto-installs the extra, writes/removes the Claude Desktop config entry (incl. Windows MSIX path) | ✅ |
 | Inline login flow (email → password in command bar, no restart) | ✅ |
@@ -344,17 +344,39 @@ ceiling):
 
 ## 4. LR5-only features
 
-LR5 exposes additional capabilities that don't exist on LR4. The app should
-detect model type and show/hide these commands gracefully.
+LR5 exposes additional capabilities that don't exist on LR4. The app detects
+model type via the `RobotAdapter` pattern: the four interactive commands below
+route through `LR5Adapter`, while the base `RobotAdapter` returns a
+`"... is only available on the LR5"` message so typing them on an LR3/LR4 is
+safe and informative rather than a crash.
+
+### Shipped ✅
 
 | Command | API | LR5 property |
 |---|---|---|
-| `privacy on/off` | `set_privacy_mode(bool)` | `privacy_mode` |
-| `volume <0-10>` | `set_volume(int)` | `sound_volume` |
-| `camera-audio on/off` | `set_camera_audio(bool)` | `camera_audio_enabled` |
+| ~~`privacy on/off`~~ ✅ | `set_privacy_mode(bool)` | `privacy_mode` |
+| ~~`volume <0-100>`~~ ✅ | `set_volume(int)` | `sound_volume` |
+| ~~`camera-audio on/off`~~ ✅ | `set_camera_audio(bool)` | `camera_audio_enabled` |
+| ~~`drawer-reset`~~ ✅ | `reset_waste_drawer()` | `is_drawer_removed` |
+
+`volume` accepts `0-100` (the actual pylitterbot range, not the `0-10` listed
+in earlier drafts of this table). Bare `volume` prints the current value
+alongside the usage line. Adapter unit tests cover the happy path, rejection,
+exceptions, and the LR3/LR4 "not supported" fallthrough for each command; pilot
+tests in `tests/test_lr5_commands.py` exercise the command-bar dispatch end to
+end against both an LR5 and an LR4 adapter.
+
+### Not yet wired
+
+| Command | API | LR5 property |
+|---|---|---|
 | `night-light color <hex>` | `set_night_light_settings(color=...)` | `night_light_color` |
-| `drawer reset` | `reset_waste_drawer()` | `is_drawer_removed` |
 | `filter reminder` | _(read-only)_ | `next_filter_replacement_date` |
+
+`night-light color` is a natural follow-on — `LR5Adapter.set_night_light`
+already calls `set_night_light_mode`; `set_night_light_settings(color=...)` is
+the richer overload that also takes `mode`/`brightness`/`color`. `filter
+reminder` is a read-only property that could slot into `info` output.
 
 The LR5 also has `get_activities(limit, offset, activity_type)` (plural) which
 is richer than `get_activity_history` and supports pagination and filtering by
@@ -2287,7 +2309,7 @@ Ranked by user-visible impact vs. implementation effort:
 
 ### Device & platform expansion
 
-1. **LR5 extras** (§4) — privacy, volume, camera, night-light colour — detect model first
+1. ~~**LR5 extras** (§4)~~ ✅ — privacy, volume, camera-audio, drawer-reset wired up via `LR5Adapter` (gracefully refused on LR3/LR4 through the base adapter). Night-light colour and filter-reminder remain as smaller follow-ons
 2. **Feeder robot support** (§5) — snack, gravity, meal size commands
 3. **Multi-robot tab view** (§11) — `TabbedContent` widget when `len(robots) > 1`
 
