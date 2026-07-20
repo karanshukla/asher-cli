@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -303,7 +303,7 @@ async def test_export_calls_get_activity_history(connected_app, tmp_path):
             for ch in "export":
                 await pilot.press(ch)
             await pilot.press("enter")
-            await pilot.pause()
+            await connected_app.workers.wait_for_complete()
             await pilot.pause()
 
         connected_app._robot.get_activity_history.assert_called_once_with(limit=500)
@@ -319,7 +319,7 @@ async def test_export_7_days(connected_app, tmp_path):
             for ch in "export 7":
                 await pilot.press(ch)
             await pilot.press("enter")
-            await pilot.pause()
+            await connected_app.workers.wait_for_complete()
             await pilot.pause()
 
         connected_app._robot.get_activity_history.assert_called_once_with(limit=500)
@@ -327,8 +327,12 @@ async def test_export_7_days(connected_app, tmp_path):
 
 @pytest.mark.asyncio
 async def test_export_writes_csv(connected_app, tmp_path):
+    # Use a timestamp relative to "now" (1 day ago) so the event is always
+    # inside the 30-day export window regardless of when the test runs.
+    # A hard-coded date sitting on the 30-day cutoff edge gets filtered out
+    # once real-world time passes it.
     act = MagicMock()
-    act.timestamp = datetime(2026, 6, 20, 14, 32, 0, tzinfo=timezone.utc)
+    act.timestamp = datetime.now(timezone.utc) - timedelta(days=1)
     act.action = MagicMock()
     act.action.text = "Clean Cycle Complete"
     act.weight = 9.1
@@ -348,7 +352,10 @@ async def test_export_writes_csv(connected_app, tmp_path):
             for ch in "export":
                 await pilot.press(ch)
             await pilot.press("enter")
-            await pilot.pause()
+            # Export runs on a @work worker — wait for all workers to drain
+            # before the test harness tears the app down, so the row write
+            # can't be cancelled mid-flight.
+            await connected_app.workers.wait_for_complete()
             await pilot.pause()
 
     csv_files = list(downloads.glob("asher-LR4C001-*.csv"))

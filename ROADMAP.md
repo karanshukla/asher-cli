@@ -14,7 +14,7 @@ Current state, missing functionality, and suggested additions — grounded in wh
 | Status bar top row — name + model, contextual online label (Cycling/Paused/Cat inside/Cycle done/Drawer full/Offline), night light mode + brightness, panel lock indicator | ✅ |
 | Status bar second row — drawer %, litter %, cat weight (with pet name), last visit | ✅ |
 | Pet name from Whisker account profile | ✅ |
-| Commands: clean, status, lock, unlock, sleep, wake, night-light on/off/auto, night-light-brightness, history, export [days\|month], help, clear, quit | ✅ |
+| Commands: clean, status, info, lock, unlock, sleep, wake, night-light on/off/auto, night-light-brightness, wait-time, power on/off, rename, insight, history, export [days\|month], help, clear, quit | ✅ |
 | Slash commands: `/login`, `/logout`, `/exit`, `/help`, `/robots`, `/robot <index\|name>`, `/pets`, `/pet <index\|name>`, `/cat on\|off\|color <hex>`, `/refresh [seconds\|off]`, `/config`, `/mcp on\|off\|status` | ✅ |
 | MCP bridge — keyring-backed `pylitterbot[mcp]` launcher, auto-installs the extra, writes/removes the Claude Desktop config entry (incl. Windows MSIX path) | ✅ |
 | Inline login flow (email → password in command bar, no restart) | ✅ |
@@ -229,14 +229,14 @@ The `help` output should list `export` alongside other robot commands, with a no
 
 ## 3. Missing robot commands
 
-All of these are real `LitterRobot4` / `LitterRobot5` methods in pylitterbot
-that aren't wired up yet.
+Real `LitterRobot3` / `LitterRobot4` / `LitterRobot5` methods in pylitterbot
+that weren't wired up. The non-destructive ones are now live; the destructive
+ones (`reset`, `reset-settings`, `firmware` update) are deliberately omitted.
 
-### `status` vs `info` — split the current status command
+### ~~`status` vs `info` — split the current status command~~ ✅
 
-`status` currently dumps every known property into the log. It should instead
-surface only what the user actually needs at a glance — the same information
-shown in the status bar, refreshed on demand:
+`status` is now the trimmed at-a-glance view — the same information shown in
+the status bar, refreshed on demand:
 
 ```
   Online         yes
@@ -248,13 +248,16 @@ shown in the status bar, refreshed on demand:
 
 `info` handles the full property dump — serial number, firmware version, wait
 time, all boolean flags, model type, etc. Useful for debugging or first-time
-setup, not something you need every time you check in:
+setup, not something you need every time you check in. Optional LR4/LR5-only
+properties (`firmware`, `clean_cycle_wait_time_minutes`) are read via
+`getattr` so `info` degrades gracefully on LR3 (renders `—` instead of
+crashing):
 
 ```
   Name           Idiot Box
   Model          LR4  (LitterRobot4)
   Serial         LR4C012345
-  Firmware       ESP: 1.1.50  STM: 1.0.11
+  Firmware       ESP: 1.1.50  PIC: 1.0.11
   Wait time      7 min
   Sleeping       no
   Panel locked   no
@@ -264,56 +267,77 @@ setup, not something you need every time you check in:
   Last seen      4m ago
 ```
 
-### `power on` / `power off`
+### ~~`power on` / `power off`~~ ✅
 ```python
 await robot.set_power_status(True / False)
 ```
 Hard-power the unit on or off. Useful for scheduled restarts.
 
-### `wait-time <minutes>`
+### ~~`wait-time <minutes>`~~ ✅
 ```python
 await robot.set_wait_time(minutes)   # VALID_WAIT_TIMES: 3, 7, 15, 25, 30
 ```
 Sets how many minutes the robot waits after a cat visit before cleaning.
-Show current value in `status` output (`robot.clean_cycle_wait_time_minutes`).
+With no argument it prints the current value and the valid set; an out-of-set
+value is rejected before hitting the API. Current value is also surfaced in
+`info` output.
 
-### `panel-brightness <low|medium|high>`
+### `panel-brightness <low|medium|high>` — not available in pylitterbot
+
 ```python
 from pylitterbot.enums import BrightnessLevel
 await robot.set_panel_brightness(BrightnessLevel.LOW)
 ```
 
-### `rename <new name>`
+Checked directly against `pylitterbot==2025.6.2`: `set_panel_brightness` does
+not exist on `LitterRobot3`, `LitterRobot4`, or `LitterRobot5` (the only
+`panel`/`brightness` attributes are `panel_lock_enabled` and
+`set_panel_lockout`). The `BrightnessLevel` enum exists but nothing consumes
+it. Revisit if a future pylitterbot release exposes this.
+
+### ~~`rename <new name>`~~ ✅
 ```python
 await robot.set_name("new name")
 ```
-Renames the unit in the Whisker cloud (persists across sessions).
+Renames the unit in the Whisker cloud (persists across sessions). Multi-word
+names are supported (`rename Idiot Box 2`); bare `rename` shows the current
+name in the usage line.
 
-### `reset` / `reset-settings`
+### `reset` / `reset-settings` — deliberately omitted
+
 ```python
-await robot.reset()          # full factory reset
 await robot.reset_settings() # settings reset only
 ```
-Should require a `--confirm` flag or an "are you sure?" prompt before running.
 
-### `firmware`
+`reset_settings()` exists on all three models; a full `reset()` does not.
+These are destructive and irreversible cloud-side operations, so they're
+intentionally left unwired. If added later, they must require a `--confirm`
+flag or an interactive "are you sure?" prompt — a fat-fingered `reset` from
+the command bar shouldn't be one keystroke away.
+
+### `firmware` — deliberately omitted
+
 ```python
 has_update = await robot.has_firmware_update()
 details    = await robot.get_firmware_details()
 ```
-Show current firmware version and whether an update is available. Add
-`firmware update` to trigger `robot.update_firmware()` with a warning.
 
-### `insight [days]` — usage statistics
+Read-only firmware display is harmless and could be folded into `info` later,
+but `robot.update_firmware()` is destructive (triggers a remote update on the
+physical device) and is intentionally not wired up. Current firmware version
+is already shown by `info` via the `firmware` property.
+
+### ~~`insight [days]` — usage statistics~~ ✅
 ```python
 insight = await robot.get_insight(days=30)
 ```
-`Insight` object contains cycle counts, averages, etc. Could render a small
-summary table:
+Renders total cycles, average cycles/day over the covered period, and the peak
+day. Accepts a day count (`insight 7`) or `month` alias (= 30, the Whisker
+ceiling):
 ```
-  Cycles last 30d    42
-  Avg cycles/day     1.4
-  Drawer emptied     2x
+  Cycles         42 (last 3 days)
+  Avg/day        1.4
+  Peak day       3 on 2026-07-20
 ```
 
 ---
@@ -2249,7 +2273,7 @@ Ranked by user-visible impact vs. implementation effort:
 4. ~~**`/cat`, `/refresh`, `/config` slash commands**~~ ✅ (§1) — cat panel toggle + colour, poll interval control, runtime config dump
 5. **Tab-completion for slash commands** (§23) — Claude Code-style overlay dropdown on `/` keypress; single-source registry drives both dispatch and completion
 6. **`/version` slash command** (§24) — print Python/package versions to log; model badge in status bar is already done
-7. **`wait-time`, `power`, `rename`, `insight` commands** (§3) — each is a two-line wiring job
+7. ~~**`wait-time`, `power`, `rename`, `insight` commands** (§3)~~ ✅ — all four wired up; plus the `status`/`info` split (`status` trimmed to at-a-glance, `info` is the full property dump). `panel-brightness` skipped (not exposed by pylitterbot 2025.6.2); `reset`/`reset-settings`/`firmware`-update deliberately omitted as destructive
 8. **Sleep schedule viewer** (§8) — read-only first, config wizard later
 9. **Headless CLI export** (§25) — `asher --export 7` for cron/Task Scheduler automation, no TUI or Claude Desktop needed
 
