@@ -317,6 +317,152 @@ class HistoryCommand(Command):
             app._log_err(f"Failed to get history: {exc}")
 
 
+class WaitTimeCommand(Command):
+    name = "wait-time"
+    aliases = ("waittime", "wait")
+    description = "<minutes>  set clean-cycle wait time"
+    requires_robot = True
+
+    @property
+    def display_name(self) -> str:
+        return "wait-time <minutes>"
+
+    async def run(self, app: AsherApp, args: list[str]) -> None:
+        assert app._robot is not None
+        valid = sorted(getattr(app._robot, "VALID_WAIT_TIMES", []))
+        if not args or not args[0].isdigit():
+            current = getattr(app._robot, "clean_cycle_wait_time_minutes", "?")
+            if valid:
+                app._log_warn(f"Usage: wait-time <{'|'.join(str(v) for v in valid)}>")
+                app._log_info(f"Current wait time: {current} min")
+            else:
+                app._log_warn("Usage: wait-time <minutes>")
+            return
+
+        minutes = int(args[0])
+        if valid and minutes not in valid:
+            app._log_warn(
+                f"Invalid wait time {minutes} - use one of: {', '.join(str(v) for v in valid)}"
+            )
+            return
+
+        try:
+            ok = await app._robot.set_wait_time(minutes)
+        except Exception as exc:
+            app._log_err(f"Wait-time change failed: {exc}")
+            return
+        if ok:
+            app._log_ok(f"Wait time set to {minutes} min")
+            await app._robot.refresh()
+            await app._refresh_status()
+        else:
+            app._log_warn("Wait-time command rejected by cloud")
+
+
+class PowerCommand(Command):
+    name = "power"
+    description = "on|off  hard-power the unit"
+    requires_robot = True
+
+    @property
+    def display_name(self) -> str:
+        return "power on|off"
+
+    async def run(self, app: AsherApp, args: list[str]) -> None:
+        assert app._robot is not None
+        arg = args[0].lower() if args else ""
+        if arg not in ("on", "off"):
+            app._log_warn("Usage: power on|off")
+            return
+        try:
+            ok = await app._robot.set_power_status(arg == "on")
+        except Exception as exc:
+            app._log_err(f"Power change failed: {exc}")
+            return
+        if ok:
+            app._log_ok(f"Power {'on' if arg == 'on' else 'off'}")
+            await app._robot.refresh()
+            await app._refresh_status()
+        else:
+            app._log_warn("Power command rejected by cloud")
+
+
+class RenameCommand(Command):
+    name = "rename"
+    description = "<new name>  rename the unit in the Whisker cloud"
+    requires_robot = True
+
+    @property
+    def display_name(self) -> str:
+        return "rename <name>"
+
+    async def run(self, app: AsherApp, args: list[str]) -> None:
+        assert app._robot is not None
+        if not args:
+            app._log_warn(f"Usage: rename <new name>  (current: {app._robot.name})")
+            return
+        new_name = " ".join(args).strip()
+        if not new_name:
+            app._log_warn("Usage: rename <new name>")
+            return
+        try:
+            ok = await app._robot.set_name(new_name)
+        except Exception as exc:
+            app._log_err(f"Rename failed: {exc}")
+            return
+        if ok:
+            app._log_ok(f"Renamed to '{new_name}'")
+            await app._robot.refresh()
+            await app._refresh_status()
+        else:
+            app._log_warn("Rename command rejected by cloud")
+
+
+class InsightCommand(Command):
+    name = "insight"
+    description = "[days]  show cycle-usage statistics (default: 30 days)"
+    requires_robot = True
+
+    async def run(self, app: AsherApp, args: list[str]) -> None:
+        assert app._robot is not None
+        raw = args[0].lower() if args else "30"
+        if raw == "month":
+            days = 30
+        else:
+            try:
+                days = max(1, min(30, int(raw)))
+            except ValueError:
+                app._log_warn(f"Unknown period '{raw}' - use a number of days or 'month'")
+                return
+
+        app._log_info(f"Fetching insight (last {days} days)…")
+        try:
+            insight = await app._robot.get_insight(days=days)
+        except Exception as exc:
+            app._log_err(f"Failed to fetch insight: {exc}")
+            return
+
+        total = getattr(insight, "total_cycles", 0)
+        avg = getattr(insight, "average_cycles", 0.0)
+        history = getattr(insight, "cycle_history", []) or []
+
+        log = app.query_one("#log", RichLog)
+        rows = [
+            ("Cycles", f"{total} (last {len(history)} days)"),
+            ("Avg/day", f"{float(avg):.1f}"),
+        ]
+        # Peak day, if any history is present
+        if history:
+            peak_date, peak_count = max(history, key=lambda x: x[1])
+            rows.append(("Peak day", f"{peak_count} on {peak_date.isoformat()}"))
+
+        for k, v in rows:
+            t = Text()
+            t.append(f"  {k:<14}", style="#484f58")
+            t.append(str(v), style="#c9d1d9")
+            log.write(t)
+
+
 # ── app commands (no robot required) ────────────────────────────────────────
 
 
@@ -847,6 +993,10 @@ _registry.register(WakeCommand())
 _registry.register(NightLightCommand())
 _registry.register(NightLightBrightnessCommand())
 _registry.register(HistoryCommand())
+_registry.register(WaitTimeCommand())
+_registry.register(PowerCommand())
+_registry.register(RenameCommand())
+_registry.register(InsightCommand())
 _registry.register(ExportCommand())
 _registry.register(HelpCommand())
 _registry.register(ClearCommand())
