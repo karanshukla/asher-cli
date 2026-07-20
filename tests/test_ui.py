@@ -63,6 +63,15 @@ class TestCSS:
     def test_css_contains_cat_fx(self):
         assert "#cat-fx" in _CSS
 
+    def test_css_contains_cat_label(self):
+        assert "#cat-label" in _CSS
+
+    def test_css_contains_cat_status(self):
+        assert "#cat-status" in _CSS
+
+    def test_css_contains_fault_banner(self):
+        assert "#fault-banner" in _CSS
+
     def test_css_contains_bottom_dock(self):
         assert "#bottom-dock" in _CSS
 
@@ -144,3 +153,6 @@ class TestUIMixinActions:
 
     def test_action_blur_input_exists(self):
         assert hasattr(UIMixin, "action_blur_input")
+
+    def test_action_dismiss_fault_exists(self):
+        assert hasattr(UIMixin, "action_dismiss_fault")

@@ -2,18 +2,27 @@
 
 from __future__ import annotations
 
+import contextlib
 from datetime import datetime
 from typing import TYPE_CHECKING
 
 from pylitterbot.enums import LitterBoxStatus
 from rich.text import Text
 from textual import work
+from textual.css.query import NoMatches
 from textual.widgets import Static
 
+from ..constants import STATUS_COLORS
+from ..faults import SEVERITY_ERROR, check_faults
 from ..helpers import drawer_bar, fmt_ago, robot_model
 
 if TYPE_CHECKING:
+    from textual.timer import Timer
+
     from ..robot_protocol import RobotProtocol
+
+
+_CYCLING_STATUSES = frozenset({LitterBoxStatus.CLEAN_CYCLE, LitterBoxStatus.EMPTY_CYCLE})
 
 
 class MonitoringMixin:
@@ -22,6 +31,10 @@ class MonitoringMixin:
     _pets: list
     _cat_mode: str
     _last_cat_seen: datetime | None
+    _prev_faults: set[str]
+    _fault_dismissed: set[str]
+    _cycle_start: datetime | None
+    _cycle_timer: Timer | None
 
     async def _start_monitoring(self) -> None:
         """Subscribe to WebSocket push updates from the robot."""
@@ -95,24 +108,32 @@ class MonitoringMixin:
         online_lbl = self.query_one("#online-lbl", Static)  # type: ignore[attr-defined]
         if not online:
             online_lbl.update(Text("○ OFFLINE", style="bold #f85149"))
+            self._stop_cycle_timer()
         elif robot_status is LitterBoxStatus.CAT_DETECTED:
             online_lbl.update(Text("~ Cat inside", style="bold #3fb950"))
+            self._stop_cycle_timer()
         elif robot_status is LitterBoxStatus.CAT_SENSOR_TIMING:
             online_lbl.update(Text("⏱ Cat delay", style="bold #d29922"))
-        elif robot_status in (LitterBoxStatus.CLEAN_CYCLE, LitterBoxStatus.EMPTY_CYCLE):
-            online_lbl.update(Text("⟳ Cycling", style="bold #58a6ff"))
+            self._stop_cycle_timer()
+        elif robot_status in _CYCLING_STATUSES:
+            self._start_cycle_timer()
+            online_lbl.update(self._cycling_chip())
         elif robot_status is LitterBoxStatus.PAUSED:
             online_lbl.update(Text("⏸ Paused", style="bold #d29922"))
+            self._stop_cycle_timer()
         elif robot_status is LitterBoxStatus.CLEAN_CYCLE_COMPLETE:
             online_lbl.update(Text("✓ Cycle done", style="bold #3fb950"))
+            self._stop_cycle_timer()
         elif robot_status in (
             LitterBoxStatus.DRAWER_FULL,
             LitterBoxStatus.DRAWER_FULL_1,
             LitterBoxStatus.DRAWER_FULL_2,
         ):
             online_lbl.update(Text("⚠ Drawer full", style="bold #f85149"))
+            self._stop_cycle_timer()
         else:
             online_lbl.update(Text("● ONLINE", style="bold #3fb950"))
+            self._stop_cycle_timer()
 
         nl_mode = getattr(r, "night_light_mode", None)
         nl_enabled = getattr(r, "night_light_mode_enabled", False)
@@ -170,8 +191,101 @@ class MonitoringMixin:
         wt_text.append(weight_val, style="#8b949e")
         self.query_one("#weight-lbl", Static).update(wt_text)  # type: ignore[attr-defined]
 
-        if drawer >= 85 and self._cat_mode not in ("cleaning", "error"):
+        self._update_cat_panel(r)
+        faults_active = self._refresh_faults(r)
+
+        if faults_active:
+            if self._cat_mode != "error":
+                self._set_cat("error", "fault!")  # type: ignore[attr-defined]
+        elif drawer >= 85 and self._cat_mode not in ("cleaning", "error"):
             self._set_cat("full", "drawer full!")  # type: ignore[attr-defined]
+        elif self._cat_mode == "error":
+            self._set_cat("idle", "ready")  # type: ignore[attr-defined]
+
+    def _update_cat_panel(self, r: RobotProtocol) -> None:
+        """Render the cat-panel status badges: status chip, lock, light, sleep, wait."""
+        status = getattr(r, "status", None)
+        locked = bool(getattr(r, "panel_lock_enabled", False))
+        sleeping = bool(getattr(r, "sleep_mode_enabled", False))
+        night = bool(getattr(r, "night_light_mode_enabled", False))
+        wait = getattr(r, "clean_cycle_wait_time_minutes", None)
+
+        status_str = status.value if status is not None and hasattr(status, "value") else "—"
+        status_color = STATUS_COLORS.get(status_str, "#8b949e")
+
+        t = Text()
+        t.append(f"● {status_str}\n", style=status_color)
+        t.append("🔒 locked\n" if locked else "🔓 unlocked\n", style="#8b949e")
+        t.append("💤 sleeping\n" if sleeping else "😺 awake\n", style="#8b949e")
+        t.append("☀ light on\n" if night else "☾ light off\n", style="#8b949e")
+        if wait:
+            t.append(f"⏱ wait {wait}m\n", style="#484f58")
+        self.query_one("#cat-status", Static).update(t)  # type: ignore[attr-defined]
+
+    def _refresh_faults(self, r: RobotProtocol) -> bool:
+        """Render the fault banner and log transitions. Returns True if any fault active."""
+        faults = check_faults(r)
+        active_labels = {f.label for f in faults}
+
+        for label in active_labels - self._prev_faults:
+            self._log_err(f"FAULT: {label}")  # type: ignore[attr-defined]
+        for label in self._prev_faults - active_labels:
+            self._log_ok(f"Cleared: {label}")  # type: ignore[attr-defined]
+
+        self._prev_faults = active_labels
+        if active_labels != self._fault_dismissed:
+            self._fault_dismissed = set()
+
+        try:
+            banner = self.query_one("#fault-banner", Static)  # type: ignore[attr-defined]
+        except NoMatches:
+            return bool(faults)
+
+        if not faults:
+            banner.display = False
+            banner.update(Text(""))
+            return False
+
+        t = Text()
+        for i, f in enumerate(faults):
+            if i:
+                t.append("\n")
+            prefix = "✖ " if f.severity == SEVERITY_ERROR else "⚠ "
+            color = "#f85149" if f.severity == SEVERITY_ERROR else "#d29922"
+            t.append(f"{prefix}{f.label}", style=color)
+        banner.update(t)
+        banner.display = self._fault_dismissed != active_labels
+        return True
+
+    def _cycling_chip(self) -> Text:
+        """Build the `⟳ Cycling M:SS` chip using `_cycle_start`."""
+        base = "⟳ Cycling"
+        if self._cycle_start is None:
+            return Text(base, style="bold #58a6ff")
+        elapsed = int((datetime.now() - self._cycle_start).total_seconds())
+        mm, ss = divmod(elapsed, 60)
+        return Text(f"{base}  {mm}:{ss:02d}", style="bold #58a6ff")
+
+    def _start_cycle_timer(self) -> None:
+        """Begin tracking an active clean cycle (idempotent)."""
+        if self._cycle_start is None:
+            self._cycle_start = datetime.now()
+        if self._cycle_timer is None:
+            self._cycle_timer = self.set_interval(1, self._tick_cycle)  # type: ignore[attr-defined]
+
+    def _stop_cycle_timer(self) -> None:
+        """Stop tracking a cycle and clear the elapsed-time chip."""
+        self._cycle_start = None
+        if self._cycle_timer is not None:
+            self._cycle_timer.stop()
+            self._cycle_timer = None
+
+    def _tick_cycle(self) -> None:
+        """Per-second refresh of the cycling chip while a cycle is active."""
+        if self._cycle_start is None or self._robot is None:
+            return
+        with contextlib.suppress(NoMatches):
+            self.query_one("#online-lbl", Static).update(self._cycling_chip())  # type: ignore[attr-defined]
 
     @work(exclusive=True)
     async def _poll_status_interval(self) -> None:

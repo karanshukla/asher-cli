@@ -43,6 +43,7 @@ asher/
   robot_adapters.py RobotAdapter ABC + LR3/LR4/LR5 subclasses + make_adapter() factory
   mcp_config.py     Claude Desktop config read/write for the /mcp slash command
   mcp_bridge.py     asher-mcp-launch console script — keyring-backed pylitterbot MCP launcher
+  faults.py         check_faults(robot) — pure safety/component fault detection (status enum + attrs)
   __main__.py       main() entry point
   commands/
     base.py         Command ABC, SlashCommand, CommandRegistry
@@ -66,6 +67,7 @@ tests/
   test_mcp_config.py      Claude Desktop config read/write
   test_mcp_bridge.py      mcp_bridge launcher credential/subprocess handling
   test_mcp_command.py     /mcp slash command dispatch
+  test_faults.py          check_faults() — safety statuses, attribute faults, graceful degradation
 
 .github/workflows/
   ci.yml            ruff + mypy + pytest on every push/PR
@@ -120,9 +122,14 @@ Do not add robot-control commands as slash commands, and do not add app-manageme
 ```
 AsherApp (textual.App)
 ├── #status-bar          top dock — two rows (top: name/online/night-light/lock; bottom: drawer/litter/weight/visit)
+├── #fault-banner        top dock (below status bar) — hidden unless check_faults() returns active faults; `d` dismisses
 ├── #main-area
 │   ├── #log             RichLog — scrollable event/command output
 │   └── #cat-panel       animated ASCII cat sidebar
+│       ├── #cat-fx      animated FX strip
+│       ├── #cat-art     the ASCII cat
+│       ├── #cat-label   italic mode label (connected / cycling… / fault!)
+│       └── #cat-status  status badges (chip, lock, night light, sleep, wait time)
 └── #bottom-dock         bottom dock
     ├── #input-bar / #input-row   command prompt ("> " label + CmdInput)
     └── #hint-bar        shortcut hints / login flow prompts
@@ -135,7 +142,10 @@ LoginScreen (ModalScreen) — available in auth.py but not the primary auth path
 | Method | Purpose |
 |---|---|
 | `_connect_worker()` | `@work` — resolve credentials (keyring → .env → inline login), authenticate |
-| `_refresh_status()` | update all header widgets from robot state |
+| `_refresh_status()` | update all header widgets + cat panel + fault banner from robot state |
+| `_update_cat_panel(robot)` | render `#cat-label` + `#cat-status` badges; called from `_refresh_status` |
+| `_refresh_faults(robot)` | run `check_faults()`, render `#fault-banner`, log transitions; sets cat mode to `error` while faults active |
+| `_cycling_chip()` / `_start_cycle_timer()` / `_stop_cycle_timer()` / `_tick_cycle()` | `⟳ Cycling M:SS` chip + lazy 1s elapsed timer |
 | `_poll_status_interval()` | `@work` — poll fallback every 300s (5 min); WebSocket is primary |
 | `_tick_cat()` | advances multi-frame cat animation every 0.4s |
 | `_dispatch_command(command, args)` | `@work` — calls `command.run(app, args)` from the registry |

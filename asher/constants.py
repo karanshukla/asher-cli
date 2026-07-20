@@ -9,6 +9,9 @@ STATUS_COLORS: dict[str, str] = {
     "Drawer Full": "#f85149",
     "Offline": "#f85149",
     "Sleeping": "#484f58",
+    "Empty Cycle": "#58a6ff",
+    "Paused": "#d29922",
+    "Clean Cycle Complete": "#3fb950",
 }
 
 ROBOT_MODELS: dict[str, str] = {

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as pkg_version
@@ -123,11 +124,15 @@ class UIMixin:
                 yield Static("│", classes="sep")
                 yield Static("", id="clean-lbl", classes="chunk")
 
+        yield Static("", id="fault-banner")
+
         with Container(id="main-area"):
             yield RichLog(id="log", highlight=True, markup=True, wrap=True, min_width=0)
             with Container(id="cat-panel"):
                 yield Static("", id="cat-fx")
                 yield Static(CATS["idle"][0], id="cat-art")  # type: ignore[arg-type]
+                yield Static("", id="cat-label")
+                yield Static("", id="cat-status")
 
         with Container(id="bottom-dock"):
             with Container(id="input-bar"), Container(id="input-row"):
@@ -220,6 +225,8 @@ class UIMixin:
         self.query_one("#cat-art", Static).update(Text(frame, style=color))  # type: ignore[attr-defined]
         fx = _CAT_FX.get(mode, [""])
         self.query_one("#cat-fx", Static).update(Text(fx[0], style=color))  # type: ignore[attr-defined]
+        label_txt = Text(label, style="#8b949e") if label else Text("")
+        self.query_one("#cat-label", Static).update(label_txt)  # type: ignore[attr-defined]
 
     def _tick_cat(self) -> None:
         try:
@@ -298,3 +305,9 @@ class UIMixin:
 
     def action_blur_input(self) -> None:
         self.query_one("#cmd-input", Input).blur()  # type: ignore[attr-defined]
+
+    def action_dismiss_fault(self) -> None:
+        """Hide the fault banner until the set of active faults changes."""
+        with contextlib.suppress(NoMatches):
+            banner = self.query_one("#fault-banner", Static)  # type: ignore[attr-defined]
+            banner.display = False
