@@ -314,6 +314,26 @@ async def test_status_is_at_a_glance_view(connected_app):
 
 
 @pytest.mark.asyncio
+async def test_status_renders_readable_status_not_enum_repr(connected_app):
+    """LitterBoxStatus is a plain Enum — str() yields 'LitterBoxStatus.READY'.
+    The status command must render the human-readable .text ('Ready') instead."""
+    from pylitterbot.enums import LitterBoxStatus
+
+    connected_app._robot.status = LitterBoxStatus.READY
+    async with connected_app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#cmd-input")
+        await _type(pilot, "status")
+        await pilot.pause()
+        await pilot.pause()
+
+        log = _log_text(connected_app)
+
+    assert "Ready" in log
+    assert "LitterBoxStatus" not in log
+
+
+@pytest.mark.asyncio
 async def test_info_shows_full_property_dump(connected_app):
     async with connected_app.run_test() as pilot:
         await pilot.pause()

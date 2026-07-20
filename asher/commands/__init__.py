@@ -39,6 +39,22 @@ def _fmt_wait_time(minutes: object) -> str:
         return "—"
 
 
+def _status_text(status: object) -> str:
+    """Render a robot status as human-readable text.
+
+    ``LitterBoxStatus`` is a plain ``Enum`` (not ``StrEnum``), so ``str()`` yields
+    the verbose ``"LitterBoxStatus.READY"``; the readable form ("Ready") lives in
+    its ``text`` property. Falls back to ``str()`` for plain strings, and to an
+    em dash when status is missing.
+    """
+    if status is None:
+        return "—"
+    text = getattr(status, "text", None)
+    if isinstance(text, str):
+        return text
+    return str(status)
+
+
 _CYCLING_STATUSES = frozenset(
     {
         LitterBoxStatus.CLEAN_CYCLE,
@@ -128,7 +144,7 @@ class StatusCommand(Command):
         last_seen = getattr(app, "_last_cat_seen", None) or getattr(r, "last_seen", None)
         rows = [
             ("Online", "yes" if getattr(r, "is_online", False) else "no"),
-            ("Status", str(getattr(r, "status", "—"))),
+            ("Status", _status_text(getattr(r, "status", None))),
             ("Drawer", f"{float(getattr(r, 'waste_drawer_level', 0) or 0):.0f}%"),
             ("Last seen", fmt_ago(last_seen)),
             ("Cat weight", weight),
