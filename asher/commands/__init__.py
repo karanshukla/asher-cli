@@ -24,9 +24,20 @@ from textual.widgets import Input, RichLog, Static
 from tzlocal import get_localzone
 
 from ..activity_labels import ACTION_LABELS, activity_raw_text, format_activity
-from ..helpers import robot_model, ts
+from ..helpers import fmt_ago, robot_model, ts
 from ..login_flow import LoginFlow, LoginState
 from .base import Command, CommandRegistry, SlashCommand
+
+
+def _fmt_wait_time(minutes: object) -> str:
+    """Render a clean-cycle wait time, tolerating a missing/None value."""
+    if minutes is None:
+        return "—"
+    try:
+        return f"{int(float(str(minutes)))} min"
+    except (TypeError, ValueError):
+        return "—"
+
 
 _CYCLING_STATUSES = frozenset(
     {
@@ -95,7 +106,7 @@ class CleanCommand(Command):
 
 class StatusCommand(Command):
     name = "status"
-    description = "refresh and display full status"
+    description = "refresh and show at-a-glance status"
     requires_robot = True
 
     async def run(self, app: AsherApp, args: list[str]) -> None:
@@ -103,25 +114,77 @@ class StatusCommand(Command):
         try:
             await app._robot.refresh()
             await app._refresh_status()
-            r = app._robot
-            rows = [
-                ("Name", r.name),
-                ("Status", str(r.status)),
-                ("Drawer", f"{r.waste_drawer_level:.0f}%"),
-                ("Sleeping", "yes" if r.sleep_mode_enabled else "no"),
-                ("Locked", "yes" if r.panel_lock_enabled else "no"),
-                ("Night light", "on" if r.night_light_mode_enabled else "off"),
-                ("Online", "yes" if r.is_online else "no"),
-                ("Serial", r.serial),
-            ]
-            log = app.query_one("#log", RichLog)
-            for k, v in rows:
-                t = Text()
-                t.append(f"  {k:<14}", style="#484f58")
-                t.append(str(v), style="#c9d1d9")
-                log.write(t)
         except Exception as exc:
             app._log_err(f"Status refresh failed: {exc}")
+            return
+        r = app._robot
+        weight = "—"
+        try:
+            w = getattr(r, "pet_weight", None)
+            if w is not None and float(w) > 0:
+                weight = f"{float(w):.1f} lb"
+        except Exception:
+            pass
+        last_seen = getattr(app, "_last_cat_seen", None) or getattr(r, "last_seen", None)
+        rows = [
+            ("Online", "yes" if getattr(r, "is_online", False) else "no"),
+            ("Status", str(getattr(r, "status", "—"))),
+            ("Drawer", f"{float(getattr(r, 'waste_drawer_level', 0) or 0):.0f}%"),
+            ("Last seen", fmt_ago(last_seen)),
+            ("Cat weight", weight),
+        ]
+        log = app.query_one("#log", RichLog)
+        for k, v in rows:
+            t = Text()
+            t.append(f"  {k:<14}", style="#484f58")
+            t.append(str(v), style="#c9d1d9")
+            log.write(t)
+
+
+class InfoCommand(Command):
+    name = "info"
+    description = "show full robot details (model, serial, firmware, …)"
+    requires_robot = True
+
+    async def run(self, app: AsherApp, args: list[str]) -> None:
+        assert app._robot is not None
+        try:
+            await app._robot.refresh()
+        except Exception as exc:
+            app._log_err(f"Info refresh failed: {exc}")
+            return
+        r = app._robot
+
+        def _yn(flag: object) -> str:
+            return "yes" if flag else "no"
+
+        # Properties marked optional are LR4/LR5-specific and absent on LR3 —
+        # read via getattr so the command degrades gracefully across models.
+        nl_mode = getattr(r, "night_light_mode", None)
+        nl_enabled = getattr(r, "night_light_mode_enabled", False)
+        night_str = (
+            nl_mode.value.lower() if nl_mode is not None else ("on" if nl_enabled else "off")
+        )
+        last_seen = getattr(app, "_last_cat_seen", None) or getattr(r, "last_seen", None)
+        rows = [
+            ("Name", getattr(r, "name", "—")),
+            ("Model", robot_model(r)),
+            ("Serial", getattr(r, "serial", "—")),
+            ("Firmware", getattr(r, "firmware", "—") or "—"),
+            ("Wait time", _fmt_wait_time(getattr(r, "clean_cycle_wait_time_minutes", None))),
+            ("Sleeping", _yn(getattr(r, "sleep_mode_enabled", False))),
+            ("Panel locked", _yn(getattr(r, "panel_lock_enabled", False))),
+            ("Night light", night_str),
+            ("Drawer", f"{float(getattr(r, 'waste_drawer_level', 0) or 0):.0f}%"),
+            ("Online", _yn(getattr(r, "is_online", False))),
+            ("Last seen", fmt_ago(last_seen)),
+        ]
+        log = app.query_one("#log", RichLog)
+        for k, v in rows:
+            t = Text()
+            t.append(f"  {k:<14}", style="#484f58")
+            t.append(str(v), style="#c9d1d9")
+            log.write(t)
 
 
 class LockCommand(Command):
@@ -986,6 +1049,7 @@ class ExportCommand(Command):
 _registry = CommandRegistry()
 _registry.register(CleanCommand())
 _registry.register(StatusCommand())
+_registry.register(InfoCommand())
 _registry.register(LockCommand())
 _registry.register(UnlockCommand())
 _registry.register(SleepCommand())

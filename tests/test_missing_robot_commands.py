@@ -41,6 +41,7 @@ def connected_app():
     robot.pet_weight = 10.5
     robot.power_status = "on"
     robot.clean_cycle_wait_time_minutes = 7
+    robot.firmware = "ESP: 1.1.50 / PIC: 1.0.11"
     robot.VALID_WAIT_TIMES = [3, 7, 15, 25, 30]
     robot.refresh = AsyncMock()
     robot.get_activity_history = AsyncMock(return_value=[])
@@ -282,3 +283,102 @@ async def test_insight_shows_peak_day(connected_app):
     # Peak day in the fixture is 3 cycles on 2026-07-20.
     assert "2026-07-20" in log
     assert "3" in log
+
+
+# ── status / info split (§3) ──────────────────────────────────────────────────
+#
+# `status` is the trimmed at-a-glance view; `info` is the full property dump.
+
+
+@pytest.mark.asyncio
+async def test_status_is_at_a_glance_view(connected_app):
+    async with connected_app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#cmd-input")
+        await _type(pilot, "status")
+        await pilot.pause()
+        await pilot.pause()
+
+        log = _log_text(connected_app)
+
+    # status refreshes the robot and refreshes the status bar
+    connected_app._robot.refresh.assert_called_once()
+    # at-a-glance fields present
+    assert "Online" in log
+    assert "Drawer" in log and "50%" in log
+    assert "Cat weight" in log and "10.5 lb" in log
+    assert "Last seen" in log
+    # status is the trimmed view — full-detail fields belong to `info`, not here
+    assert "Serial" not in log
+    assert "Firmware" not in log
+
+
+@pytest.mark.asyncio
+async def test_info_shows_full_property_dump(connected_app):
+    async with connected_app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#cmd-input")
+        await _type(pilot, "info")
+        await pilot.pause()
+        await pilot.pause()
+
+        log = _log_text(connected_app)
+
+    connected_app._robot.refresh.assert_called_once()
+    assert "Name" in log and "TestBot" in log
+    assert "Serial" in log and "LR12345" in log
+    assert "Firmware" in log and "1.1.50" in log
+    assert "Wait time" in log and "7 min" in log
+    assert "Panel locked" in log and "no" in log
+    assert "Online" in log
+
+
+@pytest.mark.asyncio
+async def test_info_handles_missing_optional_props():
+    """LR3 lacks firmware / clean_cycle_wait_time_minutes — info must degrade gracefully."""
+    robot = MagicMock(
+        spec=[
+            "name",
+            "serial",
+            "is_online",
+            "status",
+            "waste_drawer_level",
+            "sleep_mode_enabled",
+            "panel_lock_enabled",
+            "night_light_mode_enabled",
+            "last_seen",
+            "refresh",
+        ]
+    )
+    robot.name = "OldBox"
+    robot.serial = "LR3-001"
+    robot.is_online = True
+    robot.status = "Ready"
+    robot.waste_drawer_level = 40.0
+    robot.sleep_mode_enabled = False
+    robot.panel_lock_enabled = False
+    robot.night_light_mode_enabled = False
+    robot.last_seen = datetime.now(timezone.utc)
+    robot.refresh = AsyncMock()
+
+    app = AsherApp()
+    app._robot = robot
+    app._adapter = LR3Adapter(robot)
+    app._account = MagicMock()
+    app._account.disconnect = AsyncMock()
+    app._pets = []
+    app._connect_worker = lambda **kwargs: None  # type: ignore[method-assign]
+
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#cmd-input")
+        await _type(pilot, "info")
+        await pilot.pause()
+        await pilot.pause()
+
+        log = _log_text(app)
+
+    # Absent optional props render as the em-dash placeholder, not a crash.
+    assert "Firmware" in log and "—" in log
+    assert "Wait time" in log and "—" in log
+    assert "Name" in log and "OldBox" in log
