@@ -23,6 +23,7 @@ from textual import work
 from textual.widgets import Input, RichLog, Static
 from tzlocal import get_localzone
 
+from ..activity_labels import ACTION_LABELS, activity_raw_text, format_activity
 from ..helpers import robot_model, ts
 from ..login_flow import LoginFlow, LoginState
 from .base import Command, CommandRegistry, SlashCommand
@@ -290,20 +291,27 @@ class HistoryCommand(Command):
                 app._log_info("No activity history available.")
                 return
             app._log_info(f"Last {len(acts)} events:")
+            today = datetime.now(tz=timezone.utc).date()
             for act in reversed(acts):
                 ts_dt = getattr(act, "timestamp", None)
                 if ts_dt:
                     if ts_dt.tzinfo is None:
                         ts_dt = ts_dt.replace(tzinfo=timezone.utc)
-                    ts_dt = ts_dt.astimezone(get_localzone())
-                    ts_str = ts_dt.strftime("%m/%d %H:%M %Z")
+                    local_dt = ts_dt.astimezone(get_localzone())
+                    # Show the year only for events older than today, to match
+                    # the §11 "timestamps in activity history" note.
+                    if local_dt.date() == today:
+                        ts_str = local_dt.strftime("%H:%M")
+                    elif local_dt.year == today.year:
+                        ts_str = local_dt.strftime("%m/%d %H:%M")
+                    else:
+                        ts_str = local_dt.strftime("%Y-%m-%d %H:%M")
                 else:
                     ts_str = "?"
-                action = getattr(act, "action", "?")
-                action_str = action.text if hasattr(action, "text") else str(action)
+                label, colour = format_activity(act, app._pets)
                 t = Text()
                 t.append(f"  {ts_str}  ", style="#484f58")
-                t.append(action_str, style="#8b949e")
+                t.append(label, style=colour)
                 log.write(t)
         except Exception as exc:
             app._log_err(f"Failed to get history: {exc}")
@@ -725,28 +733,6 @@ class McpCommand(SlashCommand):
             app._log_info(f"MCP server was already {verb}")
 
 
-_ACTION_LABELS: dict[str, tuple[str, str]] = {
-    "ready": ("Ready", "#484f58"),
-    "litter robot is ready.": ("Ready", "#484f58"),
-    "clean cycle complete": ("Clean cycle complete", "#3fb950"),
-    "clean cycle in progress": ("Cleaning…", "#58a6ff"),
-    "cat detected": ("Cat detected", "#d29922"),
-    "cat sensor interrupted": ("Cat sensor tripped", "#d29922"),
-    "drawer full": ("Drawer full — empty now", "#f85149"),
-    "drawer full cleared": ("Drawer emptied", "#3fb950"),
-    "sleep mode on": ("Sleep mode on", "#484f58"),
-    "sleep mode off": ("Sleep mode off", "#484f58"),
-    "panel locked": ("Panel locked", "#484f58"),
-    "panel unlocked": ("Panel unlocked", "#484f58"),
-    "offline": ("Offline", "#f85149"),
-    "power off": ("Powered off", "#f85149"),
-    "power on": ("Powered on", "#3fb950"),
-    "motor fault": ("Motor fault", "#f85149"),
-    "pinch detect": ("Pinch detected", "#f85149"),
-    "timing fault": ("Timing fault", "#d29922"),
-}
-
-
 def _open_folder(path: Path) -> None:
     if sys.platform == "win32":
         subprocess.Popen(["explorer", "/select,", str(path)])
@@ -811,9 +797,8 @@ async def _run_export(app: AsherApp, days: int) -> None:
             for act, ts_dt in filtered:
                 local_dt = ts_dt.astimezone(local_tz)
                 iso_ts = local_dt.isoformat()
-                action: Any = getattr(act, "action", None)
-                raw_str = (action.text if hasattr(action, "text") else str(action)).strip()
-                label, _ = _ACTION_LABELS.get(raw_str.lower(), (raw_str, ""))
+                raw_str = activity_raw_text(act)
+                label, _ = ACTION_LABELS.get(raw_str.lower(), (raw_str, ""))
                 weight = getattr(act, "weight", None)
                 weight_str = f"{float(weight):.1f}" if weight is not None else ""
                 pet_id = getattr(act, "pet_id", None)

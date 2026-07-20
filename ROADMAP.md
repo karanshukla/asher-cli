@@ -641,71 +641,32 @@ colours:
 If `account.robots` has more than one unit, a tab bar across the top (Textual's
 `TabbedContent` widget) would let users switch without `/robot n`.
 
-### Readable event labels (replace raw library strings)
+### ~~Readable event labels (replace raw library strings)~~ ✅
 
-The current `_cmd_history_list` renders `action.text` or `str(action)` directly,
-which produces whatever pylitterbot happens to expose — enum names, internal
-strings, or unprintable objects. It needs a translation layer.
+The `history` command now renders translated, colour-coded labels instead of
+raw pylitterbot enum strings. Cat-detection events append the pet name and
+weight when available (`Cat detected  Asher  9.1 lb`), and unknown event
+types fall through to the raw string in muted grey so new pylitterbot events
+never break the display.
 
-**Current output:**
-```
-  06/14 14:22  Litter Robot is Ready.
-  06/14 13:55  Clean Cycle Complete
-  06/14 13:54  Cat Detected
-  06/14 12:01  Drawer Full
-```
+The label map and the pure `format_activity()` translator live in
+`asher/activity_labels.py`, shared by both the `history` command and the
+`export` CSV path so the two render events the same way. Timestamps also
+gained the §11 refinement: same-day events show `HH:MM`, this-year events
+show `mm/dd HH:MM`, and older events show the full `YYYY-MM-DD`.
 
-**Target output:**
+**Example output:**
 ```
-  06/14 14:22  Ready                          (muted grey)
-  06/14 13:55  Clean cycle complete  1m 42s   (green, with duration)
-  06/14 13:54  Cat detected  Asher  9.1 lb    (amber, with weight + pet)
-  06/14 12:01  Drawer full — empty now        (red)
+  14:22        Ready                          (muted grey)
+  13:55        Clean cycle complete           (green)
+  13:54        Cat detected  Asher  9.1 lb    (amber, with weight + pet)
+  12:01        Drawer full — empty now        (red)
   06/14 11:30  Sleep mode on                  (muted)
 ```
 
-**Implementation — event label map:**
-
-```python
-ACTION_LABELS: dict[str, tuple[str, str]] = {
-    # lowercased raw text → (display label, colour)
-    "ready":                      ("Ready",                   "#484f58"),
-    "litter robot is ready.":     ("Ready",                   "#484f58"),
-    "clean cycle complete":       ("Clean cycle complete",     "#3fb950"),
-    "clean cycle in progress":    ("Cleaning…",               "#58a6ff"),
-    "cat detected":               ("Cat detected",            "#d29922"),
-    "cat sensor interrupted":     ("Cat sensor tripped",      "#d29922"),
-    "drawer full":                ("Drawer full — empty now", "#f85149"),
-    "drawer full cleared":        ("Drawer emptied",          "#3fb950"),
-    "sleep mode on":              ("Sleep mode on",           "#484f58"),
-    "sleep mode off":             ("Sleep mode off",          "#484f58"),
-    "panel locked":               ("Panel locked",            "#484f58"),
-    "panel unlocked":             ("Panel unlocked",          "#484f58"),
-    "offline":                    ("Offline",                 "#f85149"),
-    "power off":                  ("Powered off",             "#f85149"),
-    "power on":                   ("Powered on",              "#3fb950"),
-    "motor fault":                ("Motor fault",             "#f85149"),
-    "pinch detect":               ("Pinch detected",          "#f85149"),
-    "timing fault":               ("Timing fault",            "#d29922"),
-}
-
-def _fmt_action(act, pets: list) -> tuple[str, str]:
-    raw     = getattr(act, "action", None)
-    raw_str = (raw.text if hasattr(raw, "text") else str(raw)).strip()
-    label, colour = ACTION_LABELS.get(raw_str.lower(), (raw_str, "#8b949e"))
-
-    weight  = getattr(act, "weight", None)
-    pet_id  = getattr(act, "pet_id", None)
-    pet_name = next((p.name for p in pets if p.id == pet_id), None)
-
-    if weight and "cat" in raw_str.lower():
-        label += f"  {pet_name}  {weight:.1f} lb" if pet_name else f"  {weight:.1f} lb"
-
-    return label, colour
-```
-
-**Fallback:** unknown event types fall through to the raw string in muted grey
-rather than crashing — new pylitterbot event types shouldn't break the display.
+Unit tests live in `tests/test_activity_labels.py` (17 cases covering the
+label map, cat suffix logic, enum vs string actions, and unknown-event
+fallback) — the module is pure and needs no Textual or event-loop harness.
 
 ### History as a scrollable sub-view (pager mode)
 
@@ -2277,7 +2238,7 @@ Ranked by user-visible impact vs. implementation effort:
 4. **Real-time cycling indicator with elapsed time** (§11) — extend the existing `⟳ Cycling` label to show elapsed time: `⟳ Cycling 0:42`; needs a per-second tick timer active only during a cycle
 5. **Token persistence** (§13) — skip password re-entry on every run
 6. **Fault & safety monitoring** (§9) — cat detected, pinch, motor faults; banner + log transition + cat alert mode
-7. **Readable history events** (§11) — map raw pylitterbot strings to human labels with weight, pet name, and colour
+7. ~~**Readable history events** (§11)~~ ✅ — `history` now renders translated, colour-coded labels via `asher/activity_labels.py` (`format_activity()`); cat-detection events append pet name + weight; shared with the `export` CSV path
 8. **History pager sub-view** (§11) — scrollable in-log display with pagination; `history 100` vs current hardcoded 25-event dump
 
 ### Commands & slash system
