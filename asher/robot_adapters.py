@@ -37,6 +37,26 @@ class RobotAdapter(ABC):
             return False, "Panel lock command rejected by cloud"
         return True, "Panel locked" if enable else "Panel unlocked"
 
+    # ── LR5-only capabilities ─────────────────────────────────────────────────
+    # The base implementations return "not supported"; LR5Adapter overrides them.
+    # Commands detect model via the adapter and surface these messages gracefully.
+
+    async def set_privacy_mode(self, enable: bool) -> tuple[bool, str]:
+        """Toggle privacy mode. LR5 only."""
+        return False, "Privacy mode is only available on the LR5"
+
+    async def set_volume(self, volume: int) -> tuple[bool, str]:
+        """Set sound volume (0-100). LR5 only."""
+        return False, "Volume control is only available on the LR5"
+
+    async def set_camera_audio(self, enable: bool) -> tuple[bool, str]:
+        """Toggle camera audio. LR5 only."""
+        return False, "Camera audio is only available on the LR5"
+
+    async def reset_waste_drawer(self) -> tuple[bool, str]:
+        """Reset the waste drawer level indicator. LR5 only."""
+        return False, "Drawer reset is only available on the LR5"
+
 
 class LR3Adapter(RobotAdapter):
     async def set_sleep(self, enable: bool) -> tuple[bool, str]:
@@ -137,6 +157,46 @@ class LR5Adapter(RobotAdapter):
         if not ok:
             return False, "Night light brightness command rejected"
         return True, f"Night light brightness set to {level}%"
+
+    # ── LR5-only capabilities ─────────────────────────────────────────────────
+
+    async def set_privacy_mode(self, enable: bool) -> tuple[bool, str]:
+        try:
+            ok = await self.robot.set_privacy_mode(enable)
+        except Exception as exc:
+            return False, f"Privacy mode command failed: {exc}"
+        if not ok:
+            return False, "Privacy mode command rejected"
+        return True, f"Privacy mode {'on' if enable else 'off'}"
+
+    async def set_volume(self, volume: int) -> tuple[bool, str]:
+        if not 0 <= volume <= 100:
+            return False, f"Invalid volume {volume} - must be 0-100"
+        try:
+            ok = await self.robot.set_volume(volume)
+        except Exception as exc:
+            return False, f"Volume command failed: {exc}"
+        if not ok:
+            return False, "Volume command rejected"
+        return True, f"Volume set to {volume}"
+
+    async def set_camera_audio(self, enable: bool) -> tuple[bool, str]:
+        try:
+            ok = await self.robot.set_camera_audio(enable)
+        except Exception as exc:
+            return False, f"Camera audio command failed: {exc}"
+        if not ok:
+            return False, "Camera audio command rejected"
+        return True, f"Camera audio {'on' if enable else 'off'}"
+
+    async def reset_waste_drawer(self) -> tuple[bool, str]:
+        try:
+            ok = await self.robot.reset_waste_drawer()
+        except Exception as exc:
+            return False, f"Drawer reset command failed: {exc}"
+        if not ok:
+            return False, "Drawer reset command rejected"
+        return True, "Waste drawer level reset"
 
 
 _ADAPTER_MAP: dict[str, type[RobotAdapter]] = {

@@ -17,6 +17,11 @@ def robot():
     r.set_night_light = AsyncMock(return_value=True)
     r.set_night_light_mode = AsyncMock(return_value=True)
     r.set_night_light_brightness = AsyncMock(return_value=True)
+    # LR5-only setters (only invoked via LR5Adapter)
+    r.set_privacy_mode = AsyncMock(return_value=True)
+    r.set_volume = AsyncMock(return_value=True)
+    r.set_camera_audio = AsyncMock(return_value=True)
+    r.reset_waste_drawer = AsyncMock(return_value=True)
     return r
 
 
@@ -391,3 +396,186 @@ async def test_lr5_brightness_exception(robot):
     ok, msg = await LR5Adapter(robot).set_night_light_brightness(50)
     assert not ok
     assert "api error" in msg
+
+
+# ── LR5-only capabilities: base class "not supported" ─────────────────────────
+# LR3/LR4 adapters should refuse these gracefully rather than calling the robot.
+
+
+@pytest.mark.parametrize("adapter_cls", [LR3Adapter, LR4Adapter])
+@pytest.mark.asyncio
+async def test_base_privacy_not_supported(robot, adapter_cls):
+    ok, msg = await adapter_cls(robot).set_privacy_mode(True)
+    assert not ok
+    assert "LR5" in msg
+    robot.set_privacy_mode.assert_not_called()
+
+
+@pytest.mark.parametrize("adapter_cls", [LR3Adapter, LR4Adapter])
+@pytest.mark.asyncio
+async def test_base_volume_not_supported(robot, adapter_cls):
+    ok, msg = await adapter_cls(robot).set_volume(50)
+    assert not ok
+    assert "LR5" in msg
+    robot.set_volume.assert_not_called()
+
+
+@pytest.mark.parametrize("adapter_cls", [LR3Adapter, LR4Adapter])
+@pytest.mark.asyncio
+async def test_base_camera_audio_not_supported(robot, adapter_cls):
+    ok, msg = await adapter_cls(robot).set_camera_audio(True)
+    assert not ok
+    assert "LR5" in msg
+    robot.set_camera_audio.assert_not_called()
+
+
+@pytest.mark.parametrize("adapter_cls", [LR3Adapter, LR4Adapter])
+@pytest.mark.asyncio
+async def test_base_drawer_reset_not_supported(robot, adapter_cls):
+    ok, msg = await adapter_cls(robot).reset_waste_drawer()
+    assert not ok
+    assert "LR5" in msg
+    robot.reset_waste_drawer.assert_not_called()
+
+
+# ── LR5Adapter: privacy mode ──────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_lr5_privacy_on(robot):
+    ok, msg = await LR5Adapter(robot).set_privacy_mode(True)
+    assert ok
+    assert "on" in msg
+    robot.set_privacy_mode.assert_called_once_with(True)
+
+
+@pytest.mark.asyncio
+async def test_lr5_privacy_off(robot):
+    ok, msg = await LR5Adapter(robot).set_privacy_mode(False)
+    assert ok
+    assert "off" in msg
+    robot.set_privacy_mode.assert_called_once_with(False)
+
+
+@pytest.mark.asyncio
+async def test_lr5_privacy_rejected(robot):
+    robot.set_privacy_mode.return_value = False
+    ok, _ = await LR5Adapter(robot).set_privacy_mode(True)
+    assert not ok
+
+
+@pytest.mark.asyncio
+async def test_lr5_privacy_exception(robot):
+    robot.set_privacy_mode.side_effect = Exception("timeout")
+    ok, msg = await LR5Adapter(robot).set_privacy_mode(True)
+    assert not ok
+    assert "timeout" in msg
+
+
+# ── LR5Adapter: volume ────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_lr5_volume_valid(robot):
+    ok, msg = await LR5Adapter(robot).set_volume(50)
+    assert ok
+    assert "50" in msg
+    robot.set_volume.assert_called_once_with(50)
+
+
+@pytest.mark.asyncio
+async def test_lr5_volume_zero(robot):
+    ok, _ = await LR5Adapter(robot).set_volume(0)
+    assert ok
+    robot.set_volume.assert_called_once_with(0)
+
+
+@pytest.mark.asyncio
+async def test_lr5_volume_above_100(robot):
+    ok, msg = await LR5Adapter(robot).set_volume(101)
+    assert not ok
+    assert "101" in msg
+    robot.set_volume.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_lr5_volume_negative(robot):
+    ok, msg = await LR5Adapter(robot).set_volume(-1)
+    assert not ok
+    assert "-1" in msg
+    robot.set_volume.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_lr5_volume_rejected(robot):
+    robot.set_volume.return_value = False
+    ok, _ = await LR5Adapter(robot).set_volume(50)
+    assert not ok
+
+
+@pytest.mark.asyncio
+async def test_lr5_volume_exception(robot):
+    robot.set_volume.side_effect = Exception("api error")
+    ok, msg = await LR5Adapter(robot).set_volume(50)
+    assert not ok
+    assert "api error" in msg
+
+
+# ── LR5Adapter: camera audio ──────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_lr5_camera_audio_on(robot):
+    ok, msg = await LR5Adapter(robot).set_camera_audio(True)
+    assert ok
+    assert "on" in msg
+    robot.set_camera_audio.assert_called_once_with(True)
+
+
+@pytest.mark.asyncio
+async def test_lr5_camera_audio_off(robot):
+    ok, msg = await LR5Adapter(robot).set_camera_audio(False)
+    assert ok
+    assert "off" in msg
+    robot.set_camera_audio.assert_called_once_with(False)
+
+
+@pytest.mark.asyncio
+async def test_lr5_camera_audio_rejected(robot):
+    robot.set_camera_audio.return_value = False
+    ok, _ = await LR5Adapter(robot).set_camera_audio(True)
+    assert not ok
+
+
+@pytest.mark.asyncio
+async def test_lr5_camera_audio_exception(robot):
+    robot.set_camera_audio.side_effect = Exception("boom")
+    ok, msg = await LR5Adapter(robot).set_camera_audio(True)
+    assert not ok
+    assert "boom" in msg
+
+
+# ── LR5Adapter: drawer reset ──────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_lr5_drawer_reset(robot):
+    ok, msg = await LR5Adapter(robot).reset_waste_drawer()
+    assert ok
+    assert "reset" in msg.lower()
+    robot.reset_waste_drawer.assert_called_once_with()
+
+
+@pytest.mark.asyncio
+async def test_lr5_drawer_reset_rejected(robot):
+    robot.reset_waste_drawer.return_value = False
+    ok, _ = await LR5Adapter(robot).reset_waste_drawer()
+    assert not ok
+
+
+@pytest.mark.asyncio
+async def test_lr5_drawer_reset_exception(robot):
+    robot.reset_waste_drawer.side_effect = Exception("nope")
+    ok, msg = await LR5Adapter(robot).reset_waste_drawer()
+    assert not ok
+    assert "nope" in msg
