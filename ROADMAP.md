@@ -1181,7 +1181,16 @@ Run: `uv run pytest`
 
 CI matrix: Python 3.10 / 3.11 / 3.12 × Ubuntu / Windows / macOS.
 
-### Integration tests — pylitterbot mocking ✅ (fixtures ready, handlers not yet covered)
+### Integration tests — pylitterbot mocking ✅
+
+The `mock_robot` / `mock_account` fixtures in `tests/conftest.py` are wired into
+command-handler tests via Textual's `Pilot` harness. Every command branch is
+covered — robot commands (`test_commands_pilot.py`, `test_new_commands_pilot.py`,
+`test_missing_robot_commands.py`), LR5 extras (`test_lr5_commands.py`), slash
+commands (`test_app_pilot.py`, `test_commands_pilot.py`), and the export CSV
+path. Tests drive the real command-bar dispatch (`pilot.press(...)`) against
+mocked robots, asserting on side effects (robot API calls, log content,
+keyring writes, cat mode). 300+ pilot tests across the suite.
 
 `tests/conftest.py` already provides `mock_robot` and `mock_account` fixtures
 using `AsyncMock`. The next step is wiring them into command handler tests:
@@ -1255,19 +1264,15 @@ async def test_status_bar_updates_on_connect(mock_robot, mock_account):
             assert "ONLINE" in str(lbl)
 ```
 
-### Code coverage
+### Code coverage ✅
 
-Add `pytest-cov` to dev dependencies:
+`pytest-cov>=5.0` is in dev dependencies (`pyproject.toml`), with a
+`[tool.coverage.run]` / `[tool.coverage.report]` block configured. A dedicated
+`.github/workflows/coverage.yml` workflow runs
+`pytest tests/ --cov=asher --cov-report=lcov --cov-report=term-missing` on a
+daily cron (and manual dispatch) and uploads to Coveralls (badge in the README).
 
-```toml
-[dependency-groups]
-dev = [
-    ...
-    "pytest-cov>=5.0",
-]
-```
-
-Run with terminal report:
+Run locally with a terminal report:
 
 ```bash
 uv run pytest --cov=asher --cov-report=term-missing
@@ -1283,20 +1288,29 @@ Target coverage by layer:
 | `monitoring/` | ≥ 70% | Mock robot; test drawer full threshold |
 | `ui/` | ≥ 50% | E2E pilot covers compose/log helpers |
 
-Add to CI once a baseline is established — fail the build if coverage drops
-below the agreed floor.
-
-### Suggested test structure (target)
+### Test structure ✅
 
 ```
 tests/
-  conftest.py         ✅ shared fixtures (mock_robot, mock_account)
-  testhelpers.py      ✅ fmt_ago, drawer_bar (12 tests)
-  testcommands.py        robot command handler integration tests
-  testslash.py           /login, /logout, /exit slash command tests
-  teste2e.py             Textual Pilot end-to-end tests
-  snapshots/             baseline TUI screenshots (textual-snapshot)
+  conftest.py                   ✅ shared fixtures (mock_robot, mock_account)
+  testhelpers.py                ✅ fmt_ago, drawer_bar
+  test_activity_labels.py       ✅ format_activity / ACTION_LABELS (pure)
+  test_cats.py                  ✅ cat art data
+  test_robot_adapters.py        ✅ LR3/4/5 adapters + make_adapter factory
+  test_commands_pilot.py        ✅ robot + slash command handlers (Pilot)
+  test_new_commands_pilot.py    ✅ /cat, /refresh, /config, /pet, export
+  test_missing_robot_commands.py ✅ wait-time, power, rename, insight, status/info
+  test_lr5_commands.py          ✅ LR5 extras (privacy, volume, camera-audio, drawer-reset)
+  test_app_pilot.py             ✅ app-level Pilot flows
+  test_auth.py / test_auth_pilot.py ✅ login flow
+  test_connection.py / _mixin.py ✅ keyring + account connect
+  test_monitoring.py            ✅ WebSocket + poll refresh
+  test_mcp_*.py                 ✅ MCP bridge + config
+  test_ui.py                    ✅ status bar rendering
 ```
+
+`snapshots/` (baseline TUI screenshots via `textual-snapshot`) is the one
+remaining item from the original suggestion that isn't yet in place.
 
 ---
 
@@ -1535,26 +1549,22 @@ Rules of thumb:
 - Bump **MAJOR** if the `.env` format changes, a command is renamed/removed,
   or the config schema breaks backward compatibility
 
-### Bumping the version
+### Bumping the version ✅
 
-Using `hatch` (pairs naturally with `hatchling` build backend):
-
-```bash
-hatch version patch    # 1.0.0 → 1.0.1
-hatch version minor    # 1.0.1 → 1.1.0
-hatch version major    # 1.1.0 → 2.0.0
-hatch version 1.2.0-alpha  # explicit
-```
-
-Or `bump-my-version` (more configurable):
+The project uses `bump-my-version` (more configurable than `hatch version`),
+configured in `pyproject.toml`:
 
 ```bash
-pip install bump-my-version
-bump-my-version bump patch
+uv run bump-my-version bump patch    # 0.0.5 → 0.0.6
+uv run bump-my-version bump minor    # 0.0.5 → 0.1.0
+uv run bump-my-version bump major    # 0.0.5 → 1.0.0
 ```
 
-Both write directly to `pyproject.toml` and can be configured to also tag the
-commit.
+The `[tool.bumpversion]` block rewrites the version in `pyproject.toml`, and is
+configured with `commit = true`, `tag = true`, `tag_name = "v{new_version}"` —
+so a single bump command commits, tags, and signs in one step (the README
+"Releasing" section documents the full flow). This is live and used for every
+release.
 
 ### Git tagging convention
 
@@ -1568,11 +1578,12 @@ git push origin v1.1.0
 The `v` prefix is conventional and lets GitHub Actions trigger release workflows
 on `v*` tag pushes.
 
-### Changelog
+### Changelog — not yet in place
 
-Keep a `CHANGELOG.md` in [Keep a Changelog](https://keepachangelog.com) format.
-Each PR merges under `## [Unreleased]`; on release that section becomes
-`## [1.1.0] — 2026-06-20`.
+No `CHANGELOG.md` exists yet. The plan is to keep one in
+[Keep a Changelog](https://keepachangelog.com) format, with each PR merging
+under `## [Unreleased]` and that section becoming `## [x.y.z] — YYYY-MM-DD` on
+release.
 
 ```markdown
 ## [Unreleased]
@@ -1610,7 +1621,14 @@ tag v*  ────────────────────────
                                     (attach binaries, publish changelog)
 ```
 
-### `.github/workflows/ci.yml` — lint + test on every push
+### `.github/workflows/ci.yml` — lint + test on every push ✅
+
+Live and matches the spec below — `name: CI`, triggers on push to `main` and
+PRs, `lint` job (`ruff check`, `ruff format --check`, `mypy`), `test` job with
+the `["3.10","3.11","3.12"] × [ubuntu, windows, macos]` matrix running
+`pytest tests/ -v --tb=short`. Actions are pinned to commit SHAs. A separate
+`.github/workflows/coverage.yml` runs the coverage report on a daily cron and
+uploads to Coveralls.
 
 ```yaml
 name: CI
@@ -1705,42 +1723,15 @@ jobs:
           files: artifacts/**/*
 ```
 
-### `.github/workflows/dependency-update.yml` — Dependabot / Renovate
+### Dependency automation ✅ (Renovate)
 
-Use Dependabot for automatic dependency PRs:
-
-```yaml
-# .github/dependabot.yml
-version: 2
-updates:
-  - package-ecosystem: pip
-    directory: "/"
-    schedule:
-      interval: weekly
-    labels: ["dependencies"]
-    open-pull-requests-limit: 5
-```
-
-Or Renovate (more configurable, handles `uv.lock` better):
-
-```json
-// renovate.json
-{
-  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:best-practices"],
-  "packageRules": [
-    {
-      "matchPackageNames": ["pylitterbot"],
-      "automerge": false,
-      "labels": ["pylitterbot", "dependencies"]
-    }
-  ]
-}
-```
-
-`pylitterbot` should never be auto-merged without manual review — the Whisker
-API is reverse-engineered and a minor version bump could change method names or
-response schemas.
+The project uses **Renovate** (`renovate.json`), not Dependabot — it handles
+`uv.lock` better and is more configurable. The config extends
+`config:recommended`, runs weekly (Mondays), and — critically for this project —
+**pins `pylitterbot` to require manual review**: the Whisker API is
+reverse-engineered and a minor version bump could change method names or
+response schemas, so it should never be auto-merged. GitHub Actions are pinned
+to commit SHAs and also bumped weekly.
 
 ### Branch strategy
 
@@ -1781,7 +1772,7 @@ Protect `main`:
 | `mypy` | Static type checking | `pyproject.toml [tool.mypy]` |
 | `pytest` | Test runner | `pyproject.toml [tool.pytest.ini_options]` |
 | `textual-snapshot` | TUI regression snapshots | `pyproject.toml [tool.pytest.ini_options]` |
-| Dependabot / Renovate | Dependency freshness | `.github/dependabot.yml` |
+| Dependabot / Renovate | Dependency freshness | `renovate.json` (Renovate) |
 
 Minimal `pyproject.toml` additions:
 
@@ -2303,9 +2294,9 @@ Ranked by user-visible impact vs. implementation effort:
 
 1. ~~**PyPI publish**~~ (§15) ✅ — `release.yml` live; push `release/x.y.z` branch to publish
 2. ~~**CI/CD pipeline**~~ ✅ — lint + test + release workflows in `.github/workflows/`
-3. **Versioning discipline** (§20) — `hatch version`, `CHANGELOG.md`, signed tags
+3. ~~**Versioning discipline** (§20)~~ ✅ — `bump-my-version` configured with auto-commit + signed tags (`v{x.y.z}`); only `CHANGELOG.md` remains undone
 4. **Standalone binary** (§16) — PyInstaller `.exe` + macOS/Linux builds via CI matrix
-5. **Dependabot / Renovate** (§21) — automated dependency PRs, `pylitterbot` pinned to manual review
+5. ~~**Dependabot / Renovate** (§21)~~ ✅ — Renovate (`renovate.json`) live, weekly, `pylitterbot` pinned to manual review
 
 ### Device & platform expansion
 
