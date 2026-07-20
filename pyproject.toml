@@ -1,6 +1,6 @@
 [project]
 name = "asher-cli"
-version = "0.0.5"
+version = "0.1.0"
 description = "Terminal dashboard for Litter Robot (LR3/LR4/LR5) via the Whisker cloud API"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -91,7 +91,7 @@ exclude = ["asher/slash-commands"]
 # ── bump-my-version ───────────────────────────────────────────────────────────
 
 [tool.bumpversion]
-current_version = "0.0.5"
+current_version = "0.1.0"
 commit = true
 tag = true
 tag_name = "v{new_version}"
