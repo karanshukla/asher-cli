@@ -22,7 +22,7 @@ Current state, missing functionality, and suggested additions — grounded in wh
 | Activity history (`get_activity_history`) | ✅ |
 | Cat animation panel with mode changes | ✅ |
 | Cat panel — mode label + status badges (status chip, lock, night light, sleep, wait) under the art | ✅ |
-| Fault & safety monitoring — `#fault-banner` driven by `asher/faults.py`; transition-logged; `d` to dismiss | ✅ |
+| Fault & safety monitoring — `#fault-banner` (in cat panel) driven by `asher/faults.py`; transition-logged; `d` to dismiss | ✅ |
 | Real-time cycling indicator with elapsed time (`⟳ Cycling M:SS`) | ✅ |
 | Command history (↑/↓) | ✅ |
 | WebSocket real-time updates (LR4 primary; poll fallback every 5 min for activity history) | ✅ |
@@ -504,12 +504,15 @@ The `sleep` / `wake` commands should detect the robot model and dispatch accordi
 Live fault detection lives in `asher/faults.py` (`check_faults(robot)`), called
 from `MonitoringMixin._refresh_faults` on every status refresh (WebSocket push
 + poll). Safety statuses (cat detected, pinch, over-torque, bonnet, position
-faults) and component-fault attributes (globe motor, USB, hopper, gas sensor,
-…) are surfaced via a `#fault-banner` widget docked above the main area —
-hidden by default, red for `error` severity, amber for `warn`. Transitions are
-logged (`_log_err` on new, `_log_ok` on cleared) but steady-state faults don't
-flood the log. While a fault is active the cat panel switches to `error` mode.
-Press `d` to dismiss the banner until the set of active faults changes.
+faults) and component-fault attributes (globe motor, hopper, gas sensor, …)
+are surfaced via a `#fault-banner` widget inside the cat panel, beneath the
+status badges — hidden by default, red for `error` severity, amber for `warn`.
+Enum-valued fault properties (`GlobeMotorFaultStatus`) are checked against
+their healthy sentinels (`NONE` / `FAULT_CLEAR`) since the enums are truthy
+even when healthy. Transitions are logged (`_log_err` on new, `_log_ok` on
+cleared) but steady-state faults don't flood the log. While a fault is active
+the cat panel switches to `error` mode. Press `d` to dismiss the banner until
+the set of active faults changes.
 
 ### 9a. Safety events (highest priority — surface immediately)
 
@@ -2295,7 +2298,7 @@ Ranked by user-visible impact vs. implementation effort:
 3. ~~**WebSocket subscription**~~ ✅ — real-time push updates live; 5-min poll fallback for activity history
 4. ~~**Real-time cycling indicator with elapsed time** (§11)~~ ✅ — `⟳ Cycling  M:SS` chip in the status bar; `_cycle_start` + a lazy 1 s `_cycle_timer` (created on cycle start, stopped on any other status)
 5. **Token persistence** (§13) — skip password re-entry on every run
-6. ~~**Fault & safety monitoring** (§9)~~ ✅ — `asher/faults.py` + `_refresh_faults` drive a `#fault-banner` (red/amber); transitions logged, steady state quiet; cat panel flips to `error`; `d` dismisses
+6. ~~**Fault & safety monitoring** (§9)~~ ✅ — `asher/faults.py` + `_refresh_faults` drive an in-panel `#fault-banner` (red/amber); enum fault props checked against healthy sentinels; transitions logged, steady state quiet; cat panel flips to `error`; `d` dismisses
 7. ~~**Readable history events** (§11)~~ ✅ — `history` now renders translated, colour-coded labels via `asher/activity_labels.py` (`format_activity()`); cat-detection events append pet name + weight; shared with the `export` CSV path
 8. **History pager sub-view** (§11) — scrollable in-log display with pagination; `history 100` vs current hardcoded 25-event dump
 

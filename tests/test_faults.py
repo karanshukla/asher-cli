@@ -4,25 +4,28 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from pylitterbot.enums import LitterBoxStatus
+from pylitterbot.enums import GlobeMotorFaultStatus, LitterBoxStatus
 
 from asher.faults import SEVERITY_ERROR, SEVERITY_WARN, Fault, check_faults
 
+# Healthy sentinels for the enum-valued fault properties.
+_OK_GLOBE = GlobeMotorFaultStatus.NONE
+_FAULT_GLOBE = GlobeMotorFaultStatus.FAULT_OVERTORQUE_AMP
+
 
 def _robot(**overrides: object) -> MagicMock:
+    """A healthy robot mock — every fault source in its no-fault state."""
     r = MagicMock()
     r.status = LitterBoxStatus.READY
-    for attr in (
-        "globe_motor_fault_status",
-        "globe_motor_retract_fault_status",
-        "usb_fault_status",
-        "is_hopper_removed",
-        "is_bonnet_removed",
-        "is_laser_dirty",
-        "is_gas_sensor_fault_detected",
-        "is_drawer_removed",
-    ):
-        setattr(r, attr, False)
+    # Enum-valued properties default to the healthy sentinel.
+    r.globe_motor_fault_status = _OK_GLOBE
+    r.globe_motor_retract_fault_status = _OK_GLOBE
+    # Boolean-valued properties default to False.
+    r.is_hopper_removed = False
+    r.is_bonnet_removed = False
+    r.is_laser_dirty = False
+    r.is_gas_sensor_fault_detected = False
+    r.is_drawer_removed = False
     for k, v in overrides.items():
         setattr(r, k, v)
     return r
@@ -37,6 +40,15 @@ class TestCheckFaultsHealthy:
 
     def test_returns_list_type(self):
         assert isinstance(check_faults(_robot()), list)
+
+    def test_enum_healthy_sentinel_is_not_a_fault(self):
+        """Regression: GlobeMotorFaultStatus.NONE is truthy but means no fault."""
+        assert check_faults(_robot()) == []
+
+    def test_enum_fault_clear_is_not_a_fault(self):
+        assert (
+            check_faults(_robot(globe_motor_fault_status=GlobeMotorFaultStatus.FAULT_CLEAR)) == []
+        )
 
 
 class TestSafetyStatuses:
@@ -72,19 +84,28 @@ class TestSafetyStatuses:
         assert faults[0].severity == SEVERITY_ERROR
 
 
-class TestAttributeFaults:
+class TestEnumAttributeFaults:
     def test_globe_motor_fault(self):
-        faults = check_faults(_robot(globe_motor_fault_status=True))
+        faults = check_faults(_robot(globe_motor_fault_status=_FAULT_GLOBE))
         assert any(f.label == "GLOBE MOTOR FAULT" and f.severity == SEVERITY_ERROR for f in faults)
 
     def test_globe_motor_retract_fault(self):
-        faults = check_faults(_robot(globe_motor_retract_fault_status=True))
+        faults = check_faults(_robot(globe_motor_retract_fault_status=_FAULT_GLOBE))
         assert any("RETRACT FAULT" in f.label for f in faults)
 
-    def test_usb_fault(self):
-        faults = check_faults(_robot(usb_fault_status=True))
-        assert any("USB" in f.label and f.severity == SEVERITY_ERROR for f in faults)
+    def test_both_globe_faults_stack(self):
+        faults = check_faults(
+            _robot(
+                globe_motor_fault_status=_FAULT_GLOBE,
+                globe_motor_retract_fault_status=_FAULT_GLOBE,
+            )
+        )
+        labels = {f.label for f in faults}
+        assert any("GLOBE MOTOR FAULT" in lbl for lbl in labels)
+        assert any("RETRACT FAULT" in lbl for lbl in labels)
 
+
+class TestBoolAttributeFaults:
     def test_hopper_removed_is_warn(self):
         faults = check_faults(_robot(is_hopper_removed=True))
         assert any("HOPPER" in f.label and f.severity == SEVERITY_WARN for f in faults)
@@ -105,32 +126,35 @@ class TestAttributeFaults:
         faults = check_faults(_robot(is_drawer_removed=True))
         assert any("DRAWER REMOVED" in f.label for f in faults)
 
-    def test_multiple_attribute_faults_stack(self):
-        faults = check_faults(_robot(usb_fault_status=True, is_hopper_removed=True))
+    def test_multiple_bool_faults_stack(self):
+        faults = check_faults(_robot(is_hopper_removed=True, is_bonnet_removed=True))
         labels = {f.label for f in faults}
         assert len(faults) == 2
-        assert any("USB" in lbl for lbl in labels)
         assert any("HOPPER" in lbl for lbl in labels)
+        assert any("BONNET" in lbl for lbl in labels)
 
 
 class TestGracefulDegradation:
     def test_missing_fault_attrs_dont_raise(self):
-        from asher.faults import check_faults as cf
+        """A bare object with only a status should contribute no faults."""
 
         class Bare:
             status = LitterBoxStatus.READY
 
-        assert cf(Bare()) == []
+        assert check_faults(Bare()) == []
 
     def test_status_none_returns_empty(self):
         assert check_faults(_robot(status=None)) == []
 
+    def test_enum_attr_none_is_not_a_fault(self):
+        """usb_fault_status / missing enum property (None) must not fire."""
+        assert check_faults(_robot(globe_motor_fault_status=None)) == []
+
 
 class TestSafetyPrecedence:
-    def test_safety_status_does_not_double_with_bonnet_attr(self):
-        """A BONNET_REMOVED status should not also trip the is_bonnet_removed attr twice."""
+    def test_safety_status_does_not_double_count(self):
+        """A BONNET_REMOVED status and the bool attr are independent; no crash."""
         faults = check_faults(_robot(status=LitterBoxStatus.BONNET_REMOVED, is_bonnet_removed=True))
-        # Both fire independently; assert at least one BONNET label present, no crash.
         assert any("BONNET" in f.label for f in faults)
 
     def test_fault_is_immutable_dataclass(self):

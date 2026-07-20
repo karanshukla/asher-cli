@@ -122,14 +122,14 @@ Do not add robot-control commands as slash commands, and do not add app-manageme
 ```
 AsherApp (textual.App)
 ├── #status-bar          top dock — two rows (top: name/online/night-light/lock; bottom: drawer/litter/weight/visit)
-├── #fault-banner        top dock (below status bar) — hidden unless check_faults() returns active faults; `d` dismisses
 ├── #main-area
 │   ├── #log             RichLog — scrollable event/command output
 │   └── #cat-panel       animated ASCII cat sidebar
 │       ├── #cat-fx      animated FX strip
 │       ├── #cat-art     the ASCII cat
-│       ├── #cat-label   italic mode label (connected / cycling… / fault!)
-│       └── #cat-status  status badges (chip, lock, night light, sleep, wait time)
+│       ├── #cat-label   mode label (connected / cycling… / fault!)
+│       ├── #cat-status  status badges (chip, lock, night light, sleep, wait time)
+│       └── #fault-banner  hidden unless check_faults() returns active faults; `d` dismisses
 └── #bottom-dock         bottom dock
     ├── #input-bar / #input-row   command prompt ("> " label + CmdInput)
     └── #hint-bar        shortcut hints / login flow prompts

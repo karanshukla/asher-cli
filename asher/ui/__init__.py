@@ -124,8 +124,6 @@ class UIMixin:
                 yield Static("│", classes="sep")
                 yield Static("", id="clean-lbl", classes="chunk")
 
-        yield Static("", id="fault-banner")
-
         with Container(id="main-area"):
             yield RichLog(id="log", highlight=True, markup=True, wrap=True, min_width=0)
             with Container(id="cat-panel"):
@@ -133,6 +131,7 @@ class UIMixin:
                 yield Static(CATS["idle"][0], id="cat-art")  # type: ignore[arg-type]
                 yield Static("", id="cat-label")
                 yield Static("", id="cat-status")
+                yield Static("", id="fault-banner")
 
         with Container(id="bottom-dock"):
             with Container(id="input-bar"), Container(id="input-row"):

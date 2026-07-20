@@ -167,6 +167,22 @@ class TestMonitoringStructureExtensions:
         assert hasattr(MonitoringMixin, "_tick_cycle")
 
 
+def _healthy_robot() -> MagicMock:
+    """A robot mock with every fault source in its no-fault state."""
+    from pylitterbot.enums import GlobeMotorFaultStatus
+
+    r = MagicMock()
+    r.status = LitterBoxStatus.READY
+    r.globe_motor_fault_status = GlobeMotorFaultStatus.NONE
+    r.globe_motor_retract_fault_status = GlobeMotorFaultStatus.NONE
+    r.is_hopper_removed = False
+    r.is_bonnet_removed = False
+    r.is_laser_dirty = False
+    r.is_gas_sensor_fault_detected = False
+    r.is_drawer_removed = False
+    return r
+
+
 class TestRefreshFaults:
     def _mixin(self, prev: set[str] | None = None):
         m = MagicMock()
@@ -178,86 +194,49 @@ class TestRefreshFaults:
         return m
 
     def test_logs_new_fault_once(self):
-        from asher.faults import check_faults
+        from pylitterbot.enums import GlobeMotorFaultStatus
 
         m = self._mixin()
-        robot = MagicMock()
-        robot.status = LitterBoxStatus.READY
-        robot.globe_motor_fault_status = True
-        # ensure other attrs falsy
-        for attr in (
-            "globe_motor_retract_fault_status",
-            "usb_fault_status",
-            "is_hopper_removed",
-            "is_bonnet_removed",
-            "is_laser_dirty",
-            "is_gas_sensor_fault_detected",
-            "is_drawer_removed",
-        ):
-            setattr(robot, attr, False)
+        robot = _healthy_robot()
+        robot.globe_motor_fault_status = GlobeMotorFaultStatus.FAULT_OVERTORQUE_AMP
 
         result = MonitoringMixin._refresh_faults(m, robot)
         assert result is True
         m._log_err.assert_called_once()
         m._log_ok.assert_not_called()
-        assert m._prev_faults == {check_faults(robot)[0].label}
+        assert m._prev_faults == {"GLOBE MOTOR FAULT"}
+
+    def test_healthy_robot_logs_nothing(self):
+        m = self._mixin()
+        MonitoringMixin._refresh_faults(m, _healthy_robot())
+        m._log_err.assert_not_called()
+        m._log_ok.assert_not_called()
+        assert m._prev_faults == set()
 
     def test_does_not_log_steady_state(self):
-        m = self._mixin()
-        robot = MagicMock()
-        robot.status = LitterBoxStatus.READY
-        for attr in (
-            "globe_motor_fault_status",
-            "globe_motor_retract_fault_status",
-            "usb_fault_status",
-            "is_hopper_removed",
-            "is_bonnet_removed",
-            "is_laser_dirty",
-            "is_gas_sensor_fault_detected",
-            "is_drawer_removed",
-        ):
-            setattr(robot, attr, False)
-        # Healthy robot => no active faults; seed prev as empty (steady state)
-        m._prev_faults = set()
+        from pylitterbot.enums import GlobeMotorFaultStatus
+
+        robot = _healthy_robot()
+        robot.globe_motor_fault_status = GlobeMotorFaultStatus.FAULT_OVERTORQUE_AMP
+        # Pre-seed the fault as already known → steady state, no re-log
+        m = self._mixin(prev={"GLOBE MOTOR FAULT"})
         MonitoringMixin._refresh_faults(m, robot)
         m._log_err.assert_not_called()
         m._log_ok.assert_not_called()
 
     def test_logs_cleared_on_resolution(self):
         m = self._mixin(prev={"GLOBE MOTOR FAULT"})
-        robot = MagicMock()
-        robot.status = LitterBoxStatus.READY
-        for attr in (
-            "globe_motor_fault_status",
-            "globe_motor_retract_fault_status",
-            "usb_fault_status",
-            "is_hopper_removed",
-            "is_bonnet_removed",
-            "is_laser_dirty",
-            "is_gas_sensor_fault_detected",
-            "is_drawer_removed",
-        ):
-            setattr(robot, attr, False)
-
-        result = MonitoringMixin._refresh_faults(m, robot)
+        # Robot is now healthy → the previously-known fault cleared
+        result = MonitoringMixin._refresh_faults(m, _healthy_robot())
         assert result is False
         m._log_ok.assert_called_once()
 
     def test_persistent_fault_not_relogged(self):
-        """A fault that's still active on the next refresh shouldn't log again."""
-        robot = MagicMock()
-        robot.status = LitterBoxStatus.READY
-        robot.globe_motor_fault_status = True
-        for attr in (
-            "globe_motor_retract_fault_status",
-            "usb_fault_status",
-            "is_hopper_removed",
-            "is_bonnet_removed",
-            "is_laser_dirty",
-            "is_gas_sensor_fault_detected",
-            "is_drawer_removed",
-        ):
-            setattr(robot, attr, False)
+        """A fault still active on the next refresh shouldn't log again."""
+        from pylitterbot.enums import GlobeMotorFaultStatus
+
+        robot = _healthy_robot()
+        robot.globe_motor_fault_status = GlobeMotorFaultStatus.FAULT_OVERTORQUE_AMP
 
         # First refresh: logs the new fault
         m1 = self._mixin()

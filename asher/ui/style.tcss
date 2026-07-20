@@ -37,16 +37,6 @@ Screen {
     height: 1;
 }
 
-/* ── Fault banner (hidden until a fault is active) ── */
-#fault-banner {
-    dock: top;
-    background: #161b22;
-    border-bottom: solid #30363d;
-    padding: 0 2;
-    height: auto;
-    display: none;
-}
-
 /* ── Main ── */
 #main-area {
     layout: horizontal;
@@ -95,7 +85,6 @@ Screen {
     text-align: center;
     width: 26;
     height: auto;
-    text-style: italic;
     padding-top: 1;
 }
 
@@ -105,6 +94,16 @@ Screen {
     text-align: left;
     padding-top: 1;
     color: #8b949e;
+}
+
+/* ── Fault banner — inside cat panel, under the status badges ── */
+#fault-banner {
+    width: 26;
+    height: auto;
+    text-align: left;
+    padding-top: 1;
+    color: #f85149;
+    display: none;
 }
 
 /* ── Input area (outer dock + hint below the box) ── */
