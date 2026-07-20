@@ -249,8 +249,8 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "keyring", specifier = ">=24.0.0" },
-    { name = "pylitterbot", specifier = "==2025.6.1" },
-    { name = "pylitterbot", extras = ["mcp"], marker = "extra == 'mcp'", specifier = "==2025.6.1" },
+    { name = "pylitterbot", specifier = "==2025.6.2" },
+    { name = "pylitterbot", extras = ["mcp"], marker = "extra == 'mcp'", specifier = "==2025.6.2" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "rich", specifier = ">=13.0.0" },
     { name = "textual", specifier = ">=0.47.0" },
@@ -2202,7 +2202,7 @@ crypto = [
 
 [[package]]
 name = "pylitterbot"
-version = "2025.6.1"
+version = "2025.6.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -2210,9 +2210,9 @@ dependencies = [
     { name = "pycognito" },
     { name = "pyjwt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/91/0f/2a0df5d4642fb23feae39165697a2a8b9859c1d541782975e49665b188ec/pylitterbot-2025.6.1.tar.gz", hash = "sha256:9e5113e723d14d450f594a7c51622c2437802665a4ebd2dd844eddfc3becf5fc", size = 66643, upload-time = "2026-07-05T01:33:25.349Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ef/db/68159db19e237cd66ad0659bd9ba4c047b4c4729fb31373fcebac7f1784e/pylitterbot-2025.6.2.tar.gz", hash = "sha256:58e370ef093e7fb374a127ead507e932b9bed1da521a0a5b3da2dfad5ba487a9", size = 67438, upload-time = "2026-07-19T04:12:39.595Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a9/85/b28d1101c698da15032033f0ac4c0c95e1245dbef6ed31f5aa436a3e96df/pylitterbot-2025.6.1-py3-none-any.whl", hash = "sha256:a16d19b1df45b932f8c93e6358dcacbf47631880b6d46f7fca2346aa433e02db", size = 83684, upload-time = "2026-07-05T01:33:26.248Z" },
+    { url = "https://files.pythonhosted.org/packages/95/b6/65d4b676b6fcbc8c056e110a419adcd122ed2e11f5d8e66ffdfdd35996ef/pylitterbot-2025.6.2-py3-none-any.whl", hash = "sha256:142bfbac623f0798f5e8c3926c4d96d31dcd0bfab17f57ccf11d937c99290ff4", size = 84500, upload-time = "2026-07-19T04:12:40.737Z" },
 ]
 
 [package.optional-dependencies]
