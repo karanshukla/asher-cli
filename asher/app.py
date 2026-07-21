@@ -26,6 +26,7 @@ class AsherApp(UIMixin, ConnectionMixin, MonitoringMixin, CommandsMixin, App):  
         Binding("ctrl+c", "quit", "Quit", priority=True),
         Binding("ctrl+l", "clear_log", "Clear log"),
         Binding("escape", "blur_input", "Focus log", show=False),
+        Binding("d", "dismiss_fault", "Dismiss fault banner", show=False),
     ]
 
     def __init__(self) -> None:
@@ -51,6 +52,10 @@ class AsherApp(UIMixin, ConnectionMixin, MonitoringMixin, CommandsMixin, App):  
         self._cat_panel_visible: bool = True
         self._cat_color: str | None = None
         self._active_pet_idx: int = 0
+        self._prev_faults: set[str] = set()
+        self._fault_dismissed: set[str] = set()
+        self._cycle_start: Any = None
+        self._cycle_timer: Timer | None = None
 
     def on_mount(self) -> None:
         self._refresh_title()

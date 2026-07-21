@@ -80,6 +80,29 @@ Screen {
     content-align: center middle;
 }
 
+#cat-label {
+    color: #8b949e;
+    text-align: center;
+    width: 26;
+    height: 1;
+}
+
+#cat-status {
+    width: 26;
+    height: auto;
+    text-align: left;
+    color: #8b949e;
+}
+
+/* ── Fault banner — inside cat panel, under the status badges ── */
+#fault-banner {
+    width: 26;
+    height: auto;
+    text-align: left;
+    color: #f85149;
+    display: none;
+}
+
 /* ── Input area (outer dock + hint below the box) ── */
 #bottom-dock {
     dock: bottom;
