@@ -168,14 +168,19 @@ class TestMonitoringStructureExtensions:
 
 
 def _healthy_robot() -> MagicMock:
-    """A robot mock with every fault source in its no-fault state."""
+    """A healthy LR4 mock — ``type(r).__name__`` is LitterRobot4 for model dispatch.
+
+    ``is_hopper_removed`` is True to model an LR4 with no hopper accessory
+    fitted; this must NOT be reported as a fault.
+    """
     from pylitterbot.enums import GlobeMotorFaultStatus
 
-    r = MagicMock()
+    lr4_cls = type("LitterRobot4", (MagicMock,), {})
+    r = lr4_cls()
     r.status = LitterBoxStatus.READY
     r.globe_motor_fault_status = GlobeMotorFaultStatus.NONE
     r.globe_motor_retract_fault_status = GlobeMotorFaultStatus.NONE
-    r.is_hopper_removed = False
+    r.is_hopper_removed = True
     r.is_bonnet_removed = False
     r.is_laser_dirty = False
     r.is_gas_sensor_fault_detected = False

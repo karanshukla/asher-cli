@@ -203,34 +203,41 @@ class MonitoringMixin:
             self._set_cat("idle", "ready")  # type: ignore[attr-defined]
 
     def _update_cat_panel(self, r: RobotProtocol) -> None:
-        """Render the cat-panel status badges: status chip, lock, light, sleep, wait.
+        """Render the cat-panel status badges.
 
-        Symbols mirror the top status bar conventions (`●`/`○` state, `⊘`/`□`
-        lock, `○`/`◐`/`☀` night light) so the panel reads as one design language.
+        Deliberately complementary to the top status bar — no lock or night
+        light here (those live in the top row). Shows: status, power source,
+        lifetime cycle count, and the clean-cycle wait time.
+
+        Lines use a fixed-width ASCII key column so they stay vertically
+        aligned in every terminal — no emoji or ambiguous-width glyphs that
+        would render at varying cell counts.
         """
         online = bool(getattr(r, "is_online", True))
         status = getattr(r, "status", None)
-        locked = bool(getattr(r, "panel_lock_enabled", False))
-        sleeping = bool(getattr(r, "sleep_mode_enabled", False))
-        night = bool(getattr(r, "night_light_mode_enabled", False))
+        power_type = getattr(r, "power_status", None) or getattr(r, "power_type", None)
+        cycle_count = getattr(r, "cycle_count", None)
         wait = getattr(r, "clean_cycle_wait_time_minutes", None)
 
         status_str = status.value if status is not None and hasattr(status, "value") else "—"
         status_color = STATUS_COLORS.get(status_str, "#3fb950" if online else "#f85149")
 
         t = Text()
-        t.append(f"● {status_str}\n", style=status_color)
-        if locked:
-            t.append("⊘ locked\n", style="#d29922")
+        t.append(f"status   {status_str}\n", style=status_color)
+
+        if power_type == "AC":
+            t.append("power    mains\n", style="#3fb950")
+        elif power_type == "DC":
+            t.append("power    battery\n", style="#d29922")
         else:
-            t.append("□ unlocked\n", style="#8b949e")
-        if sleeping:
-            t.append("☾ sleeping\n", style="#8b949e")
-        else:
-            t.append("● awake\n", style="#8b949e")
-        t.append("☀ light on\n" if night else "○ light off\n", style="#8b949e")
+            t.append("power    off\n", style="#484f58")
+
+        if cycle_count is not None:
+            t.append(f"cycles   {cycle_count}\n", style="#8b949e")
+
         if wait:
-            t.append(f"⏱ wait {wait}m\n", style="#484f58")
+            t.append(f"wait     {wait}m\n", style="#484f58")
+
         self.query_one("#cat-status", Static).update(t)  # type: ignore[attr-defined]
 
     def _refresh_faults(self, r: RobotProtocol) -> bool:

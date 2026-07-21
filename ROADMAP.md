@@ -503,16 +503,26 @@ The `sleep` / `wake` commands should detect the robot model and dispatch accordi
 
 Live fault detection lives in `asher/faults.py` (`check_faults(robot)`), called
 from `MonitoringMixin._refresh_faults` on every status refresh (WebSocket push
-+ poll). Safety statuses (cat detected, pinch, over-torque, bonnet, position
-faults) and component-fault attributes (globe motor, hopper, gas sensor, …)
-are surfaced via a `#fault-banner` widget inside the cat panel, beneath the
-status badges — hidden by default, red for `error` severity, amber for `warn`.
-Enum-valued fault properties (`GlobeMotorFaultStatus`) are checked against
-their healthy sentinels (`NONE` / `FAULT_CLEAR`) since the enums are truthy
-even when healthy. Transitions are logged (`_log_err` on new, `_log_ok` on
-cleared) but steady-state faults don't flood the log. While a fault is active
-the cat panel switches to `error` mode. Press `d` to dismiss the banner until
-the set of active faults changes.
++ poll). Detection is **model-scoped** — each model only checks the component
+attributes that are genuine fault indicators for it (mirrors the adapter
+pattern in `robot_adapters.py`):
+
+- **LR4** — globe motor + retract faults only
+- **LR5** — globe motor + retract + bonnet + laser + gas sensor + drawer-removed
+- **LR3** — no component checks (pylitterbot exposes none)
+
+`is_hopper_removed` is **never** treated as a fault: on the LR4 it's `True`
+when no hopper accessory is fitted (a hardware configuration, not a fault),
+and on the LR5 it's standard hardware state. Universal safety statuses (cat
+detected, pinch, over-torque, position faults) are checked on every model.
+Enum-valued properties (`GlobeMotorFaultStatus`) are checked against their
+healthy sentinels (`NONE` / `FAULT_CLEAR`) since the enums are truthy even
+when healthy. Faults surface via a `#fault-banner` widget inside the cat panel,
+beneath the status badges — hidden by default, red for `error`, amber for
+`warn`. Transitions are logged (`_log_err` new / `_log_ok` cleared) but
+steady-state faults don't flood the log. While a fault is active the cat
+panel switches to `error` mode. Press `d` to dismiss the banner until the set
+of active faults changes.
 
 ### 9a. Safety events (highest priority — surface immediately)
 
@@ -1337,12 +1347,22 @@ remaining item from the original suggestion that isn't yet in place.
 
 ## ~~18. Cat panel — robot status badges underneath the art~~ ✅
 
-A `#cat-label` widget now renders the previously-stored-but-never-shown mode
-label (`connected`, `cycling…`, `fault!`, …), and a `#cat-status` widget below
-it shows the status chip + lock + night light + sleep + wait-time badges.
-Both are updated from `_refresh_status` via `MonitoringMixin._update_cat_panel`,
-so they refresh in real time on WebSocket push (no extra polling). Badge
-colours reuse the consolidated `STATUS_COLORS` map in `constants.py`.
+A `#cat-label` widget renders the mode label (`connected`, `cycling…`,
+`fault!`, …) and a `#cat-status` widget below it shows **complementary** info
+that the top status bar doesn't surface — deliberately avoiding duplication of
+the top row's lock / night-light. The panel shows:
+
+```
+status   Ready
+power    mains
+cycles   1234
+wait     7m
+```
+
+Lines use a fixed-width ASCII key column (no emoji or ambiguous-width glyphs)
+so they stay vertically aligned in every terminal. Updated from `_refresh_status`
+via `MonitoringMixin._update_cat_panel`, so it refreshes in real time on
+WebSocket push. Status colour comes from the consolidated `STATUS_COLORS` map.
 
 ### Proposed layout
 

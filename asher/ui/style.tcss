@@ -84,15 +84,13 @@ Screen {
     color: #8b949e;
     text-align: center;
     width: 26;
-    height: auto;
-    padding-top: 1;
+    height: 1;
 }
 
 #cat-status {
     width: 26;
     height: auto;
     text-align: left;
-    padding-top: 1;
     color: #8b949e;
 }
 
@@ -101,7 +99,6 @@ Screen {
     width: 26;
     height: auto;
     text-align: left;
-    padding-top: 1;
     color: #f85149;
     display: none;
 }

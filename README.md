@@ -17,7 +17,7 @@ A Claude Code-style terminal dashboard for monitoring and controlling Litter Rob
 - Live status bar — unit name, online/offline, drawer fill level, last activity, cat weight
 - Human-readable robot status — translates raw API states into plain English (`Ready`, `Cleaning`, `Cat Detected`, `Drawer Full`, etc.)
 - Real-time cycling indicator with elapsed time (`⟳ Cycling  M:SS`)
-- Fault & safety monitoring — in-panel alert for cat detected, pinch, motor/position/gas faults, bonnet/hopper removed; press `d` to dismiss
+- Fault & safety monitoring — model-scoped in-panel alerts for cat detected, pinch, motor/position/gas faults (LR5: bonnet/laser/drawer); press `d` to dismiss
 - Cat panel with mode label + status badges (status chip, lock, night light, sleep, wait time) under the art
 - Scrollable activity log with timestamps
 - Commands: `clean`, `status`, `lock`, `unlock`, `sleep`, `wake`, `night-light on|off|auto`, `night-light-brightness`, `history`, `export [days|month]`, `help`, `quit`

@@ -12,7 +12,9 @@ import pytest
 def mock_robot():
     from pylitterbot.enums import GlobeMotorFaultStatus, LitterBoxStatus
 
-    r = MagicMock()
+    # Named subclass so type(r).__name__ == "LitterRobot4" (check_faults dispatch).
+    lr4_cls = type("LitterRobot4", (MagicMock,), {})
+    r = lr4_cls()
     r.name = "Test Box"
     r.is_online = True
     r.waste_drawer_level = 42.0
