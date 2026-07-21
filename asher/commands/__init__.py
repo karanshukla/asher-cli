@@ -8,7 +8,9 @@ import csv
 import os
 import subprocess
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, time, timedelta, timezone
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as pkg_version
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -542,6 +544,101 @@ class InsightCommand(Command):
             log.write(t)
 
 
+_DAY_NAMES = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+
+
+def _fmt_sleep_time(t: object) -> str:
+    if t is None:
+        return "—"
+    if isinstance(t, time):
+        return t.strftime("%H:%M")
+    return str(t)
+
+
+def _dow_to_weekday(day: int) -> int:
+    """Convert a pylitterbot DayOfWeek (Sun=0..Sat=6) to Python weekday (Mon=0..Sun=6)."""
+    return (day - 1) % 7
+
+
+class SleepScheduleCommand(Command):
+    name = "sleep-schedule"
+    aliases = ("sleepschedule",)
+    description = "show the per-day sleep schedule (read-only)"
+    requires_robot = True
+
+    @property
+    def display_name(self) -> str:
+        return "sleep-schedule"
+
+    async def run(self, app: AsherApp, args: list[str]) -> None:
+        assert app._robot is not None
+        try:
+            schedule = getattr(app._robot, "sleep_schedule", None)
+        except Exception as exc:
+            app._log_err(f"Failed to read sleep schedule: {exc}")
+            return
+
+        if schedule is None:
+            app._log_warn(
+                "No sleep schedule set — the unit is always awake "
+                "(or toggle sleep/wake for an immediate nap)."
+            )
+            return
+
+        try:
+            days = sorted(
+                getattr(schedule, "days", []),
+                key=lambda d: _dow_to_weekday(int(getattr(d, "day", 0))),
+            )
+            is_enabled = bool(getattr(schedule, "is_enabled", False))
+            # Window covers [sleep_start, wake_end] as datetimes; None if disabled/expired.
+            window = None
+            with contextlib.suppress(Exception):
+                window = schedule.get_window()
+        except Exception as exc:
+            app._log_err(f"Failed to parse sleep schedule: {exc}")
+            return
+
+        if not is_enabled:
+            app._log_info("Sleep schedule is disabled. Configured windows:")
+
+        log = app.query_one("#log", RichLog)
+        active_day_indices = set()
+        if window is not None:
+            try:
+                start_dt, end_dt = window
+                # Sleep windows can wrap past midnight, so flag both the start
+                # and end day as "active now" for the user-facing marker.
+                active_day_indices.add(start_dt.weekday())
+                active_day_indices.add(end_dt.weekday())
+            except Exception:
+                pass
+
+        for day in days:
+            try:
+                idx = _dow_to_weekday(int(getattr(day, "day", 0)))
+                day_enabled = bool(getattr(day, "is_enabled", False))
+                sleep_t = getattr(day, "sleep_time", None)
+                wake_t = getattr(day, "wake_time", None)
+            except Exception:
+                continue
+
+            name = _DAY_NAMES[idx]
+            t = Text()
+            t.append(f"  {name} ", style="#484f58")
+            if day_enabled:
+                window_str = f"{_fmt_sleep_time(sleep_t)} → {_fmt_sleep_time(wake_t)}"
+                t.append(window_str, style="#c9d1d9")
+                if idx in active_day_indices:
+                    t.append("   ● now", style="bold #d29922")
+            else:
+                t.append("off", style="#484f58")
+            log.write(t)
+
+        if is_enabled and not active_day_indices:
+            app._log_info("Outside the active sleep window right now.")
+
+
 # ── LR5-only commands ─────────────────────────────────────────────────────────
 # These route through the adapter, which returns a "not supported" message on
 # LR3/LR4 rather than crashing — so the commands are safe to type on any model.
@@ -1054,6 +1151,23 @@ class McpCommand(SlashCommand):
             app._log_info(f"MCP server was already {verb}")
 
 
+class VersionCommand(SlashCommand):
+    name = "version"
+    description = "show version info (asher-cli, Python, pylitterbot, textual)"
+
+    async def run(self, app: AsherApp, args: list[str]) -> None:  # noqa: ARG002
+        def _v(pkg: str) -> str:
+            try:
+                return pkg_version(pkg)
+            except PackageNotFoundError:
+                return "?"
+
+        app._log_info(f"Asher CLI v{_v('asher-cli')}")
+        app._log_info(f"Python {sys.version.split()[0]}")
+        app._log_info(f"pylitterbot {_v('pylitterbot')}")
+        app._log_info(f"textual {_v('textual')}")
+
+
 def _open_folder(path: Path) -> None:
     if sys.platform == "win32":
         subprocess.Popen(["explorer", "/select,", str(path)])
@@ -1173,6 +1287,7 @@ _registry.register(WaitTimeCommand())
 _registry.register(PowerCommand())
 _registry.register(RenameCommand())
 _registry.register(InsightCommand())
+_registry.register(SleepScheduleCommand())
 _registry.register(PrivacyCommand())
 _registry.register(VolumeCommand())
 _registry.register(CameraAudioCommand())
@@ -1191,6 +1306,7 @@ _registry.register(CatCommand())
 _registry.register(RefreshCommand())
 _registry.register(ConfigCommand())
 _registry.register(McpCommand())
+_registry.register(VersionCommand())
 
 
 # ── mixin ───────────────────────────────────────────────────────────────────
