@@ -402,3 +402,133 @@ async def test_info_handles_missing_optional_props():
     assert "Firmware" in log and "—" in log
     assert "Wait time" in log and "—" in log
     assert "Name" in log and "OldBox" in log
+
+
+# ── sleep-schedule (§8) — read-only viewer ─────────────────────────────────────
+
+
+def _make_schedule(enabled_days: list[int] | None = None, disabled_days: list[int] | None = None):
+    """Build a fake SleepSchedule-like object from the real pylitterbot dataclasses.
+
+    `enabled_days`/`disabled_days` are weekday indices (Mon=0..Sun=6). The
+    command reads `.days`, `.is_enabled`, and `.get_window()` defensively.
+    """
+    from datetime import time
+
+    from pylitterbot.sleep_schedule import DayOfWeek, SleepSchedule, SleepScheduleDay
+
+    days = []
+    enabled_days = enabled_days or []
+    disabled_days = disabled_days or []
+    # Map Mon=0..Sun=6 (Python weekday) to DayOfWeek Sun=0..Sat=6.
+    wd_to_dow = {
+        0: DayOfWeek.MONDAY,
+        1: DayOfWeek.TUESDAY,
+        2: DayOfWeek.WEDNESDAY,
+        3: DayOfWeek.THURSDAY,
+        4: DayOfWeek.FRIDAY,
+        5: DayOfWeek.SATURDAY,
+        6: DayOfWeek.SUNDAY,
+    }
+    for wd in enabled_days:
+        days.append(
+            SleepScheduleDay(
+                day=wd_to_dow[wd], sleep_time=time(22, 0), wake_time=time(7, 0), is_enabled=True
+            )
+        )
+    for wd in disabled_days:
+        days.append(
+            SleepScheduleDay(
+                day=wd_to_dow[wd], sleep_time=time(22, 0), wake_time=time(7, 0), is_enabled=False
+            )
+        )
+    return SleepSchedule(days=days)
+
+
+@pytest.mark.asyncio
+async def test_sleep_schedule_shows_enabled_windows(connected_app):
+    connected_app._robot.sleep_schedule = _make_schedule(
+        enabled_days=[0, 1, 2],
+        disabled_days=[3, 4],  # Mon-Wed on, Thu-Fri off
+    )
+    async with connected_app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#cmd-input")
+        await _type(pilot, "sleep-schedule")
+        await pilot.pause()
+        await pilot.pause()
+
+        log = _log_text(connected_app)
+
+    assert "22:00" in log
+    assert "07:00" in log
+    assert "Mon" in log and "Tue" in log and "Wed" in log
+    # disabled days render "off"
+    assert "off" in log
+
+
+@pytest.mark.asyncio
+async def test_sleep_schedule_handles_none(connected_app):
+    """_sleep_schedule is None when no schedule is configured — must warn, not crash."""
+    connected_app._robot.sleep_schedule = None
+    async with connected_app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#cmd-input")
+        await _type(pilot, "sleep-schedule")
+        await pilot.pause()
+
+        log = _log_text(connected_app)
+
+    assert "No sleep schedule" in log or "always awake" in log.lower()
+
+
+@pytest.mark.asyncio
+async def test_sleep_schedule_reports_disabled_when_no_days_enabled(connected_app):
+    connected_app._robot.sleep_schedule = _make_schedule(disabled_days=[0, 1])
+    async with connected_app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#cmd-input")
+        await _type(pilot, "sleep-schedule")
+        await pilot.pause()
+        await pilot.pause()
+
+        log = _log_text(connected_app)
+
+    assert "disabled" in log.lower()
+
+
+@pytest.mark.asyncio
+async def test_sleep_schedule_requires_robot():
+    """sleep-schedule should refuse when no robot is connected."""
+    app = AsherApp()
+    app._robot = None
+    app._account = MagicMock()
+    app._account.disconnect = AsyncMock()
+    app._pets = []
+    app._connect_worker = lambda **kwargs: None  # type: ignore[method-assign]
+
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#cmd-input")
+        await _type(pilot, "sleep-schedule")
+        await pilot.pause()
+
+        log = _log_text(app)
+
+    assert "Not connected" in log or "connected" in log.lower()
+
+
+@pytest.mark.asyncio
+async def test_sleep_schedule_alias_works(connected_app):
+    """The 'sleepschedule' alias should dispatch the same command."""
+    connected_app._robot.sleep_schedule = _make_schedule(enabled_days=[0])
+    async with connected_app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#cmd-input")
+        await _type(pilot, "sleepschedule")
+        await pilot.pause()
+        await pilot.pause()
+
+        log = _log_text(connected_app)
+
+    assert "22:00" in log

@@ -477,11 +477,24 @@ If weight ID misidentifies a cat, this corrects the record.
 objects (day, sleep_time, wake_time, is_enabled). This is more granular than the
 current `sleep` / `wake` toggle.
 
+### ~~`sleep-schedule` — read-only viewer~~ ✅
+
+The `sleep-schedule` (alias `sleepschedule`) command renders the per-day
+sleep/wake window read-only. Days are sorted Mon→Sun (converted from pylitterbot's
+Sun=0..Sat=6 `DayOfWeek`); enabled days show `22:00 → 07:00`, disabled days show
+`off`. If `schedule.get_window()` returns an active window covering the current
+time, the affected day(s) get a `● now` marker. When the whole schedule is
+disabled it notes that and still lists the configured windows; when
+`sleep_schedule is None` it warns that the unit is always awake and points at
+`sleep`/`wake`. `_sleep_schedule` can raise on malformed data, so the whole read
+is wrapped defensively and degrades to a `_log_err`. Works on LR3/LR4/LR5 — the
+property exists on all three.
+
 ```
-sleep-schedule            show current schedule
-sleep-schedule set        interactive wizard (or flags)
-sleep-schedule Mon 22:00 07:00   set Monday sleep window
-sleep-schedule disable    clear all days
+sleep-schedule            show current schedule ✅
+sleep-schedule set        interactive wizard (or flags) — not yet
+sleep-schedule Mon 22:00 07:00   set Monday sleep window — not yet
+sleep-schedule disable    clear all days — not yet
 ```
 
 ### Contextual sleep/wake toggle
@@ -920,27 +933,27 @@ Helper functions in `asher/connection/__init__.py`:
 
 Keyring service name: `asher-cli`, keys `email` and `password`.
 
-### Token persistence (stretch — avoid API re-auth on every run)
+### Token persistence ✅ — avoid API re-auth on every run
 
-`Account.connect()` accepts a pre-existing `token` dict and exposes a
-`token_update_callback`. If we save the session token alongside credentials
-after first login, subsequent runs skip the username/password API call entirely
-— faster startup and more resilient to rate-limiting.
+`Account.__init__()` accepts a pre-existing `token` dict and a
+`token_update_callback`; `connect()` with no username/password reuses a valid
+token or silently refreshes it via the refresh token. The cached session token
+is stored as a JSON blob in the OS keyring (key `"token"` under service
+`asher-cli`), so subsequent launches skip the OAuth password login entirely —
+faster startup, less password exposure, more resilient to rate-limiting.
 
-```python
-def save_token(token: dict | None) -> None:
-    if token:
-        keyring.set_password("asher-cli", "token", json.dumps(token))
+`_connect_worker` tries the token first (via `_try_token_connect`), and only
+falls back to the email/password path if the token is absent, expired, or
+rejected — in which case the stale token is wiped so a poisoned token can't
+loop. `token_update_callback=_keyring_save_token` is also wired into the
+password-login `Account()` construction, so refreshes during a session are
+captured for the next launch. Users only re-enter their password when the
+refresh token itself expires (typically months).
 
-account = Account(
-    token=json.loads(keyring.get_password("asher-cli", "token") or "null"),
-    token_update_callback=save_token,
-)
-```
-
-The token is automatically refreshed by pylitterbot when it expires. This
-would mean users only re-enter their password when the refresh token itself
-expires (typically months).
+Helpers in `asher/connection/__init__.py`:
+- `_keyring_load_token() → dict | None` — returns the cached token or `None`
+- `_keyring_save_token(token: dict | None)` — persists, or clears when `None`
+- `_keyring_delete()` now also clears `"token"` (so `/logout` invalidates it)
 
 ### `subscribe_for_updates` — let pylitterbot manage WebSocket per robot
 
@@ -2067,33 +2080,18 @@ chip of the status bar:
 The `_refresh_title()` method in `asher/ui/__init__.py` builds this; version
 falls back to `"dev"` when running from source without `pip install -e .`.
 
-### `/version` slash command
+### ~~`/version` slash command~~ ✅
 
-A convenience command that prints version info to the log without requiring
-the user to look at the status bar:
+`/version` (a `SlashCommand` in `asher/commands/__init__.py`) prints the
+runtime versions to the log via `importlib.metadata.version()` with a
+`PackageNotFoundError` → `"?"` fallback, so it degrades cleanly when run from
+source without `pip install -e .`:
 
 ```
   Asher CLI v1.0.0
   Python 3.12.3
   pylitterbot 3.x.x
   textual 0.x.x
-```
-
-```python
-async def _slash_version(self) -> None:
-    import sys
-    from importlib.metadata import version as pkg_version, PackageNotFoundError
-
-    def _v(pkg):
-        try:
-            return pkg_version(pkg)
-        except PackageNotFoundError:
-            return "?"
-
-    self._log_info(f"Asher CLI v{_v('asher-cli')}")
-    self._log_info(f"Python {sys.version.split()[0]}")
-    self._log_info(f"pylitterbot {_v('pylitterbot')}")
-    self._log_info(f"textual {_v('textual')}")
 ```
 
 ### ~~Status bar title — model badge~~ ✅
@@ -2317,7 +2315,7 @@ Ranked by user-visible impact vs. implementation effort:
 2. ~~**Cat panel status badges** (§18)~~ ✅ — `#cat-label` (revived mode label) + `#cat-status` badges (status chip, lock, night light, sleep, wait) under the art; refreshed via `_update_cat_panel` on every status refresh
 3. ~~**WebSocket subscription**~~ ✅ — real-time push updates live; 5-min poll fallback for activity history
 4. ~~**Real-time cycling indicator with elapsed time** (§11)~~ ✅ — `⟳ Cycling  M:SS` chip in the status bar; `_cycle_start` + a lazy 1 s `_cycle_timer` (created on cycle start, stopped on any other status)
-5. **Token persistence** (§13) — skip password re-entry on every run
+5. ~~**Token persistence** (§13)~~ ✅ — OAuth session token cached as JSON in the keyring; `_connect_worker` tries the token first and only falls back to email/password on failure (wiping the stale token). `token_update_callback` captures refreshes during a session, so launches skip the password login entirely until the refresh token itself expires
 6. ~~**Fault & safety monitoring** (§9)~~ ✅ — `asher/faults.py` + `_refresh_faults` drive an in-panel `#fault-banner` (red/amber); enum fault props checked against healthy sentinels; transitions logged, steady state quiet; cat panel flips to `error`; `d` dismisses
 7. ~~**Readable history events** (§11)~~ ✅ — `history` now renders translated, colour-coded labels via `asher/activity_labels.py` (`format_activity()`); cat-detection events append pet name + weight; shared with the `export` CSV path
 8. **History pager sub-view** (§11) — scrollable in-log display with pagination; `history 100` vs current hardcoded 25-event dump
@@ -2329,9 +2327,9 @@ Ranked by user-visible impact vs. implementation effort:
 3. ~~**`/pet` slash command**~~ ✅ (§1, §14) — `/pet` lists, `/pet <idx|name>` switches; `_active_pet_idx` persists for session
 4. ~~**`/cat`, `/refresh`, `/config` slash commands**~~ ✅ (§1) — cat panel toggle + colour, poll interval control, runtime config dump
 5. **Tab-completion for slash commands** (§23) — Claude Code-style overlay dropdown on `/` keypress; single-source registry drives both dispatch and completion
-6. **`/version` slash command** (§24) — print Python/package versions to log; model badge in status bar is already done
+6. ~~**`/version` slash command** (§24)~~ ✅ — prints asher-cli / Python / pylitterbot / textual versions to the log via `importlib.metadata`, with a `"?"` fallback when not installed; model badge in the status bar was already done
 7. ~~**`wait-time`, `power`, `rename`, `insight` commands** (§3)~~ ✅ — all four wired up; plus the `status`/`info` split (`status` trimmed to at-a-glance, `info` is the full property dump). `panel-brightness` skipped (not exposed by pylitterbot 2025.6.2); `reset`/`reset-settings`/`firmware`-update deliberately omitted as destructive
-8. **Sleep schedule viewer** (§8) — read-only first, config wizard later
+8. ~~**Sleep schedule viewer** (§8)~~ ✅ — `sleep-schedule` (alias `sleepschedule`) renders the per-day sleep/wake window read-only, sorted Mon→Sun, with an active-window `● now` marker; config wizard/set/disable still TODO
 9. **Headless CLI export** (§25) — `asher --export 7` for cron/Task Scheduler automation, no TUI or Claude Desktop needed
 
 ### Release pipeline

@@ -80,7 +80,7 @@ class TestKeyringDelete:
     def test_deletes_all_credentials(self):
         with patch("asher.connection.keyring.delete_password") as mock_delete:
             _keyring_delete()
-            assert mock_delete.call_count == 3
+            assert mock_delete.call_count == 4
 
     def test_uses_correct_service_and_keys(self):
         with patch("asher.connection.keyring.delete_password") as mock_delete:
@@ -89,8 +89,106 @@ class TestKeyringDelete:
             assert calls[0][0] == ("asher-cli", "email")
             assert calls[1][0] == ("asher-cli", "password")
             assert calls[2][0] == ("asher-cli", "preferred_robot")
+            assert calls[3][0] == ("asher-cli", "token")
 
     def test_suppresses_exceptions(self):
         with patch("asher.connection.keyring.delete_password") as mock_delete:
             mock_delete.side_effect = Exception("Keyring error")
             _keyring_delete()
+
+
+class TestKeyringTokenLoad:
+    def test_loads_token_successfully(self):
+        from asher.connection import _keyring_load_token
+
+        with patch("asher.connection.keyring.get_password") as mock_get:
+            mock_get.return_value = '{"access_token": "a", "id_token": "i", "refresh_token": "r"}'
+            token = _keyring_load_token()
+            assert token == {"access_token": "a", "id_token": "i", "refresh_token": "r"}
+            mock_get.assert_called_once_with("asher-cli", "token")
+
+    def test_returns_none_when_no_token(self):
+        from asher.connection import _keyring_load_token
+
+        with patch("asher.connection.keyring.get_password") as mock_get:
+            mock_get.return_value = None
+            assert _keyring_load_token() is None
+
+    def test_returns_none_for_empty_string(self):
+        from asher.connection import _keyring_load_token
+
+        with patch("asher.connection.keyring.get_password") as mock_get:
+            mock_get.return_value = ""
+            assert _keyring_load_token() is None
+
+    def test_returns_none_on_invalid_json(self):
+        from asher.connection import _keyring_load_token
+
+        with patch("asher.connection.keyring.get_password") as mock_get:
+            mock_get.return_value = "not json{"
+            assert _keyring_load_token() is None
+
+    def test_returns_none_for_non_dict_json(self):
+        from asher.connection import _keyring_load_token
+
+        with patch("asher.connection.keyring.get_password") as mock_get:
+            mock_get.return_value = '["not", "a", "dict"]'
+            assert _keyring_load_token() is None
+
+    def test_returns_none_on_exception(self):
+        from asher.connection import _keyring_load_token
+
+        with patch("asher.connection.keyring.get_password") as mock_get:
+            mock_get.side_effect = Exception("Keyring error")
+            assert _keyring_load_token() is None
+
+
+class TestKeyringTokenSave:
+    def test_saves_token_as_json(self):
+        import json
+
+        from asher.connection import _keyring_save_token
+
+        token = {"access_token": "a", "id_token": "i", "refresh_token": "r"}
+        with patch("asher.connection.keyring.set_password") as mock_set:
+            _keyring_save_token(token)
+            mock_set.assert_called_once()
+            assert mock_set.call_args[0][0] == "asher-cli"
+            assert mock_set.call_args[0][1] == "token"
+            assert json.loads(mock_set.call_args[0][2]) == token
+
+    def test_none_token_deletes(self):
+        from asher.connection import _keyring_save_token
+
+        with (
+            patch("asher.connection.keyring.set_password") as mock_set,
+            patch("asher.connection.keyring.delete_password") as mock_del,
+        ):
+            _keyring_save_token(None)
+            mock_set.assert_not_called()
+            mock_del.assert_called_once_with("asher-cli", "token")
+
+    def test_empty_dict_deletes(self):
+        from asher.connection import _keyring_save_token
+
+        with (
+            patch("asher.connection.keyring.set_password") as mock_set,
+            patch("asher.connection.keyring.delete_password") as mock_del,
+        ):
+            _keyring_save_token({})
+            mock_set.assert_not_called()
+            mock_del.assert_called_once_with("asher-cli", "token")
+
+    def test_save_suppresses_exceptions(self):
+        from asher.connection import _keyring_save_token
+
+        with patch("asher.connection.keyring.set_password") as mock_set:
+            mock_set.side_effect = Exception("Keyring error")
+            _keyring_save_token({"access_token": "a"})  # should not raise
+
+    def test_delete_on_none_suppresses_exceptions(self):
+        from asher.connection import _keyring_save_token
+
+        with patch("asher.connection.keyring.delete_password") as mock_del:
+            mock_del.side_effect = Exception("Keyring error")
+            _keyring_save_token(None)  # should not raise
