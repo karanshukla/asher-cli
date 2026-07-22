@@ -103,10 +103,12 @@ pylitterbot ships an optional MCP server (`pip install pylitterbot[mcp]`, run vi
 ## Command convention
 
 **Normal commands** (no prefix) — robot actions only:
-`clean`, `status`, `lock`, `unlock`, `sleep`, `wake`, `night-light on|off|auto`, `night-light-brightness <level>`, `history`, `clear`, `help`
+`clean`, `status`, `info`, `lock`, `unlock`, `sleep`, `wake`, `night-light on|off|auto`, `night-light-brightness <level>`, `wait-time <minutes>`, `power on|off`, `rename <name>`, `insight [days|month]`, `sleep-schedule`, `privacy on|off`, `volume <0-100>`, `camera-audio on|off`, `drawer-reset`, `history`, `export [days|month]`, `clear`, `help`, `quit`
 
 **Slash commands** (`/` prefix) — app management only:
-`/login`, `/logout`, `/exit`, `/robots`, `/robot <index|name>`, `/pets`, `/pet <index|name>`, `/cat on|off|color <hex>`, `/refresh <seconds|off>`, `/config`, `/mcp on|off|status`
+`/login`, `/logout`, `/robots`, `/robot <index|name>`, `/pets`, `/pet <index|name>`, `/cat on|off|color <hex>`, `/refresh [seconds|off]`, `/config`, `/version`, `/mcp on|off|status`, `/exit`
+
+> The authoritative list is the `_registry` in `asher/commands/__init__.py`; `/help` renders it at runtime. If you add a command, update the tables in `README.md` and the list in `asher/slash-commands/__init__.py`.
 
 **Special cases** (accepted both with and without `/`):
 `exit`, `quit`, `q` — exit the app
