@@ -20,8 +20,8 @@ A Claude Code-style terminal dashboard for monitoring and controlling Litter Rob
 - Fault & safety monitoring — model-scoped in-panel alerts for cat detected, pinch, motor/position/gas faults (LR5: bonnet/laser/drawer); press `d` to dismiss
 - Cat panel with mode label + status badges (status chip, lock, night light, sleep, wait time) under the art
 - Scrollable activity log with timestamps
-- Commands: `clean`, `status`, `lock`, `unlock`, `sleep`, `wake`, `night-light on|off|auto`, `night-light-brightness`, `history`, `export [days|month]`, `help`, `quit`
-- Slash commands for app management: `/login`, `/logout`, `/robots`, `/robot <index|name>`, `/pets`, `/pet <index|name>`, `/cat on|off|color <hex>`, `/refresh [seconds|off]`, `/config`, `/exit`
+- Commands: `clean`, `status`, `info`, `lock`, `unlock`, `sleep`, `wake`, `night-light on|off|auto`, `night-light-brightness`, `wait-time`, `power on|off`, `rename`, `insight`, `sleep-schedule`, plus LR5 extras (`privacy`, `volume`, `camera-audio`, `drawer-reset`), `history`, `export [days|month]`, `help`, `quit`
+- Slash commands for app management: `/login`, `/logout`, `/robots`, `/robot <index|name>`, `/pets`, `/pet <index|name>`, `/cat on|off|color <hex>`, `/refresh [seconds|off]`, `/config`, `/version`, `/mcp on|off|status`, `/exit`
 - Cat animation panel that reacts to robot state
 - Command history (↑/↓ arrows)
 - Real-time updates via WebSocket; 5-minute poll fallback
@@ -86,6 +86,15 @@ LITTER_ROBOT_PASSWORD=yourpassword
 | `sleep` / `wake` | Toggle sleep mode |
 | `night-light on\|off\|auto` | Set night light mode |
 | `night-light-brightness <level>` | Set brightness (LR5: 0-100; LR4: 25/50/100) |
+| `wait-time <minutes>` | Set clean-cycle wait time (shows valid values / current if omitted) |
+| `power on\|off` | Hard-power the unit on or off |
+| `rename <new name>` | Rename the unit in the Whisker cloud |
+| `insight [days\|month]` | Show cycle-usage statistics (default: 30 days) |
+| `sleep-schedule` | Show the per-day sleep schedule (read-only) |
+| `privacy on\|off` | Toggle LR5 privacy mode |
+| `volume <0-100>` | Set LR5 sound volume |
+| `camera-audio on\|off` | Toggle LR5 camera audio |
+| `drawer-reset` | Reset the LR5 waste drawer level indicator |
 | `history` | Show last 25 activity events |
 | `export [days\|month]` | Export activity history to CSV in `~/Downloads` (default: 30 days) |
 | `clear` | Clear the log |
@@ -106,6 +115,8 @@ LITTER_ROBOT_PASSWORD=yourpassword
 | `/cat color <hex>` | Change the cat art colour (e.g. `/cat color #ff79c6`); `/cat reset` to revert |
 | `/refresh [seconds\|off]` | Change the auto-poll interval or disable it (`/refresh 60`, `/refresh off`) |
 | `/config` | Show current runtime settings (robot, refresh rate, cat panel, active pet) |
+| `/version` | Show version info (asher-cli, Python, pylitterbot, textual) |
+| `/mcp on\|off\|status` | Toggle the Litter-Robot MCP server entry in Claude Desktop |
 | `/exit` | Exit Asher CLI |
 
 **Keyboard shortcuts:** `Ctrl+L` clears the log, `Ctrl+C` quits.
@@ -215,6 +226,26 @@ uv run poe check   # run all of the above + tests (same as CI)
 ```
 
 CI runs on Python 3.10 / 3.11 / 3.12 across Ubuntu, Windows, and macOS on every push.
+
+## Changelog
+
+### v0.1.1
+
+- **Token persistence** — the OAuth session token is now saved to the keyring, so re-logins are skipped on subsequent launches.
+- **`/version`** — new slash command showing asher-cli, Python, pylitterbot, and textual versions.
+- **Sleep-schedule viewer** — new `sleep-schedule` command renders the per-day schedule (read-only).
+- **Cat panel badges** — mode label plus status chips (status, lock, night light, sleep, wait time) under the cat art.
+- **Fault & safety monitoring** — model-scoped, enum-aware detection with an in-panel banner; press `d` to dismiss.
+- **Cycling indicator** — real-time elapsed timer (`⟳ Cycling M:SS`).
+
+### v0.1.0
+
+- **Readable status & history** — robot status and activity events now render as plain English instead of raw enum values.
+- **Missing robot commands** — added `wait-time`, `power on|off`, `rename`, `insight`, and split `status` (summary) from `info` (full property dump).
+- **LR5 extras** — `privacy`, `volume`, `camera-audio`, and `drawer-reset` wired up via the robot adapter (gracefully refused on LR3/LR4).
+- **MCP bridge** — keyring-backed `pylitterbot[mcp]` launcher with Claude Desktop config management (`/mcp on|off|status`).
+
+Full history: see the [commit log](https://github.com/karanshukla/asher-cli/commits/main).
 
 ## Notes
 
