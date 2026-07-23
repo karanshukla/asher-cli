@@ -146,8 +146,8 @@ async def test_history_command_with_connected_robot(connected_app):
         await pilot.press("h", "i", "s", "t", "o", "r", "y")
         await pilot.press("enter")
         await pilot.pause()
-        # Robot's get_activity_history should be called
-        app._robot.get_activity_history.assert_called_once_with(limit=25)
+        # Robot's get_activity_history should be called (default limit 50)
+        app._robot.get_activity_history.assert_called_once_with(limit=50)
 
 
 @pytest.mark.asyncio

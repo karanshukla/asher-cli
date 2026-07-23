@@ -23,10 +23,10 @@ from pylitterbot.robot import EVENT_UPDATE
 from rich.text import Text
 from textual import work
 from textual.widgets import Input, RichLog, Static
-from tzlocal import get_localzone
 
-from ..activity_labels import ACTION_LABELS, activity_raw_text, format_activity
+from ..activity_labels import ACTION_LABELS, activity_raw_text
 from ..helpers import fmt_ago, robot_model, ts
+from ..history_view import HistoryScreen, format_history_rows
 from ..login_flow import LoginFlow, LoginState
 from .base import Command, CommandRegistry, SlashCommand
 
@@ -360,42 +360,33 @@ class NightLightBrightnessCommand(Command):
 class HistoryCommand(Command):
     name = "history"
     aliases = ("hist",)
-    description = "show recent activity log"
+    description = "[count|all]  show recent activity in a scrollable pager"
     requires_robot = True
 
     async def run(self, app: AsherApp, args: list[str]) -> None:
         assert app._robot is not None
-        try:
-            acts = await app._robot.get_activity_history(limit=25)
-            log = app.query_one("#log", RichLog)
-            if not acts:
-                app._log_info("No activity history available.")
+        raw = args[0].lower() if args else ""
+        if raw in ("all", "max"):
+            limit = 500
+        elif raw:
+            try:
+                limit = max(1, min(500, int(raw)))
+            except ValueError:
+                app._log_warn(f"Unknown count '{raw}' — use a number of events or 'all'")
                 return
-            app._log_info(f"Last {len(acts)} events:")
-            today = datetime.now(tz=timezone.utc).date()
-            for act in reversed(acts):
-                ts_dt = getattr(act, "timestamp", None)
-                if ts_dt:
-                    if ts_dt.tzinfo is None:
-                        ts_dt = ts_dt.replace(tzinfo=timezone.utc)
-                    local_dt = ts_dt.astimezone(get_localzone())
-                    # Show the year only for events older than today, to match
-                    # the §11 "timestamps in activity history" note.
-                    if local_dt.date() == today:
-                        ts_str = local_dt.strftime("%H:%M")
-                    elif local_dt.year == today.year:
-                        ts_str = local_dt.strftime("%m/%d %H:%M")
-                    else:
-                        ts_str = local_dt.strftime("%Y-%m-%d %H:%M")
-                else:
-                    ts_str = "?"
-                label, colour = format_activity(act, app._pets)
-                t = Text()
-                t.append(f"  {ts_str}  ", style="#484f58")
-                t.append(label, style=colour)
-                log.write(t)
+        else:
+            limit = 50
+        try:
+            acts = await app._robot.get_activity_history(limit=limit)
         except Exception as exc:
             app._log_err(f"Failed to get history: {exc}")
+            return
+        rows = format_history_rows(acts, app._pets)
+        robot_name = getattr(app._robot, "name", "robot")
+        count = len(rows)
+        noun = "event" if count == 1 else "events"
+        title = f"  Activity history — {robot_name}   {count} {noun}   [q] close"
+        app.push_screen(HistoryScreen(rows, title))
 
 
 class WaitTimeCommand(Command):

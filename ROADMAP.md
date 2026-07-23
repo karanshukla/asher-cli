@@ -753,11 +753,21 @@ Unit tests live in `tests/test_activity_labels.py` (17 cases covering the
 label map, cat suffix logic, enum vs string actions, and unknown-event
 fallback) — the module is pure and needs no Textual or event-loop harness.
 
-### History as a scrollable sub-view (pager mode)
+### ~~History as a scrollable sub-view (pager mode)~~ ✅
 
-Currently `history` dumps rows into the main log, which then scrolls off.
-The better pattern — like Claude Code's diff/file viewers — is a dedicated
-screen pushed over the main UI that the user scrolls through and dismisses.
+`history` now pushes a `HistoryScreen` (a `ModalScreen` in
+`asher/history_view.py`) over the main UI instead of dumping rows into the main
+log, where they scrolled off as new output arrived. A `ScrollableContainer`
+takes focus on mount, so the arrow keys, `Page Up`/`Page Down`, and
+`Home`/`End` page through long histories natively; `q`, `Escape`, or `Enter`
+pops back to the main view. A header bar shows the robot name and event count.
+
+`history` also gained an optional count: bare `history` fetches 50 events (up
+from the old hardcoded 25), `history 100` fetches more, and `history all`
+fetches up to 500. The fetch/format logic lives in the pure
+`format_history_rows()` helper (newest-first, shared timestamp rules from §11),
+so the rendering stays identical to the old log rows. No new deps — just
+`ScrollableContainer` + `ModalScreen` from Textual.
 
 **Behaviour:**
 - `history` command pushes a `HistoryScreen` over the main app
@@ -2318,7 +2328,7 @@ Ranked by user-visible impact vs. implementation effort:
 5. ~~**Token persistence** (§13)~~ ✅ — OAuth session token cached as JSON in the keyring; `_connect_worker` tries the token first and only falls back to email/password on failure (wiping the stale token). `token_update_callback` captures refreshes during a session, so launches skip the password login entirely until the refresh token itself expires
 6. ~~**Fault & safety monitoring** (§9)~~ ✅ — `asher/faults.py` + `_refresh_faults` drive an in-panel `#fault-banner` (red/amber); enum fault props checked against healthy sentinels; transitions logged, steady state quiet; cat panel flips to `error`; `d` dismisses
 7. ~~**Readable history events** (§11)~~ ✅ — `history` now renders translated, colour-coded labels via `asher/activity_labels.py` (`format_activity()`); cat-detection events append pet name + weight; shared with the `export` CSV path
-8. **History pager sub-view** (§11) — scrollable in-log display with pagination; `history 100` vs current hardcoded 25-event dump
+8. ~~**History pager sub-view** (§11)~~ ✅ — `history` now pushes a `HistoryScreen` (`ModalScreen` in `asher/history_view.py`) with a focused `ScrollableContainer`; arrow keys / `Page Up`/`Page Down` / `Home`/`End` scroll, `q`/`Esc`/`Enter` close. Optional count arg (`history 100`, `history all`); default raised from 25 → 50. Pure `format_history_rows()` shares the timestamp/label rules with the old log rows
 
 ### Commands & slash system
 

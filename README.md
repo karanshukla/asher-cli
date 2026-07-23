@@ -19,8 +19,8 @@ A Claude Code-style terminal dashboard for monitoring and controlling Litter Rob
 - Real-time cycling indicator with elapsed time (`⟳ Cycling  M:SS`)
 - Fault & safety monitoring — model-scoped in-panel alerts for cat detected, pinch, motor/position/gas faults (LR5: bonnet/laser/drawer); press `d` to dismiss
 - Cat panel with mode label + status badges (status chip, lock, night light, sleep, wait time) under the art
-- Scrollable activity log with timestamps
-- Commands: `clean`, `status`, `info`, `lock`, `unlock`, `sleep`, `wake`, `night-light on|off|auto`, `night-light-brightness`, `wait-time`, `power on|off`, `rename`, `insight`, `sleep-schedule`, plus LR5 extras (`privacy`, `volume`, `camera-audio`, `drawer-reset`), `history`, `export [days|month]`, `help`, `quit`
+- Scrollable activity-history pager — `history [count|all]` opens a full-screen, paginated view (arrow keys, `Page Up`/`Page Down`, `Home`/`End`); `q`/`Esc`/`Enter` to close
+- Commands: `clean`, `status`, `info`, `lock`, `unlock`, `sleep`, `wake`, `night-light on|off|auto`, `night-light-brightness`, `wait-time`, `power on|off`, `rename`, `insight`, `sleep-schedule`, plus LR5 extras (`privacy`, `volume`, `camera-audio`, `drawer-reset`), `history [count|all]`, `export [days|month]`, `help`, `quit`
 - Slash commands for app management: `/login`, `/logout`, `/robots`, `/robot <index|name>`, `/pets`, `/pet <index|name>`, `/cat on|off|color <hex>`, `/refresh [seconds|off]`, `/config`, `/version`, `/mcp on|off|status`, `/exit`
 - Cat animation panel that reacts to robot state
 - Command history (↑/↓ arrows)
@@ -95,7 +95,7 @@ LITTER_ROBOT_PASSWORD=yourpassword
 | `volume <0-100>` | Set LR5 sound volume |
 | `camera-audio on\|off` | Toggle LR5 camera audio |
 | `drawer-reset` | Reset the LR5 waste drawer level indicator |
-| `history` | Show last 25 activity events |
+| `history [count\|all]` | Show recent activity in a scrollable pager (default: 50 events) |
 | `export [days\|month]` | Export activity history to CSV in `~/Downloads` (default: 30 days) |
 | `clear` | Clear the log |
 | `help` | Show command list |
@@ -228,6 +228,10 @@ uv run poe check   # run all of the above + tests (same as CI)
 CI runs on Python 3.10 / 3.11 / 3.12 across Ubuntu, Windows, and macOS on every push.
 
 ## Changelog
+
+### Unreleased
+
+- **Activity-history pager** — `history` now opens a full-screen, scrollable view instead of dumping into the main log. Page through long histories with the arrow keys / `Page Up`/`Page Down` / `Home`/`End`; `q`, `Esc`, or `Enter` closes it. Accepts an optional event count (`history 100`) or `all` (default: 50).
 
 ### v0.1.1
 

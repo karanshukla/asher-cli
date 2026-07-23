@@ -44,6 +44,7 @@ asher/
   mcp_config.py     Claude Desktop config read/write for the /mcp slash command
   mcp_bridge.py     asher-mcp-launch console script — keyring-backed pylitterbot MCP launcher
   faults.py         check_faults(robot) — model-scoped safety/component fault detection (status enum + per-model attr allowlist; hopper never a fault)
+  history_view.py   HistoryScreen (ModalScreen) + format_history_rows() — scrollable activity-history pager pushed by the `history` command
   __main__.py       main() entry point
   commands/
     base.py         Command ABC, SlashCommand, CommandRegistry
@@ -68,6 +69,7 @@ tests/
   test_mcp_bridge.py      mcp_bridge launcher credential/subprocess handling
   test_mcp_command.py     /mcp slash command dispatch
   test_faults.py          check_faults() — safety statuses, attribute faults, graceful degradation
+  test_history_view.py    format_history_rows() + HistoryScreen structure + Pilot push/dismiss
 
 .github/workflows/
   ci.yml            ruff + mypy + pytest on every push/PR
@@ -103,7 +105,7 @@ pylitterbot ships an optional MCP server (`pip install pylitterbot[mcp]`, run vi
 ## Command convention
 
 **Normal commands** (no prefix) — robot actions only:
-`clean`, `status`, `info`, `lock`, `unlock`, `sleep`, `wake`, `night-light on|off|auto`, `night-light-brightness <level>`, `wait-time <minutes>`, `power on|off`, `rename <name>`, `insight [days|month]`, `sleep-schedule`, `privacy on|off`, `volume <0-100>`, `camera-audio on|off`, `drawer-reset`, `history`, `export [days|month]`, `clear`, `help`, `quit`
+`clean`, `status`, `info`, `lock`, `unlock`, `sleep`, `wake`, `night-light on|off|auto`, `night-light-brightness <level>`, `wait-time <minutes>`, `power on|off`, `rename <name>`, `insight [days|month]`, `sleep-schedule`, `privacy on|off`, `volume <0-100>`, `camera-audio on|off`, `drawer-reset`, `history [count|all]`, `export [days|month]`, `clear`, `help`, `quit`
 
 **Slash commands** (`/` prefix) — app management only:
 `/login`, `/logout`, `/robots`, `/robot <index|name>`, `/pets`, `/pet <index|name>`, `/cat on|off|color <hex>`, `/refresh [seconds|off]`, `/config`, `/version`, `/mcp on|off|status`, `/exit`
