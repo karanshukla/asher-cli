@@ -4,8 +4,9 @@ Covers two layers:
 
 * ``format_history_rows`` — pure formatter (timestamp + ``format_activity``), no
   Textual or event-loop dependency, mirroring ``test_activity_labels.py``.
-* ``HistoryScreen`` — structure, focus-on-mount, and Pilot-driven dismiss,
-  mirroring the ``LoginScreen`` pattern in ``test_auth_pilot.py``.
+* ``HistoryScreen`` — structure, focus-on-mount, layout widgets, and
+  Pilot-driven dismiss, mirroring the ``LoginScreen`` pattern in
+  ``test_auth_pilot.py``.
 """
 
 from __future__ import annotations
@@ -31,16 +32,25 @@ def _act(action: Any, *, timestamp: datetime | None = None) -> SimpleNamespace:
     )
 
 
+def _some_acts() -> list:
+    """A couple of newish activities for screen-structure tests."""
+    return [
+        _act(
+            LitterBoxStatus.CLEAN_CYCLE_COMPLETE,
+            timestamp=datetime(2026, 6, 14, 14, 0, tzinfo=timezone.utc),
+        ),
+        _act(LitterBoxStatus.READY, timestamp=datetime(2026, 6, 14, 10, 0, tzinfo=timezone.utc)),
+    ]
+
+
 # ── format_history_rows ──────────────────────────────────────────────────────
 
 
 class TestFormatHistoryRows:
     def test_returns_one_text_per_activity(self):
-        acts = [
-            _act(LitterBoxStatus.CLEAN_CYCLE_COMPLETE),
-            _act(LitterBoxStatus.READY),
-        ]
-        rows = format_history_rows(acts)
+        rows = format_history_rows(
+            [_act(LitterBoxStatus.CLEAN_CYCLE_COMPLETE), _act(LitterBoxStatus.READY)]
+        )
         assert len(rows) == 2
 
     def test_preserves_input_order_newest_first(self):
@@ -59,31 +69,33 @@ class TestFormatHistoryRows:
         assert newer.astimezone(get_localzone()).strftime("%H:%M") in str(rows[0])
         assert older.astimezone(get_localzone()).strftime("%H:%M") in str(rows[1])
 
-    def test_same_day_timestamp_shows_only_time(self):
+    def test_timestamps_are_fixed_width_so_labels_align(self):
+        # Today's events used to show only HH:MM while older ones showed the
+        # date, leaving ragged indentation. Every timestamp must now be padded
+        # to the same width so the event column lines up vertically.
         from tzlocal import get_localzone
 
-        now = datetime.now(tz=timezone.utc)
-        rows = format_history_rows([_act("Ready", timestamp=now)])
-        # HH:MM only — no date component for a same-day event (compared in the
-        # formatter's local timezone, not the raw UTC value).
-        rendered = str(rows[0])
-        assert now.astimezone(get_localzone()).strftime("%H:%M") in rendered
+        today = datetime.now(tz=timezone.utc)
+        older = datetime(2025, 1, 1, 9, 0, tzinfo=timezone.utc)
+        rows = format_history_rows([_act("Ready", timestamp=today), _act("Ready", timestamp=older)])
+        first_ts = str(rows[0]).split("Ready")[0]
+        second_ts = str(rows[1]).split("Ready")[0]
+        # Both timestamp prefixes are the same length → labels start aligned.
+        assert len(first_ts) == len(second_ts)
+        # The today-event carries a date (MM/DD), not bare time.
+        assert today.astimezone(get_localzone()).strftime("%m/%d") in first_ts
 
     def test_naive_timestamp_is_treated_as_utc(self):
         # pylitterbot returns tz-aware datetimes, but the formatter degrades
         # gracefully if it ever receives a naive one.
         naive = datetime(2026, 6, 14, 12, 0)
-        rows = format_history_rows([_act("Ready", timestamp=naive)])
-        assert len(rows) == 1
+        assert len(format_history_rows([_act("Ready", timestamp=naive)])) == 1
 
     def test_missing_timestamp_renders_placeholder(self):
         act = SimpleNamespace(action="Ready", timestamp=None)
-        row = str(format_history_rows([act])[0])
-        assert "?" in row
+        assert "?" in str(format_history_rows([act])[0])
 
     def test_translated_label_and_colour_flow_through(self):
-        # Cat-detected events are amber and gain a pet/weight suffix when pets
-        # are supplied — the row should carry both the timestamp and the label.
         pets = [SimpleNamespace(id="pet-1", name="Asher")]
         act = SimpleNamespace(
             timestamp=datetime.now(tz=timezone.utc),
@@ -118,62 +130,93 @@ class _ShellApp(App):
         self.push_screen(self._screen)
 
 
-def _some_rows() -> list:
-    from rich.text import Text
-
-    return [Text("Clean cycle complete", style="#3fb950"), Text("Ready", style="#484f58")]
+def _screen(acts: list | None = None) -> HistoryScreen:
+    return HistoryScreen(acts if acts is not None else _some_acts(), None, "TestBot")
 
 
 @pytest.mark.asyncio
-async def test_history_screen_renders_header_and_rows():
-    screen = HistoryScreen(_some_rows(), "  Activity history — TestBot   2 events   [q] close")
+async def test_history_screen_renders_title_meta_and_rows():
+    screen = _screen()
     app = _ShellApp(screen)
     async with app.run_test() as pilot:
         await pilot.pause()
         assert app.screen is screen
-        header = screen.query_one("#history-header", Static)
-        assert "Activity history" in str(header.render())
+        title = screen.query_one("#history-title", Static)
+        assert "Activity history" in str(title.render())
+        assert "TestBot" in str(title.render())
+        assert "2 events" in str(title.render())
+        # Summary (event-type breakdown) line is present.
+        meta = screen.query_one("#history-meta", Static)
+        assert str(meta.render()).strip() != ""
+        # Column header is pinned above the scroll area.
+        colhead = screen.query_one("#history-colhead", Static)
+        assert "TIME" in str(colhead.render())
+        assert "EVENT" in str(colhead.render())
+        # Two event rows inside the scroll area.
         rows = screen.query("#history-scroll Static")
-        # Two event rows (the #history-empty placeholder must not appear).
         assert len(rows) == 2
 
 
 @pytest.mark.asyncio
-async def test_history_screen_scroll_takes_focus_on_mount():
-    screen = HistoryScreen(_some_rows(), "title")
+async def test_history_screen_footer_shows_navigation_and_close_hints():
+    screen = _screen()
     app = _ShellApp(screen)
     async with app.run_test() as pilot:
         await pilot.pause()
-        scroll = screen.query_one("#history-scroll", ScrollableContainer)
-        assert scroll.has_focus
+        footer = str(screen.query_one("#history-footer", Static).render())
+        # Close hints for all three dismiss keys.
+        assert "q" in footer
+        assert "Esc" in footer
+        assert "Enter" in footer
+        # Navigation hints.
+        assert "PgUp" in footer or "Page" in footer
+
+
+@pytest.mark.asyncio
+async def test_history_screen_title_singular_event():
+    screen = _screen([_act(LitterBoxStatus.CLEAN_CYCLE_COMPLETE)])
+    app = _ShellApp(screen)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        assert "1 event" in str(screen.query_one("#history-title", Static).render())
+
+
+@pytest.mark.asyncio
+async def test_history_screen_scroll_takes_focus_on_mount():
+    screen = _screen()
+    app = _ShellApp(screen)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        assert screen.query_one("#history-scroll", ScrollableContainer).has_focus
 
 
 @pytest.mark.asyncio
 async def test_history_screen_empty_state_shows_placeholder():
-    screen = HistoryScreen([], "title")
+    screen = _screen([])
     app = _ShellApp(screen)
     async with app.run_test() as pilot:
         await pilot.pause()
+        title = str(screen.query_one("#history-title", Static).render())
+        assert "0 events" in title
         empty = screen.query_one("#history-empty", Static)
         assert "No activity history" in str(empty.render())
 
 
 @pytest.mark.asyncio
 async def test_history_screen_q_dismisses():
-    screen = HistoryScreen(_some_rows(), "title")
+    screen = _screen()
     app = _ShellApp(screen)
     async with app.run_test() as pilot:
         await pilot.pause()
         assert app.screen is screen
         await pilot.press("q")
         await pilot.pause()
-        # Screen popped — back to the app's default screen.
         assert app.screen is not screen
 
 
 @pytest.mark.asyncio
 async def test_history_screen_escape_dismisses():
-    screen = HistoryScreen(_some_rows(), "title")
+    screen = _screen()
     app = _ShellApp(screen)
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -184,7 +227,7 @@ async def test_history_screen_escape_dismisses():
 
 @pytest.mark.asyncio
 async def test_history_screen_enter_dismisses():
-    screen = HistoryScreen(_some_rows(), "title")
+    screen = _screen()
     app = _ShellApp(screen)
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -195,7 +238,7 @@ async def test_history_screen_enter_dismisses():
 
 @pytest.mark.asyncio
 async def test_history_command_pushes_screen_with_default_limit():
-    """End-to-end: typing `history` fetches with the new default and pushes the pager."""
+    """End-to-end: typing `history` fetches with the default and pushes the pager."""
     from unittest.mock import AsyncMock, MagicMock
 
     from asher.app import AsherApp
@@ -224,10 +267,10 @@ async def test_history_command_pushes_screen_with_default_limit():
         await pilot.press("h", "i", "s", "t", "o", "r", "y")
         await pilot.press("enter")
         await pilot.pause()
-        # New default limit is 50 (was 25 before the pager shipped).
+        # Default limit is 50 (was 25 before the pager shipped).
         app._robot.get_activity_history.assert_called_once_with(limit=50)
         # The pager screen is now on top of the screen stack.
         assert app.screen.__class__.__name__ == "HistoryScreen"
-        header = app.screen.query_one("#history-header", Static)
-        assert "TestBot" in str(header.render())
-        assert "1 event" in str(header.render())
+        title = app.screen.query_one("#history-title", Static)
+        assert "TestBot" in str(title.render())
+        assert "1 event" in str(title.render())

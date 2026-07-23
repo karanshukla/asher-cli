@@ -26,7 +26,7 @@ from textual.widgets import Input, RichLog, Static
 
 from ..activity_labels import ACTION_LABELS, activity_raw_text
 from ..helpers import fmt_ago, robot_model, ts
-from ..history_view import HistoryScreen, format_history_rows
+from ..history_view import HistoryScreen
 from ..login_flow import LoginFlow, LoginState
 from .base import Command, CommandRegistry, SlashCommand
 
@@ -381,12 +381,8 @@ class HistoryCommand(Command):
         except Exception as exc:
             app._log_err(f"Failed to get history: {exc}")
             return
-        rows = format_history_rows(acts, app._pets)
         robot_name = getattr(app._robot, "name", "robot")
-        count = len(rows)
-        noun = "event" if count == 1 else "events"
-        title = f"  Activity history — {robot_name}   {count} {noun}   [q] close"
-        app.push_screen(HistoryScreen(rows, title))
+        app.push_screen(HistoryScreen(acts, app._pets, robot_name))
 
 
 class WaitTimeCommand(Command):
