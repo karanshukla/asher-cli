@@ -126,6 +126,7 @@ class UIMixin:
 
         with Container(id="main-area"):
             yield RichLog(id="log", highlight=True, markup=True, wrap=True, min_width=0)
+            yield Static("", id="completion-overlay")
             with Container(id="cat-panel"):
                 yield Static("", id="cat-fx")
                 yield Static(CATS["idle"][0], id="cat-art")  # type: ignore[arg-type]

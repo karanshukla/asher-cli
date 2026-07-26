@@ -22,9 +22,11 @@ from pylitterbot.enums import LitterBoxStatus
 from pylitterbot.robot import EVENT_UPDATE
 from rich.text import Text
 from textual import work
+from textual.css.query import NoMatches
 from textual.widgets import Input, RichLog, Static
 
 from ..activity_labels import ACTION_LABELS, activity_raw_text
+from ..completion import enter_completes, render_completion, slash_matches
 from ..helpers import fmt_ago, robot_model, ts
 from ..history_view import HistoryScreen
 from ..login_flow import LoginFlow, LoginState
@@ -1306,12 +1308,25 @@ class CommandsMixin:
     _cmd_history: list[str]
     _hist_idx: int
     _login: LoginFlow
+    _completion_matches: list[Command]
+    _completion_idx: int
 
     # ── input events ─────────────────────────────────────────────────────────
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
+        cmd_input = self.query_one("#cmd-input", Input)  # type: ignore[attr-defined]
         raw = event.value.strip()
-        self.query_one("#cmd-input", Input).value = ""  # type: ignore[attr-defined]
+        completed = enter_completes(self._completion_matches, self._completion_idx, raw)
+        if completed is not None:
+            # Fill the completion but don't submit — Enter confirms the pick,
+            # a second Enter runs it. Cursor sits after a space ready for args.
+            cmd_input.value = f"{completed.full_name} "
+            cmd_input.cursor_position = len(cmd_input.value)
+            self._hide_completion()
+            return
+
+        cmd_input.value = ""
+        self._hide_completion()
         if not raw:
             return
 
@@ -1362,12 +1377,90 @@ class CommandsMixin:
 
         self._dispatch_command(command, args)
 
+    def on_input_changed(self, event: Input.Changed) -> None:
+        """Live-filter the slash-command completion overlay as the user types."""
+        if self._login.is_active:
+            self._hide_completion()
+            return
+        text = event.value
+        # Only the first token is a command name; once a space is present the
+        # user is typing arguments, so the overlay should not stay open.
+        if " " in text or "\t" in text:
+            self._hide_completion()
+            return
+        matches = slash_matches(_registry.slash, text)
+        if matches:
+            self._completion_matches = matches
+            self._completion_idx = 0
+            self._show_completion()
+        else:
+            self._hide_completion()
+
+    def _render_completion(self) -> None:
+        """Refresh the overlay widget's content from the current match list."""
+        with contextlib.suppress(NoMatches):
+            self.query_one("#completion-overlay", Static).update(  # type: ignore[attr-defined]
+                render_completion(self._completion_matches, self._completion_idx)
+            )
+
+    def _show_completion(self) -> None:
+        with contextlib.suppress(NoMatches):
+            overlay = self.query_one("#completion-overlay", Static)  # type: ignore[attr-defined]
+            overlay.update(render_completion(self._completion_matches, self._completion_idx))
+            overlay.display = True
+
+    def _hide_completion(self) -> None:
+        self._completion_matches = []
+        self._completion_idx = 0
+        with contextlib.suppress(NoMatches):
+            overlay = self.query_one("#completion-overlay", Static)  # type: ignore[attr-defined]
+            overlay.display = False
+            overlay.update("")
+
+    def _accept_completion(self, *, append_space: bool) -> bool:
+        """Fill the input with the selected completion. Returns True if handled."""
+        if not self._completion_matches:
+            return False
+        idx = min(self._completion_idx, len(self._completion_matches) - 1)
+        cmd = self._completion_matches[idx]
+        cmd_input = self.query_one("#cmd-input", Input)  # type: ignore[attr-defined]
+        value = f"{cmd.full_name} " if append_space else cmd.full_name
+        cmd_input.value = value
+        cmd_input.cursor_position = len(cmd_input.value)
+        self._hide_completion()
+        return True
+
     def on_key(self, event) -> None:  # type: ignore[override]
         cmd_input = self.query_one("#cmd-input", Input)  # type: ignore[attr-defined]
         if not cmd_input.has_focus:
             return
         if self._login.is_active:
-            return  # disable history nav during login
+            return  # disable history nav + completion during login
+
+        # Completion navigation takes precedence over history while the overlay
+        # is open — mirrors the Claude Code behaviour where ↑/↓ move through
+        # suggestions rather than recycling prior commands.
+        if self._completion_matches:
+            if event.key == "up":
+                event.prevent_default()
+                if self._completion_idx > 0:
+                    self._completion_idx -= 1
+                    self._render_completion()
+                return
+            if event.key == "down":
+                event.prevent_default()
+                if self._completion_idx < len(self._completion_matches) - 1:
+                    self._completion_idx += 1
+                    self._render_completion()
+                return
+            if event.key == "escape":
+                event.prevent_default()
+                self._hide_completion()
+                return
+            if event.key == "tab":
+                event.prevent_default()
+                self._accept_completion(append_space=True)
+                return
 
         if event.key == "up":
             event.prevent_default()
