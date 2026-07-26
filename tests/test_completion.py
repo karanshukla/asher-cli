@@ -1,13 +1,16 @@
-"""Tests for slash-command tab completion.
+"""Tests for command completion — slash popup + bare-command ghost text.
 
-Two layers:
+Three layers:
 
-1. Pure helpers in ``asher.completion`` — matching, enter-completion decision,
-   and rendering are data-in/data-out, so they're tested directly without a
-   Textual event loop.
-2. Pilot-driven integration — the overlay appears/updates/hides as the user
-   types into ``#cmd-input``, arrow keys move the selection, Tab/Esc behave,
-   and Enter completes a partial command instead of erroring as unknown.
+1. Pure helpers in ``asher.completion`` — slash matching, enter-completion
+   decision, popup rendering, and the ``CommandSuggester`` are data-in/
+   data-out, tested directly without a Textual event loop.
+2. Pilot integration for the slash popup (``#completion-overlay``) — appears/
+   updates/hides as the user types ``/``, arrow keys move the selection,
+   Tab/Esc/Enter behave.
+3. Pilot integration for inline ghost text — typing a bare command prefix
+   shows a greyed suggestion; Tab and Right-arrow accept it; exact matches
+   suppress the suggestion; slash names are excluded from the ghost list.
 
 The Pilot tests share the ``connected_app`` fixture pattern from
 ``test_commands_pilot.py``: a mocked robot is injected before ``run_test``
@@ -25,7 +28,12 @@ from textual.widgets import Input, Static
 
 from asher.app import AsherApp
 from asher.commands import _registry
-from asher.completion import enter_completes, render_completion, slash_matches
+from asher.completion import (
+    CommandSuggester,
+    enter_completes,
+    render_completion,
+    slash_matches,
+)
 
 # ── fixtures ─────────────────────────────────────────────────────────────────
 
@@ -386,3 +394,178 @@ async def test_overlay_not_shown_during_login_flow(connected_app):
         await pilot.press("/")
         await pilot.pause()
         assert app.query_one("#completion-overlay", Static).display is False
+
+
+# ── CommandSuggester (pure) ─────────────────────────────────────────────────
+
+
+class TestCommandSuggester:
+    """Unit tests for the inline ghost-text suggester.
+
+    Note: the Suggester base casefolds the value before calling
+    get_suggestion, so these tests pass already-casefolded input to match the
+    real Input-widget code path.
+    """
+
+    @pytest.mark.asyncio
+    async def test_prefix_match_returns_suggestion(self):
+        s = CommandSuggester(["clean", "clear", "status"])
+        assert await s.get_suggestion("cle") == "clean"
+
+    @pytest.mark.asyncio
+    async def test_first_match_wins_on_ambiguous_prefix(self):
+        s = CommandSuggester(["clean", "clear"])
+        # "cl" matches both; registry order determines the pick (first wins).
+        assert await s.get_suggestion("cl") == "clean"
+
+    @pytest.mark.asyncio
+    async def test_exact_match_returns_none(self):
+        # Once the typed text equals a complete command name, don't ghost-append.
+        s = CommandSuggester(["clean", "status"])
+        assert await s.get_suggestion("clean") is None
+        assert await s.get_suggestion("status") is None
+
+    @pytest.mark.asyncio
+    async def test_no_match_returns_none(self):
+        s = CommandSuggester(["clean", "status"])
+        assert await s.get_suggestion("xyz") is None
+
+    @pytest.mark.asyncio
+    async def test_empty_input_returns_none(self):
+        s = CommandSuggester(["clean"])
+        assert await s.get_suggestion("") is None
+
+    @pytest.mark.asyncio
+    async def test_case_insensitive_via_casefold(self):
+        # The base class casefolds before calling get_suggestion; mirror that.
+        s = CommandSuggester(["status", "clean"])
+        assert await s.get_suggestion("STA".casefold()) == "status"
+
+    @pytest.mark.asyncio
+    async def test_real_registry_includes_core_commands(self):
+        # The suggester fed by the real registry must cover the common commands.
+        names = []
+        for cmd in _registry.robot:
+            names.append(cmd.name)
+            names.extend(cmd.aliases)
+        s = CommandSuggester(names)
+        assert await s.get_suggestion("cle") == "clean"
+        assert await s.get_suggestion("stat") == "status"
+        assert await s.get_suggestion("hel") == "help"
+
+
+# ── Pilot integration: inline ghost text ────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_typing_bare_prefix_shows_ghost_suggestion(connected_app):
+    app = connected_app
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#cmd-input")
+        await pilot.press("c", "l", "e")
+        await pilot.pause()
+
+        cmd_input = app.query_one("#cmd-input", Input)
+        # The greyed ghost suggestion is "clean" (the suffix after "cle").
+        assert cmd_input._suggestion == "clean"
+
+
+@pytest.mark.asyncio
+async def test_tab_accepts_ghost_suggestion(connected_app):
+    app = connected_app
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#cmd-input")
+        await pilot.press("c", "l", "e")
+        await pilot.pause()
+
+        await pilot.press("tab")
+        await pilot.pause()
+
+        cmd_input = app.query_one("#cmd-input", Input)
+        assert cmd_input.value == "clean"
+        assert cmd_input.cursor_at_end
+
+
+@pytest.mark.asyncio
+async def test_right_arrow_accepts_ghost_suggestion(connected_app):
+    app = connected_app
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#cmd-input")
+        await pilot.press("s", "t", "a")
+        await pilot.pause()
+
+        await pilot.press("right")
+        await pilot.pause()
+
+        cmd_input = app.query_one("#cmd-input", Input)
+        assert cmd_input.value == "status"
+
+
+@pytest.mark.asyncio
+async def test_exact_command_name_shows_no_ghost(connected_app):
+    """Typing a complete command name suppresses the suggestion."""
+    app = connected_app
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#cmd-input")
+        await pilot.press("c", "l", "e", "a", "n")
+        await pilot.pause()
+
+        cmd_input = app.query_one("#cmd-input", Input)
+        assert cmd_input._suggestion == ""
+
+
+@pytest.mark.asyncio
+async def test_slash_prefix_does_not_trigger_ghost(connected_app):
+    """Slash names are excluded from the ghost list — they use the popup."""
+    app = connected_app
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#cmd-input")
+        await pilot.press("/", "l", "o", "g")
+        await pilot.pause()
+
+        cmd_input = app.query_one("#cmd-input", Input)
+        # No ghost suggestion for slash commands (the popup handles them).
+        assert cmd_input._suggestion == ""
+
+
+@pytest.mark.asyncio
+async def test_tab_prefers_slash_popup_when_open(connected_app):
+    """When the slash popup is open, Tab fills the slash name, not ghost text."""
+    app = connected_app
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#cmd-input")
+        await pilot.press("/", "l", "o", "g")
+        await pilot.pause()
+        assert app._completion_matches  # slash popup is open
+
+        await pilot.press("tab")
+        await pilot.pause()
+
+        cmd_input = app.query_one("#cmd-input", Input)
+        # Tab filled the slash completion (/login ), not a bare-command ghost.
+        assert cmd_input.value == "/login "
+
+
+@pytest.mark.asyncio
+async def test_ghost_suggestion_not_shown_during_login_flow(connected_app):
+    """Ghost text must not appear during the email/password prompts."""
+    app = connected_app
+    app._account = None  # signed-out so /login starts the flow
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#cmd-input")
+        await pilot.press("/", "l", "o", "g", "i", "n")
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause()
+
+        # In the email-prompt state, typing a bare prefix shows no ghost.
+        await pilot.press("c", "l", "e")
+        await pilot.pause()
+        assert app.query_one("#cmd-input", Input)._suggestion == ""

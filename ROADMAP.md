@@ -2029,12 +2029,20 @@ real time as they type.
 
 ### Implementation
 
-The pure helpers live in `asher/completion.py` (`slash_matches`,
-`enter_completes`, `render_completion`) — no Textual imports, so they're
-unit-testable without an event loop. They read `_registry.slash` directly,
-making the registry the single source of truth for both dispatch and
-completion: any newly registered `SlashCommand` appears in the overlay
-automatically, with no per-command wiring.
+Two complementary completion modes share `asher/completion.py`:
+
+**Slash popup** (the `/` overlay above) — pure helpers `slash_matches`,
+`enter_completes`, `render_completion` read `_registry.slash` directly, so any
+newly registered `SlashCommand` appears in the overlay with no per-command
+wiring. No Textual imports, unit-testable without an event loop.
+
+**Inline ghost text** (bare commands) — `CommandSuggester(Suggester)` drives
+Textual's built-in `Input` suggestion rendering: typing a prefix (`cle`)
+shows the rest (`an`) greyed after the cursor via the `input--suggestion`
+component class, and `Right-arrow` / `Tab` accept it into `value`. Built from
+`_registry.robot` (names + aliases), so newly registered bare commands get
+ghost text with no extra wiring. Exact-match suppression (`name != value`)
+stops the ghost from appending to a complete word.
 
 The overlay is a `Static` widget (`#completion-overlay`) mounted inside
 `#main-area`. It uses Textual's `overlay: screen` CSS property (not

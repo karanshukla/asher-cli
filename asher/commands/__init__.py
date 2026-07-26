@@ -1378,9 +1378,14 @@ class CommandsMixin:
         self._dispatch_command(command, args)
 
     def on_input_changed(self, event: Input.Changed) -> None:
-        """Live-filter the slash-command completion overlay as the user types."""
+        """Live-filter the slash popup and clear ghost text as the user types."""
         if self._login.is_active:
+            # Suppress both completions during the email/password prompts —
+            # the suggester fires on every keystroke, so wipe its result too.
             self._hide_completion()
+            with contextlib.suppress(NoMatches):
+                app_input = self.query_one("#cmd-input", Input)  # type: ignore[attr-defined]
+                app_input._suggestion = ""  # type: ignore[attr-defined]
             return
         text = event.value
         # Only the first token is a command name; once a space is present the
@@ -1430,6 +1435,21 @@ class CommandsMixin:
         self._hide_completion()
         return True
 
+    def _accept_ghost(self) -> bool:
+        """Accept the inline ghost-text suggestion in the command bar.
+
+        Returns True if a suggestion was accepted (so the caller can swallow
+        the keypress). Mirrors the CmdInput's own Right-arrow acceptance: only
+        fires at cursor-end when a suggestion is showing.
+        """
+        cmd_input = self.query_one("#cmd-input", Input)  # type: ignore[attr-defined]
+        suggestion = getattr(cmd_input, "_suggestion", "") or ""
+        if suggestion and getattr(cmd_input, "cursor_at_end", False):
+            cmd_input.value = suggestion
+            cmd_input.cursor_position = len(cmd_input.value)
+            return True
+        return False
+
     def on_key(self, event) -> None:  # type: ignore[override]
         cmd_input = self.query_one("#cmd-input", Input)  # type: ignore[attr-defined]
         if not cmd_input.has_focus:
@@ -1461,6 +1481,13 @@ class CommandsMixin:
                 event.prevent_default()
                 self._accept_completion(append_space=True)
                 return
+
+        # Tab accepts the inline ghost-text suggestion when the slash popup is
+        # closed — same role as Right-arrow, but matching IDE muscle memory.
+        if event.key == "tab":
+            if self._accept_ghost():
+                event.prevent_default()
+            return
 
         if event.key == "up":
             event.prevent_default()

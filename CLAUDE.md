@@ -45,7 +45,7 @@ asher/
   mcp_bridge.py     asher-mcp-launch console script — keyring-backed pylitterbot MCP launcher
   faults.py         check_faults(robot) — model-scoped safety/component fault detection (status enum + per-model attr allowlist; hopper never a fault)
   history_view.py   HistoryScreen (ModalScreen) + format_history_rows() — scrollable activity-history pager pushed by the `history` command
-  completion.py     pure helpers for slash-command tab completion (slash_matches, enter_completes, render_completion) — fed by _registry.slash, no Textual imports
+  completion.py     pure helpers for command completion: slash popup (slash_matches, enter_completes, render_completion) + inline ghost text (CommandSuggester) — fed by _registry, no Textual imports except the Suggester base class
   __main__.py       main() entry point
   commands/
     base.py         Command ABC, SlashCommand, CommandRegistry
@@ -157,8 +157,8 @@ LoginScreen (ModalScreen) — available in auth.py but not the primary auth path
 | `_tick_cat()` | advances multi-frame cat animation every 0.4s |
 | `_dispatch_command(command, args)` | `@work` — calls `command.run(app, args)` from the registry |
 | `on_input_submitted()` | routes input to login flow or `_dispatch_command` via `CommandRegistry`; Enter on a partial `/cmd` completes it instead of submitting |
-| `on_input_changed()` | live-filters the `#completion-overlay` as the user types (slash commands only; hides once a space is present) |
-| `on_key()` | `↑`/`↓` history nav, plus completion nav (arrows cycle, `Tab`/`Enter` accept, `Esc` dismisses) while the overlay is open |
+| `on_input_changed()` | live-filters the `#completion-overlay` as the user types (slash commands only; hides once a space is present); also clears ghost text during the login flow |
+| `on_key()` | `↑`/`↓` history nav, plus completion nav (arrows cycle the slash popup, `Tab`/`Enter` accept, `Esc` dismisses); `Tab` also accepts the inline ghost-text suggestion when the popup is closed |
 | `_start_login_flow()` | begin inline email/password prompt in command bar |
 | `_cmd_logout()` | delete creds from keyring, disconnect |
 | `make_adapter(robot)` | factory in `robot_adapters.py` — returns correct `RobotAdapter` subclass |

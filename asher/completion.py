@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from rich.text import Text
+from textual.suggester import Suggester
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -86,3 +87,27 @@ def render_completion(matches: Sequence[Command], selected_idx: int) -> Text:
             line.append(f"  {cmd.description}", style="#484f58")
         lines.append(line)
     return Text("\n").join(lines)
+
+
+class CommandSuggester(Suggester):
+    """Inline ghost-text completer for bare robot commands (names + aliases).
+
+    Drives Textual's built-in ``Input`` suggestion rendering: typing a prefix
+    shows the rest of the matching command name greyed after the cursor, and
+    Right-arrow / Tab accept it into ``value``. Constructed from
+    ``_registry.robot`` so any newly registered bare command or alias gets
+    ghost-text suggestions with no extra wiring — mirroring how the slash
+    popup reads ``_registry.slash``.
+    """
+
+    def __init__(self, names: Sequence[str]) -> None:
+        super().__init__(use_cache=True, case_sensitive=False)
+        self._names = [n.casefold() for n in names]
+
+    async def get_suggestion(self, value: str) -> str | None:
+        if not value:
+            return None
+        for name in self._names:
+            if name.startswith(value) and name != value:
+                return name
+        return None
