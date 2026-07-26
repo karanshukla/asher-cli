@@ -10,18 +10,25 @@ from importlib.metadata import version as pkg_version
 from dotenv import load_dotenv
 from rich.text import Text
 from textual.app import ComposeResult
+from textual.binding import Binding
 from textual.containers import Container
 from textual.css.query import NoMatches
 from textual.widgets import Input, RichLog, Static
 
 from ..cats import CATS
+from ..completion import CommandSuggester
 from ..helpers import ts
 
 load_dotenv()
 
 
 class CmdInput(Input):
-    """Input with all focus borders and tints removed."""
+    """Input with all focus borders and tints removed.
+
+    Carries the bare-command ``CommandSuggester`` for inline ghost-text
+    completion; Tab accepts the suggestion (Right-arrow already does via
+    Textual's default ``action_cursor_right``).
+    """
 
     DEFAULT_CSS = (
         Input.DEFAULT_CSS
@@ -39,6 +46,15 @@ class CmdInput(Input):
     """
     )
 
+    BINDINGS = [
+        Binding("tab", "accept_suggestion", "Accept suggestion", show=False),
+    ]
+
+    def action_accept_suggestion(self) -> None:
+        if self._suggestion and self.cursor_at_end:
+            self.value = self._suggestion
+            self.cursor_position = len(self.value)
+
 
 if os.getenv("ASHER_CLI_DEV_MODE", "false").lower() == "true":
     VERSION = "dev"
@@ -49,6 +65,23 @@ else:
         VERSION = "dev"
 
 _SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+
+
+def _build_command_suggester() -> CommandSuggester:
+    """Build the inline ghost-text suggester from the live bare-command registry.
+
+    Reads ``_registry.robot`` (names + aliases) so newly registered commands
+    appear in ghost text with no extra wiring. Imported lazily to keep the
+    command module out of the UI import graph at module load.
+    """
+    from ..commands import _registry  # noqa: PLC0415
+
+    names: list[str] = []
+    for cmd in _registry.robot:
+        names.append(cmd.name)
+        names.extend(cmd.aliases)
+    return CommandSuggester(names)
+
 
 _CAT_PALETTES: dict[str, list[str]] = {
     "idle": ["#58a6ff", "#6cb0ff", "#7db8ff", "#6cb0ff"],
@@ -126,6 +159,7 @@ class UIMixin:
 
         with Container(id="main-area"):
             yield RichLog(id="log", highlight=True, markup=True, wrap=True, min_width=0)
+            yield Static("", id="completion-overlay")
             with Container(id="cat-panel"):
                 yield Static("", id="cat-fx")
                 yield Static(CATS["idle"][0], id="cat-art")  # type: ignore[arg-type]
@@ -136,7 +170,11 @@ class UIMixin:
         with Container(id="bottom-dock"):
             with Container(id="input-bar"), Container(id="input-row"):
                 yield Static(">", id="prompt")
-                yield CmdInput(placeholder="type a command  (help for list)…", id="cmd-input")
+                yield CmdInput(
+                    placeholder="type a command  (help for list)…",
+                    id="cmd-input",
+                    suggester=_build_command_suggester(),
+                )
             yield Static(
                 "help · clean · status · history · /login · /logout · quit",
                 id="hint-bar",

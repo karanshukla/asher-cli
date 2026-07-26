@@ -22,6 +22,8 @@ A Claude Code-style terminal dashboard for monitoring and controlling Litter Rob
 - Scrollable activity-history pager — `history [count|all]` opens a full-screen, paginated view (arrow keys, `Page Up`/`Page Down`, `Home`/`End`); `q`/`Esc`/`Enter` to close
 - Commands: `clean`, `status`, `info`, `lock`, `unlock`, `sleep`, `wake`, `night-light on|off|auto`, `night-light-brightness`, `wait-time`, `power on|off`, `rename`, `insight`, `sleep-schedule`, plus LR5 extras (`privacy`, `volume`, `camera-audio`, `drawer-reset`), `history [count|all]`, `export [days|month]`, `help`, `quit`
 - Slash commands for app management: `/login`, `/logout`, `/robots`, `/robot <index|name>`, `/pets`, `/pet <index|name>`, `/cat on|off|color <hex>`, `/refresh [seconds|off]`, `/config`, `/version`, `/mcp on|off|status`, `/exit`
+- Slash-command tab completion — type `/` and a Claude Code-style overlay lists matching commands; `↑`/`↓` to move, `Tab` or `Enter` to accept, `Esc` to dismiss
+- Inline ghost-text completion for bare commands — type a prefix (`cle`) and the rest (`an`) appears greyed; `Tab` or `→` to accept → `clean`
 - Cat animation panel that reacts to robot state
 - Command history (↑/↓ arrows)
 - Real-time updates via WebSocket; 5-minute poll fallback
@@ -119,7 +121,7 @@ LITTER_ROBOT_PASSWORD=yourpassword
 | `/mcp on\|off\|status` | Toggle the Litter-Robot MCP server entry in Claude Desktop |
 | `/exit` | Exit Asher CLI |
 
-**Keyboard shortcuts:** `Ctrl+L` clears the log, `Ctrl+C` quits.
+**Keyboard shortcuts:** `Ctrl+L` clears the log, `Ctrl+C` quits. While typing a `/` slash command, `↑`/`↓` move through completions, `Tab` or `Enter` accepts, `Esc` dismisses. While typing a bare command, a greyed ghost suggestion appears — `Tab` or `→` accepts it.
 
 ## Releasing
 

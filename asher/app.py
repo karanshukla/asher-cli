@@ -56,6 +56,8 @@ class AsherApp(UIMixin, ConnectionMixin, MonitoringMixin, CommandsMixin, App):  
         self._fault_dismissed: set[str] = set()
         self._cycle_start: Any = None
         self._cycle_timer: Timer | None = None
+        self._completion_matches: list = []
+        self._completion_idx: int = 0
 
     def on_mount(self) -> None:
         self._refresh_title()

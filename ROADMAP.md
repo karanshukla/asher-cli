@@ -1998,83 +1998,94 @@ cross-platform.
 
 ---
 
-## 23. Tab completion for slash commands
+## ~~23. Tab completion for slash commands~~ ✅
 
 Inspired by Claude Code's `/` menu — when the user types `/` into the command
-input, a completion overlay appears above the input bar listing all slash
-commands. Narrows in real time as they type.
+input, a completion overlay appears listing all slash commands and narrows in
+real time as they type.
 
-### Behaviour
+### Behaviour (shipped)
 
 ```
-/ro[b...]
+/lo[g...]
   ┌──────────────────────────────────────┐
-  │  /robot    switch active robot       │
-  │  /refresh  change poll interval      │
+  │  /login    sign in or switch accounts│   ← highlighted (selected)
+  │  /logout   sign out and re-enter ... │
   └──────────────────────────────────────┘
 ```
 
-- Overlay appears immediately on `/` keypress
-- Filtered as the user continues typing (prefix match)
-- `Tab` or `↓` moves focus into the list; `↑` moves back to the input
-- `Enter` on a completion fills the command; `Escape` dismisses without filling
-- Unknown `/xyz` commands fall through to `_run_slash_cmd` with the current
-  "unknown slash command" warning — completion is an enhancement, not a gate
+- Overlay appears immediately on `/` keypress (via `on_input_changed`)
+- Filtered as the user continues typing (case-insensitive prefix match against
+  `_registry.slash`)
+- `↑`/`↓` move the selection; `Tab` or `Enter` accept (filling `/name ` with a
+  trailing space ready for args); `Esc` dismisses without filling
+- Typing a space hides the overlay — completion covers only the command name,
+  not arguments
+- Enter on a *partial* command (`/log`) completes to `/login ` instead of
+  erroring as unknown; Enter on an *exact* match (`/login`, or `/pet` even
+  though it's a prefix of `/pets`) submits the command normally
+- Unknown `/xyz` commands still fall through to the "unknown slash command"
+  warning — completion is an enhancement, not a gate
 
-### Textual implementation
+### Implementation
 
-A `ListView` (or plain `Container` of `Static` rows) mounted in `#main-area`
-or just above `#input-bar`, hidden by default. Shown/hidden reactively as the
-`Input.Changed` event fires:
+Two complementary completion modes share `asher/completion.py`:
 
-```python
-def on_input_changed(self, event: Input.Changed) -> None:
-    raw = event.value
-    overlay = self.query_one("#completion-overlay")
-    if raw.startswith("/") and len(raw) > 0:
-        prefix = raw[1:].lower()
-        matches = [cmd for cmd in SLASH_COMMANDS if cmd.startswith(prefix)]
-        overlay.display = bool(matches)
-        # rebuild rows...
-    else:
-        overlay.display = False
-```
+**Slash popup** (the `/` overlay above) — pure helpers `slash_matches`,
+`enter_completes`, `render_completion` read `_registry.slash` directly, so any
+newly registered `SlashCommand` appears in the overlay with no per-command
+wiring. No Textual imports, unit-testable without an event loop.
 
-`SLASH_COMMANDS` is a dict `{name: description}` imported from
-`asher/slash-commands/__init__.py`, making the registry the single source of
-truth for both dispatch and completion.
+**Inline ghost text** (bare commands) — `CommandSuggester(Suggester)` drives
+Textual's built-in `Input` suggestion rendering: typing a prefix (`cle`)
+shows the rest (`an`) greyed after the cursor via the `input--suggestion`
+component class, and `Right-arrow` / `Tab` accept it into `value`. Built from
+`_registry.robot` (names + aliases), so newly registered bare commands get
+ghost text with no extra wiring. Exact-match suppression (`name != value`)
+stops the ghost from appending to a complete word.
 
-### CSS sketch
+The overlay is a `Static` widget (`#completion-overlay`) mounted inside
+`#main-area`. It uses Textual's `overlay: screen` CSS property (not
+`dock + layer`, which reserves layout space) to float over `#log`'s last rows
+without squeezing the log while hidden — verified against the Textual 8.x
+source and runtime. `#main-area` declares `layers: base overlay` so the
+overlay paints above the log; unstyled children (`#log`, `#cat-panel`) land on
+the base layer automatically. Toggling is via `widget.display` plus a content
+`update()` from `render_completion()` (one `Text` block, one row per match,
+selected row inverted to white-on-accent-blue).
+
+Navigation is handled in `CommandsMixin.on_key`: while the overlay is open,
+`↑`/`↓`/`Tab`/`Esc`/`Enter` are intercepted (with `event.prevent_default()`)
+and take precedence over history navigation; once closed, `↑`/`↓` revert to
+the existing command-history behaviour. The overlay is suppressed during the
+inline login flow so it doesn't fight the email/password prompts.
+
+### CSS (live in `asher/ui/style.tcss`)
 
 ```css
+#main-area {
+    layout: horizontal;
+    height: 1fr;
+    layers: base overlay;
+}
+
 #completion-overlay {
+    layer: overlay;
+    overlay: screen;          /* floats over #log without reserving space */
     dock: bottom;
-    offset-y: -3;          /* sit just above the input bar */
-    background: #161b22;
-    border: solid #30363d;
-    width: 48;
     height: auto;
     max-height: 8;
+    background: #161b22;
+    border: solid #30363d;
     padding: 0 1;
     display: none;
-    layer: overlay;
-}
-
-.completion-row {
-    height: 1;
-    padding: 0 1;
-    color: #e6edf3;
-}
-
-.completion-row.--highlight {
-    background: #1f6feb33;
-    color: #58a6ff;
-}
-
-.completion-desc {
-    color: #484f58;
 }
 ```
+
+Unit + Pilot tests live in `tests/test_completion.py` (31 cases: pure
+matching/enter-decision/rendering, plus Pilot-driven overlay visibility,
+filtering, arrow-key selection, Tab/Esc/Enter behaviour, and suppression
+during the login flow).
 
 ---
 
@@ -2336,7 +2347,7 @@ Ranked by user-visible impact vs. implementation effort:
 2. ~~**`export` command**~~ ✅ (§2) — activity history to CSV; writes to `~/Downloads`, opens folder in OS explorer
 3. ~~**`/pet` slash command**~~ ✅ (§1, §14) — `/pet` lists, `/pet <idx|name>` switches; `_active_pet_idx` persists for session
 4. ~~**`/cat`, `/refresh`, `/config` slash commands**~~ ✅ (§1) — cat panel toggle + colour, poll interval control, runtime config dump
-5. **Tab-completion for slash commands** (§23) — Claude Code-style overlay dropdown on `/` keypress; single-source registry drives both dispatch and completion
+5. ~~**Tab-completion for slash commands** (§23)~~ ✅ — Claude Code-style overlay dropdown on `/` keypress; single-source registry drives both dispatch and completion
 6. ~~**`/version` slash command** (§24)~~ ✅ — prints asher-cli / Python / pylitterbot / textual versions to the log via `importlib.metadata`, with a `"?"` fallback when not installed; model badge in the status bar was already done
 7. ~~**`wait-time`, `power`, `rename`, `insight` commands** (§3)~~ ✅ — all four wired up; plus the `status`/`info` split (`status` trimmed to at-a-glance, `info` is the full property dump). `panel-brightness` skipped (not exposed by pylitterbot 2025.6.2); `reset`/`reset-settings`/`firmware`-update deliberately omitted as destructive
 8. ~~**Sleep schedule viewer** (§8)~~ ✅ — `sleep-schedule` (alias `sleepschedule`) renders the per-day sleep/wake window read-only, sorted Mon→Sun, with an active-window `● now` marker; config wizard/set/disable still TODO

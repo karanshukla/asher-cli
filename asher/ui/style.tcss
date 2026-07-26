@@ -41,6 +41,7 @@ Screen {
 #main-area {
     layout: horizontal;
     height: 1fr;
+    layers: base overlay;
 }
 
 #log {
@@ -52,6 +53,22 @@ Screen {
     scrollbar-background: #161b22;
     scrollbar-color: #30363d;
     scrollbar-color-hover: #58a6ff;
+}
+
+/* ── Slash-command completion overlay ── */
+/* overlay: screen floats the widget over #log's last rows without reserving
+   layout space, so the log isn't squeezed while the overlay is hidden. */
+#completion-overlay {
+    layer: overlay;
+    overlay: screen;
+    dock: bottom;
+    min-width: 0;
+    height: auto;
+    max-height: 8;
+    background: #161b22;
+    border: solid #30363d;
+    padding: 0 1;
+    display: none;
 }
 
 /* ── Cat panel ── */

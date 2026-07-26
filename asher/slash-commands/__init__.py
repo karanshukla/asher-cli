@@ -31,4 +31,13 @@ To add a new slash command
 3. Register an instance in `_registry`.
 
 Remember to also update the slash-command table in `README.md`.
+
+Tab completion
+--------------
+Slash commands get Claude Code-style completion for free: typing `/` opens a
+floating overlay (`#completion-overlay`) that filters the registry in real time.
+`↑`/`↓` move the selection, `Tab` or `Enter` accept (filling `/name ` ready for
+args), and `Esc` dismisses. No per-command wiring is needed — the pure helpers
+in `asher/completion.py` read `_registry.slash` directly, so any newly
+registered `SlashCommand` appears in the overlay automatically.
 """
