@@ -156,6 +156,19 @@ Exit codes for scripting:
 asher.exe --export 7 --output C:\Users\me\litter-history.csv
 ```
 
+## Configuration
+
+Runtime settings persist across restarts in `~/.asher-cli/config.json`, so you don't have to re-apply `/refresh 60`, `/cat color #ff79c6`, or `/pet 1` every launch. The file is auto-created on first change and holds four non-secret UI preferences:
+
+| Setting | Slash command | Default |
+|---|---|---|
+| `poll_interval_seconds` | `/refresh <seconds\|off>` | `300` |
+| `cat_panel_visible` | `/cat on\|off` | `true` |
+| `cat_panel_color` | `/cat color <hex>\|reset` | `null` (default palette) |
+| `active_pet_index` | `/pet <index\|name>` | `0` |
+
+Credentials and the preferred-robot serial stay in the OS keyring; `.env` vars stay as env vars. You generally don't need to edit the file by hand — just use the slash commands — but it's plain JSON and safe to inspect or delete (deleting it restores defaults).
+
 ## Releasing
 
 ```bash
@@ -265,6 +278,8 @@ CI runs on Python 3.10 / 3.11 / 3.12 across Ubuntu, Windows, and macOS on every 
 ## Changelog
 
 ### Unreleased
+
+- **Config persistence** — runtime settings (`/refresh`, `/cat`, `/pet`) now survive restarts via `~/.asher-cli/config.json`. The file is auto-created on first change and holds four non-secret UI preferences; credentials stay in the keyring.
 
 ### v0.2.0 — 2026-07-27
 

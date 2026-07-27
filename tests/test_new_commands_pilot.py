@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from asher.app import AsherApp
+from asher.config import _DEFAULTS
 from asher.robot_adapters import LR3Adapter
 
 
@@ -28,7 +29,8 @@ def connected_app():
     robot.refresh = AsyncMock()
     robot.get_activity_history = AsyncMock(return_value=[])
 
-    app = AsherApp()
+    with patch("asher.config.load", return_value=dict(_DEFAULTS)):
+        app = AsherApp()
     app._robot = robot
     app._adapter = LR3Adapter(robot)
     app._account = MagicMock()

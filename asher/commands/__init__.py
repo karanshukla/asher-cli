@@ -58,6 +58,21 @@ def _status_text(status: object) -> str:
     return str(status)
 
 
+def _persist(app: AsherApp, **changes: object) -> None:
+    """Persist a runtime setting to ``~/.asher-cli/config.json``.
+
+    A read-only filesystem (container, restricted environment) must not break
+    the in-session command, so filesystem errors degrade to a warning log
+    rather than raising.
+    """
+    from ..config import update  # noqa: PLC0415
+
+    try:
+        update(**changes)
+    except OSError:
+        app._log_warn("Could not save setting (filesystem read-only?)")
+
+
 _CYCLING_STATUSES = frozenset(
     {
         LitterBoxStatus.CLEAN_CYCLE,
@@ -853,6 +868,7 @@ class PetCommand(SlashCommand):
             idx = int(target)
             if 0 <= idx < len(pets):
                 app._active_pet_idx = idx
+                _persist(app, active_pet_index=idx)
                 name = getattr(pets[idx], "name", str(idx))
                 app._log_ok(f"Showing pet: {name}")
                 await app._refresh_status()
@@ -867,6 +883,7 @@ class PetCommand(SlashCommand):
                 app._log_warn(f"No pet matching '{target}' - use /pet to list")
                 return
             app._active_pet_idx = match
+            _persist(app, active_pet_index=match)
             name = getattr(pets[match], "name", str(match))
             app._log_ok(f"Showing pet: {name}")
             await app._refresh_status()
@@ -885,10 +902,12 @@ class CatCommand(SlashCommand):
         if sub == "off":
             app.query_one("#cat-panel").display = False
             app._cat_panel_visible = False
+            _persist(app, cat_panel_visible=False)
             app._log_ok("Cat panel hidden")
         elif sub == "on":
             app.query_one("#cat-panel").display = True
             app._cat_panel_visible = True
+            _persist(app, cat_panel_visible=True)
             app._log_ok("Cat panel visible")
         elif sub == "color":
             if len(args) < 2:
@@ -898,10 +917,12 @@ class CatCommand(SlashCommand):
             if not color.startswith("#"):
                 color = f"#{color}"
             app._cat_color = color
+            _persist(app, cat_panel_color=color)
             app._set_cat(app._cat_mode, getattr(app, "_cat_label", ""))
             app._log_ok(f"Cat color set to {color}")
         elif sub == "reset":
             app._cat_color = None
+            _persist(app, cat_panel_color=None)
             app._set_cat(app._cat_mode, getattr(app, "_cat_label", ""))
             app._log_ok("Cat color reset to default")
         else:
@@ -929,6 +950,7 @@ class RefreshCommand(SlashCommand):
                 poll_timer.stop()
                 app._poll_timer = None
             app._poll_interval = 0
+            _persist(app, poll_interval_seconds=0)
             app._log_ok("Auto-refresh disabled")
             return
 
@@ -942,6 +964,7 @@ class RefreshCommand(SlashCommand):
             poll_timer.stop()
         app._poll_timer = app.set_interval(seconds, app._poll_status_interval)
         app._poll_interval = seconds
+        _persist(app, poll_interval_seconds=seconds)
         app._log_ok(f"Auto-refresh set to every {seconds}s")
 
 
