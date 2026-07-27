@@ -891,11 +891,11 @@ class PetCommand(SlashCommand):
 
 class CatCommand(SlashCommand):
     name = "cat"
-    description = "on|off|color <hex>  configure the cat panel"
+    description = "on|off|colour <hex>  configure the cat panel"
 
     async def run(self, app: AsherApp, args: list[str]) -> None:
         if not args:
-            app._log_info("Usage: /cat on|off|color <hex>")
+            app._log_info("Usage: /cat on|off|colour <hex>")
             return
 
         sub = args[0].lower()
@@ -909,9 +909,9 @@ class CatCommand(SlashCommand):
             app._cat_panel_visible = True
             _persist(app, cat_panel_visible=True)
             app._log_ok("Cat panel visible")
-        elif sub == "color":
+        elif sub in ("colour", "color"):
             if len(args) < 2:
-                app._log_warn("Usage: /cat color <hex>  e.g. /cat color #ff79c6")
+                app._log_warn("Usage: /cat colour <hex>  e.g. /cat colour #ff79c6")
                 return
             color = args[1]
             if not color.startswith("#"):
@@ -919,14 +919,14 @@ class CatCommand(SlashCommand):
             app._cat_color = color
             _persist(app, cat_panel_color=color)
             app._set_cat(app._cat_mode, getattr(app, "_cat_label", ""))
-            app._log_ok(f"Cat color set to {color}")
+            app._log_ok(f"Cat colour set to {color}")
         elif sub == "reset":
             app._cat_color = None
             _persist(app, cat_panel_color=None)
             app._set_cat(app._cat_mode, getattr(app, "_cat_label", ""))
-            app._log_ok("Cat color reset to default")
+            app._log_ok("Cat colour reset to default")
         else:
-            app._log_warn("Usage: /cat on|off|color <hex>")
+            app._log_warn("Usage: /cat on|off|colour <hex>")
 
 
 class RefreshCommand(SlashCommand):
