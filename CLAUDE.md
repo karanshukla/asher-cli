@@ -45,12 +45,13 @@ asher/
   mcp_bridge.py     asher-mcp-launch console script — keyring-backed pylitterbot MCP launcher
   faults.py         check_faults(robot) — model-scoped safety/component fault detection (status enum + per-model attr allowlist; hopper never a fault)
   history_view.py   HistoryScreen (ModalScreen) + format_history_rows() — scrollable activity-history pager pushed by the `history` command
+  export.py         shared activity-history CSV core + headless export path: build_history_csv(), resolve_dest(), resolve_robot(), _run_headless_export(), ExportError — no Textual imports; both the TUI `export` command and `asher --export` call build_history_csv()
   completion.py     pure helpers for command completion: slash popup (slash_matches, enter_completes, render_completion) + inline ghost text (CommandSuggester) — fed by _registry, no Textual imports except the Suggester base class
   __main__.py       main() entry point
   commands/
     base.py         Command ABC, SlashCommand, CommandRegistry
     __init__.py     CommandsMixin — all command classes + registry + dispatch
-  connection/       ConnectionMixin — keyring auth, _connect_worker, keyring helpers
+  connection/       ConnectionMixin — keyring auth, _connect_worker, keyring helpers, _connect_headless() (no-UI auth for `asher --export`)
   monitoring/       MonitoringMixin — _poll_status_interval, _refresh_status
   ui/               UIMixin — CSS, compose(), log helpers, cat helpers
   slash-commands/   Convention doc
@@ -71,6 +72,7 @@ tests/
   test_mcp_command.py     /mcp slash command dispatch
   test_faults.py          check_faults() — safety statuses, attribute faults, graceful degradation
   test_history_view.py    format_history_rows() + HistoryScreen structure + Pilot push/dismiss
+  test_export.py          build_history_csv/resolve_dest/resolve_robot/parse_days (pure) + headless _run_headless_export (no Pilot, mocks _connect_headless)
   test_completion.py      slash_matches/enter_completes/render_completion (pure) + Pilot overlay visibility/navigation/accept
 
 .github/workflows/

@@ -24,6 +24,7 @@ A Claude Code-style terminal dashboard for monitoring and controlling Litter Rob
 - Slash commands for app management: `/login`, `/logout`, `/robots`, `/robot <index|name>`, `/pets`, `/pet <index|name>`, `/cat on|off|color <hex>`, `/refresh [seconds|off]`, `/config`, `/version`, `/mcp on|off|status`, `/exit`
 - Slash-command tab completion — type `/` and a Claude Code-style overlay lists matching commands; `↑`/`↓` to move, `Tab` or `Enter` to accept, `Esc` to dismiss
 - Inline ghost-text completion for bare commands — type a prefix (`cle`) and the rest (`an`) appears greyed; `Tab` or `→` to accept → `clean`
+- Headless export — `asher --export 7` writes activity history to CSV from cron / Task Scheduler / SSH without launching the TUI
 - Cat animation panel that reacts to robot state
 - Command history (↑/↓ arrows)
 - Real-time updates via WebSocket; 5-minute poll fallback
@@ -122,6 +123,38 @@ LITTER_ROBOT_PASSWORD=yourpassword
 | `/exit` | Exit Asher CLI |
 
 **Keyboard shortcuts:** `Ctrl+L` clears the log, `Ctrl+C` quits. While typing a `/` slash command, `↑`/`↓` move through completions, `Tab` or `Enter` accepts, `Esc` dismisses. While typing a bare command, a greyed ghost suggestion appears — `Tab` or `→` accepts it.
+
+### Headless export (cron / Task Scheduler / SSH)
+
+`--export` writes the same CSV as the `export` command **without launching the TUI** — so you can script activity-history exports from cron, Windows Task Scheduler, or a server over SSH. No flags launches the interactive dashboard as before.
+
+```bash
+asher --export 7                         export last 7 days to ~/Downloads
+asher --export 7 --output ~/hist.csv     explicit output path
+asher --export month --robot "Asher 2"   30 days (Whisker ceiling) for a specific robot
+```
+
+`--robot` accepts an index or a partial, case-insensitive name (defaults to your saved preferred robot, else the first). Credentials use the same keyring → `.env` priority as the TUI, but with **no interactive login prompt** — a scheduled task can't type a password, so sign in once with `/login` first.
+
+Exit codes for scripting:
+
+| Code | Meaning |
+|---|---|
+| `0` | export succeeded |
+| `1` | no credentials found (keyring or `.env`) |
+| `2` | connection or API failure |
+| `3` | failed to write the CSV (permissions, disk full) |
+| `4` | `--robot` matched no robot on the account |
+
+```bash
+# crontab — nightly export at 03:00
+0 3 * * * /usr/bin/env asher --export 7 --output /home/me/litter-history.csv >> /var/log/asher-export.log 2>&1
+```
+
+```powershell
+# Windows Task Scheduler action
+asher.exe --export 7 --output C:\Users\me\litter-history.csv
+```
 
 ## Releasing
 
@@ -233,6 +266,7 @@ CI runs on Python 3.10 / 3.11 / 3.12 across Ubuntu, Windows, and macOS on every 
 
 ### Unreleased
 
+- **Headless export** — `asher --export 7` writes activity history to CSV without launching the TUI, for cron / Task Scheduler / SSH. `--output` and `--robot <index|name>` flags select the destination and robot; documented exit codes for scripting.
 - **Activity-history pager** — `history` now opens a full-screen, scrollable view instead of dumping into the main log. Page through long histories with the arrow keys / `Page Up`/`Page Down` / `Home`/`End`; `q`, `Esc`, or `Enter` closes it. Accepts an optional event count (`history 100`) or `all` (default: 50).
 
 ### v0.1.1

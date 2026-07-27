@@ -4,11 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import csv
 import os
 import subprocess
 import sys
-from datetime import datetime, time, timedelta, timezone
+from datetime import time
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as pkg_version
 from pathlib import Path
@@ -25,8 +24,8 @@ from textual import work
 from textual.css.query import NoMatches
 from textual.widgets import Input, RichLog, Static
 
-from ..activity_labels import ACTION_LABELS, activity_raw_text
 from ..completion import enter_completes, render_completion, slash_matches
+from ..export import ExportError, build_history_csv, resolve_dest
 from ..helpers import fmt_ago, robot_model, ts
 from ..history_view import HistoryScreen
 from ..login_flow import LoginFlow, LoginState
@@ -1168,75 +1167,16 @@ def _open_folder(path: Path) -> None:
 
 async def _run_export(app: AsherApp, days: int) -> None:
     assert app._robot is not None
+    dest = resolve_dest(app._robot, None)
     app._log_info(f"Fetching history (last {days} days)…")
     try:
-        acts = await app._robot.get_activity_history(limit=500)
-    except Exception as exc:
-        app._log_err(f"Failed to fetch history: {exc}")
-        return
-
-    cutoff = datetime.now(tz=timezone.utc) - timedelta(days=days)
-    filtered = []
-    for act in acts:
-        ts_dt = getattr(act, "timestamp", None)
-        if ts_dt is None:
-            continue
-        if ts_dt.tzinfo is None:
-            ts_dt = ts_dt.replace(tzinfo=timezone.utc)
-        if ts_dt >= cutoff:
-            filtered.append((act, ts_dt))
-    filtered.sort(key=lambda x: x[1])
-
-    serial = getattr(app._robot, "serial", "unknown")
-    robot_name = getattr(app._robot, "name", "—")
-    date_str = datetime.now().strftime("%Y-%m-%d")
-    filename = f"asher-{serial}-{date_str}.csv"
-
-    downloads = Path.home() / "Downloads"
-    if downloads.exists():
-        dest = downloads / filename
-    else:
-        fallback = Path.home() / "Documents" / "asher-cli"
-        fallback.mkdir(parents=True, exist_ok=True)
-        dest = fallback / filename
-
-    app._log_info(f"Writing {filename}… {len(filtered)} events")
-    try:
-        with dest.open("w", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            writer.writerow(
-                [
-                    "timestamp",
-                    "event",
-                    "raw_event",
-                    "weight_lb",
-                    "pet_name",
-                    "robot_name",
-                    "robot_serial",
-                ]
-            )
-            from tzlocal import get_localzone  # noqa: PLC0415
-
-            local_tz = get_localzone()
-            for act, ts_dt in filtered:
-                local_dt = ts_dt.astimezone(local_tz)
-                iso_ts = local_dt.isoformat()
-                raw_str = activity_raw_text(act)
-                label, _ = ACTION_LABELS.get(raw_str.lower(), (raw_str, ""))
-                weight = getattr(act, "weight", None)
-                weight_str = f"{float(weight):.1f}" if weight is not None else ""
-                pet_id = getattr(act, "pet_id", None)
-                pet_name = next(
-                    (getattr(p, "name", "") for p in app._pets if getattr(p, "id", None) == pet_id),
-                    "",
-                )
-                writer.writerow([iso_ts, label, raw_str, weight_str, pet_name, robot_name, serial])
-    except Exception as exc:
-        app._log_err(f"Failed to write CSV: {exc}")
-        app._log_info(f"Try: {Path.home() / filename}")
+        count = await build_history_csv(app._robot, app._pets, days, dest)
+    except ExportError as exc:
+        app._log_err(str(exc))
         return
 
     app._log_ok(f"Saved → {dest}")
+    app._log_info(f"{count} events")
     app._log_info("Opening folder…")
     _open_folder(dest)
 
