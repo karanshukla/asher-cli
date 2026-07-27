@@ -15,7 +15,7 @@ Current state, missing functionality, and suggested additions — grounded in wh
 | Status bar second row — drawer %, litter %, cat weight (with pet name), last visit | ✅ |
 | Pet name from Whisker account profile | ✅ |
 | Commands: clean, status, info, lock, unlock, sleep, wake, night-light on/off/auto, night-light-brightness, wait-time, power on/off, rename, insight, privacy on/off, volume, camera-audio on/off, drawer-reset (LR5 extras via adapter; gracefully refused on LR3/LR4), history, export [days\|month], help, clear, quit | ✅ |
-| Slash commands: `/login`, `/logout`, `/exit`, `/help`, `/robots`, `/robot <index\|name>`, `/pets`, `/pet <index\|name>`, `/cat on\|off\|color <hex>`, `/refresh [seconds\|off]`, `/config`, `/mcp on\|off\|status` | ✅ |
+| Slash commands: `/login`, `/logout`, `/exit`, `/help`, `/robots`, `/robot <index\|name>`, `/pets`, `/pet <index\|name>`, `/cat on\|off\|colour <hex>`, `/refresh [seconds\|off]`, `/config`, `/mcp on\|off\|status` | ✅ |
 | MCP bridge — keyring-backed `pylitterbot[mcp]` launcher, auto-installs the extra, writes/removes the Claude Desktop config entry (incl. Windows MSIX path) | ✅ |
 | Inline login flow (email → password in command bar, no restart) | ✅ |
 | `LoginScreen` modal (`auth.py`) — available for future use | ✅ |
@@ -66,7 +66,7 @@ keyring and the connection is re-established — no restart needed.
 ```
 /cat off              hide the cat panel entirely (more log space)
 /cat on               show the cat panel
-/cat color <hex>      change the cat art colour (#58a6ff default)
+/cat colour <hex>     change the cat art colour (color also accepted)
 /cat reset            revert to default palette colours
 ```
 

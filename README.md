@@ -21,7 +21,7 @@ A Claude Code-style terminal dashboard for monitoring and controlling Litter Rob
 - Cat panel with mode label + status badges (status chip, lock, night light, sleep, wait time) under the art
 - Scrollable activity-history pager — `history [count|all]` opens a full-screen, paginated view (arrow keys, `Page Up`/`Page Down`, `Home`/`End`); `q`/`Esc`/`Enter` to close
 - Commands: `clean`, `status`, `info`, `lock`, `unlock`, `sleep`, `wake`, `night-light on|off|auto`, `night-light-brightness`, `wait-time`, `power on|off`, `rename`, `insight`, `sleep-schedule`, plus LR5 extras (`privacy`, `volume`, `camera-audio`, `drawer-reset`), `history [count|all]`, `export [days|month]`, `help`, `quit`
-- Slash commands for app management: `/login`, `/logout`, `/robots`, `/robot <index|name>`, `/pets`, `/pet <index|name>`, `/cat on|off|color <hex>`, `/refresh [seconds|off]`, `/config`, `/version`, `/mcp on|off|status`, `/exit`
+- Slash commands for app management: `/login`, `/logout`, `/robots`, `/robot <index|name>`, `/pets`, `/pet <index|name>`, `/cat on|off|colour <hex>`, `/refresh [seconds|off]`, `/config`, `/version`, `/mcp on|off|status`, `/exit`
 - Slash-command tab completion — type `/` and a Claude Code-style overlay lists matching commands; `↑`/`↓` to move, `Tab` or `Enter` to accept, `Esc` to dismiss
 - Inline ghost-text completion for bare commands — type a prefix (`cle`) and the rest (`an`) appears greyed; `Tab` or `→` to accept → `clean`
 - Headless export — `asher --export 7` writes activity history to CSV from cron / Task Scheduler / SSH without launching the TUI
@@ -115,7 +115,7 @@ LITTER_ROBOT_PASSWORD=yourpassword
 | `/pets` | List all pets on the account |
 | `/pet <index\|name>` | Switch which pet's name/weight shows in the status bar |
 | `/cat on\|off` | Show or hide the cat animation panel |
-| `/cat color <hex>` | Change the cat art colour (e.g. `/cat color #ff79c6`); `/cat reset` to revert |
+| `/cat colour <hex>` | Change the cat art colour (e.g. `/cat colour #ff79c6`); `color` also accepted; `/cat reset` to revert |
 | `/refresh [seconds\|off]` | Change the auto-poll interval or disable it (`/refresh 60`, `/refresh off`) |
 | `/config` | Show current runtime settings (robot, refresh rate, cat panel, active pet) |
 | `/version` | Show version info (asher-cli, Python, pylitterbot, textual) |

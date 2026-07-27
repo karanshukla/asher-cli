@@ -103,6 +103,20 @@ async def test_cat_color_sets_override(connected_app):
 
 
 @pytest.mark.asyncio
+async def test_cat_colour_sets_override(connected_app):
+    """British spelling is the documented default; both spellings must work."""
+    async with connected_app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#cmd-input")
+        for ch in "/cat colour #ff79c6":
+            await pilot.press(ch)
+        await pilot.press("enter")
+        await pilot.pause()
+
+        assert connected_app._cat_color == "#ff79c6"
+
+
+@pytest.mark.asyncio
 async def test_cat_reset_clears_color(connected_app):
     connected_app._cat_color = "#ff0000"
     async with connected_app.run_test() as pilot:

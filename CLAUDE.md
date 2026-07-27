@@ -114,7 +114,7 @@ pylitterbot ships an optional MCP server (`pip install pylitterbot[mcp]`, run vi
 `clean`, `status`, `info`, `lock`, `unlock`, `sleep`, `wake`, `night-light on|off|auto`, `night-light-brightness <level>`, `wait-time <minutes>`, `power on|off`, `rename <name>`, `insight [days|month]`, `sleep-schedule`, `privacy on|off`, `volume <0-100>`, `camera-audio on|off`, `drawer-reset`, `history [count|all]`, `export [days|month]`, `clear`, `help`, `quit`
 
 **Slash commands** (`/` prefix) — app management only:
-`/login`, `/logout`, `/robots`, `/robot <index|name>`, `/pets`, `/pet <index|name>`, `/cat on|off|color <hex>`, `/refresh [seconds|off]`, `/config`, `/version`, `/mcp on|off|status`, `/exit`
+`/login`, `/logout`, `/robots`, `/robot <index|name>`, `/pets`, `/pet <index|name>`, `/cat on|off|colour <hex>`, `/refresh [seconds|off]`, `/config`, `/version`, `/mcp on|off|status`, `/exit`
 
 `/refresh`, `/cat`, and `/pet` persist their settings to `~/.asher-cli/config.json` (via `asher.config.update()`), so they survive restarts. Credentials and the preferred-robot serial stay in the OS keyring; the config file holds only non-secret UI preferences.
 

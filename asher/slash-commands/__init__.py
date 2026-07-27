@@ -17,7 +17,7 @@ authoritative, always-up-to-date list is the registry itself — run
     /robot <index|name>    switch active robot (persists to keyring)
     /pets                  list all pets on the account
     /pet <index|name>      switch which pet's name/weight shows in the status bar
-    /cat on|off|color ...  show/hide the cat panel, or recolour the art
+    /cat on|off|colour ... show/hide the cat panel, or recolour the art
     /refresh [seconds|off] change the auto-poll interval or disable it
     /config                show current runtime settings
     /version               show asher-cli / Python / pylitterbot / textual versions
