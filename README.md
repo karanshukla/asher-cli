@@ -266,6 +266,8 @@ CI runs on Python 3.10 / 3.11 / 3.12 across Ubuntu, Windows, and macOS on every 
 
 ### Unreleased
 
+### v0.2.0 — 2026-07-27
+
 - **Headless export** — `asher --export 7` writes activity history to CSV without launching the TUI, for cron / Task Scheduler / SSH. `--output` and `--robot <index|name>` flags select the destination and robot; documented exit codes for scripting.
 - **Activity-history pager** — `history` now opens a full-screen, scrollable view instead of dumping into the main log. Page through long histories with the arrow keys / `Page Up`/`Page Down` / `Home`/`End`; `q`, `Esc`, or `Enter` closes it. Accepts an optional event count (`history 100`) or `all` (default: 50).
 
