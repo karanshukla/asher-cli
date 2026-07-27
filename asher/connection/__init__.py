@@ -24,6 +24,18 @@ load_dotenv()
 _SERVICE = "asher-cli"
 
 
+class HeadlessAuthError(Exception):
+    """Raised when the headless path can't obtain credentials or connect.
+
+    Carries the exit code the caller should surface (matches ROADMAP §25):
+    1 = no credentials, 2 = connection/API failure.
+    """
+
+    def __init__(self, message: str, code: int) -> None:
+        super().__init__(message)
+        self.code = code
+
+
 def _keyring_available() -> bool:
     try:
         keyring.get_keyring()
@@ -257,3 +269,54 @@ class ConnectionMixin:
         log.write(t)
         self._set_cat("happy", "connected!")  # type: ignore[attr-defined]
         return True
+
+
+async def _connect_headless() -> Any:
+    """Connect for the headless CLI (``asher --export``) — no TUI, no prompts.
+
+    Same credential priority as ``_connect_worker`` — cached OAuth token first,
+    then email/password from the OS keyring → ``.env`` — but with **no interactive
+    login fallback** (there's no command bar to type into). A scheduled task's
+    environment can't be assumed to match the project dir, so ``.env`` discovery
+    relies on the ``load_dotenv()`` already called at import time rather than an
+    upward directory search.
+
+    Returns a connected ``Account`` on success. Raises :class:`HeadlessAuthError`
+    (exit code 1 = no credentials, 2 = connection failure) otherwise — the caller
+    maps those to process exit codes.
+    """
+    from pylitterbot import Account  # noqa: PLC0415
+
+    # Token first: faster startup and avoids password exposure, mirroring
+    # _try_token_connect. A stale token is wiped so a poisoned token can't loop.
+    token = _keyring_load_token()
+    if token:
+        try:
+            account = Account(token=token, token_update_callback=_keyring_save_token)
+            await account.connect(load_robots=True, load_pets=True)
+            return account
+        except Exception:
+            _keyring_save_token(None)
+            with contextlib.suppress(Exception):
+                await account.disconnect()  # type: ignore[possibly-undefined]
+
+    email, password = "", ""
+    if _keyring_available():
+        email, password = _keyring_load()
+    if not email or not password:
+        email = email or os.getenv("LITTER_ROBOT_USER") or ""
+        password = password or os.getenv("LITTER_ROBOT_PASSWORD") or ""
+
+    if not email or not password:
+        raise HeadlessAuthError(
+            "No credentials found. Run asher-cli and sign in with /login at least "
+            "once, or set LITTER_ROBOT_USER / LITTER_ROBOT_PASSWORD in .env.",
+            1,
+        )
+
+    try:
+        account = Account(token_update_callback=_keyring_save_token)
+        await account.connect(username=email, password=password, load_robots=True, load_pets=True)
+    except Exception as exc:
+        raise HeadlessAuthError(f"Connection failed: {exc}", 2) from exc
+    return account
