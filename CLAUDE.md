@@ -37,6 +37,7 @@ asher/
   auth.py           LoginScreen modal (ModalScreen[tuple[str,str]]) — available, not primary flow
   helpers.py        fmt_ago(), drawer_bar(), ts(), robot_model()  (pure, testable)
   constants.py      STATUS_COLORS, ROBOT_MODELS
+  config.py         runtime settings persistence — load()/save()/update() over ~/.asher-cli/config.json; holds poll interval, cat-panel visibility/colour, active pet index (non-secret UI prefs only; credentials stay in keyring)
   cats.py           CATS dict (ASCII art)
   login_flow.py     LoginFlow state machine — inline email/password prompt in command bar
   robot_protocol.py RobotProtocol structural Protocol for pylitterbot robot objects
@@ -68,6 +69,7 @@ tests/
   test_monitoring.py      MonitoringMixin async methods
   test_ui.py              UIMixin constants, CSS, helper existence
   test_mcp_config.py      Claude Desktop config read/write
+  test_config.py          runtime settings persistence — load/save/update over defaults
   test_mcp_bridge.py      mcp_bridge launcher credential/subprocess handling
   test_mcp_command.py     /mcp slash command dispatch
   test_faults.py          check_faults() — safety statuses, attribute faults, graceful degradation
@@ -113,6 +115,8 @@ pylitterbot ships an optional MCP server (`pip install pylitterbot[mcp]`, run vi
 
 **Slash commands** (`/` prefix) — app management only:
 `/login`, `/logout`, `/robots`, `/robot <index|name>`, `/pets`, `/pet <index|name>`, `/cat on|off|color <hex>`, `/refresh [seconds|off]`, `/config`, `/version`, `/mcp on|off|status`, `/exit`
+
+`/refresh`, `/cat`, and `/pet` persist their settings to `~/.asher-cli/config.json` (via `asher.config.update()`), so they survive restarts. Credentials and the preferred-robot serial stay in the OS keyring; the config file holds only non-secret UI preferences.
 
 > The authoritative list is the `_registry` in `asher/commands/__init__.py`; `/help` renders it at runtime. If you add a command, update the tables in `README.md` and the list in `asher/slash-commands/__init__.py`.
 

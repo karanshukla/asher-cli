@@ -47,11 +47,14 @@ class AsherApp(UIMixin, ConnectionMixin, MonitoringMixin, CommandsMixin, App):  
         self._last_cat_seen: Any = None
         self._is_loading: bool = True
         self._spinner_idx: int = 0
-        self._poll_interval: int = 300
+        from .config import load as _load_config  # noqa: PLC0415
+
+        _cfg = _load_config()
+        self._poll_interval: int = _cfg["poll_interval_seconds"]
         self._poll_timer: Timer | None = None
-        self._cat_panel_visible: bool = True
-        self._cat_color: str | None = None
-        self._active_pet_idx: int = 0
+        self._cat_panel_visible: bool = _cfg["cat_panel_visible"]
+        self._cat_color: str | None = _cfg["cat_panel_color"]
+        self._active_pet_idx: int = _cfg["active_pet_index"]
         self._prev_faults: set[str] = set()
         self._fault_dismissed: set[str] = set()
         self._cycle_start: Any = None
@@ -63,8 +66,12 @@ class AsherApp(UIMixin, ConnectionMixin, MonitoringMixin, CommandsMixin, App):  
         self._refresh_title()
         self._show_welcome()
         self._show_loading_state()
+        self.query_one("#cat-panel").display = self._cat_panel_visible
         self._connect_worker()
-        self._poll_timer = self.set_interval(300, self._poll_status_interval)
+        if self._poll_interval > 0:
+            self._poll_timer = self.set_interval(self._poll_interval, self._poll_status_interval)
+        else:
+            self._poll_timer = None
         self.set_interval(0.4, self._tick_cat)
         self.query_one("#cmd-input", Input).focus()
 

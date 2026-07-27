@@ -644,23 +644,46 @@ watching the terminal.
 
 ---
 
-## 10. Config file persistence
+## ~~10. Config file persistence~~ ✅
 
-Currently all settings are read-only from `.env` and nothing the user sets at
-runtime persists across restarts (e.g. `/refresh 10`, `/cat color green`).
+Runtime settings now persist to `~/.asher-cli/config.json` and survive
+restarts. `asher/config.py` (modeled on `asher/mcp_config.py`) provides
+`load()` / `save()` / `update(**changes)` over a small defaults dict — no
+Textual or pylitterbot imports, pure stdlib (`json` + `pathlib`), so it's
+fully unit-testable without an event loop.
 
-A simple `config.json` alongside `.env` could store:
 ```json
 {
-  "active_robot_index": 0,
-  "active_pet_index": 0,
-  "poll_interval_seconds": 30,
+  "poll_interval_seconds": 300,
   "cat_panel_visible": true,
-  "cat_panel_color": "#58a6ff"
+  "cat_panel_color": null,
+  "active_pet_index": 0
 }
 ```
 
-Load on startup, write on any `/config set` or `/cat` change.
+`AsherApp.__init__` reads its four runtime defaults from `config.load()`
+instead of hardcoding them, and `on_mount` seeds the poll timer from the
+loaded interval. The `/refresh`, `/cat`, and `/pet` slash commands each
+call a thin `_persist(app, **changes)` helper (in `asher/commands/__init__.py`)
+right after mutating the in-memory attribute, which delegates to
+`config.update()` — load-merge-save in one call. A read-only filesystem
+(container, restricted environment) degrades gracefully: the `OSError` is
+caught and logged as a warning so the in-session command still succeeds
+even when the setting can't be written.
+
+Defaults are merged on every load, so a stale key left by an older release
+is silently ignored and a future key absent from an older file falls back
+to its default. A corrupt or hand-edited JSON file degrades to defaults
+rather than crashing the app.
+
+**Explicitly not persisted** (by design):
+- Credentials and the OAuth token stay in the OS keyring (secrets).
+- The preferred-robot serial stays in the keyring (keyed by serial, not
+  the fragile `active_robot_index` this section originally proposed —
+  index would break if the cloud's robot ordering changed).
+- `.env` vars stay as env vars.
+- Ephemeral UI state (cat animation frame, command history, fault sets,
+  timers) resets each launch as before.
 
 ---
 
@@ -2447,7 +2470,7 @@ Ranked by user-visible impact vs. implementation effort:
 
 ### Polish & stretch
 
-1. **Config persistence** (`config.json`, §10) — runtime settings survive restarts
+1. ~~**Config persistence** (`config.json`, §10)~~ ✅ — runtime settings (`/refresh`, `/cat`, `/pet`) survive restarts via `~/.asher-cli/config.json`; `asher/config.py` provides load/save/update over a defaults dict (no Textual/pylitterbot deps); `_persist()` helper in `commands/__init__.py` wires each slash command to `config.update()`
 2. **Weight sparkline in cat panel** (§7) — 7-day ASCII chart; delightful but non-essential
 3. **Desktop notifications** (§22) — `plyer` toasts + `winsound` bell on fault/cat-detected; `/notify on|off` command
 4. **Dark/light theme toggle** (§12) — CSS variable swap; nice-to-have but not critical
