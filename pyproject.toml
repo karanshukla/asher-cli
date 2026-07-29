@@ -23,6 +23,7 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "keyring>=24.0.0",
     "tzlocal>=5.4",
+    "plyer>=2.1.0",
 ]
 
 [project.optional-dependencies]

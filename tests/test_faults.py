@@ -100,6 +100,24 @@ class TestSafetyStatuses:
         for robot in (_lr3, _lr4, _lr5):
             assert len(check_faults(robot(status=LitterBoxStatus.PINCH_DETECT))) == 1
 
+    def test_drawer_full_is_warn(self):
+        faults = check_faults(_lr4(status=LitterBoxStatus.DRAWER_FULL))
+        assert len(faults) == 1
+        assert faults[0].severity == SEVERITY_WARN
+        assert "DRAWER FULL" in faults[0].label
+
+    def test_drawer_full_variants_all_detected(self):
+        for status in (
+            LitterBoxStatus.DRAWER_FULL,
+            LitterBoxStatus.DRAWER_FULL_1,
+            LitterBoxStatus.DRAWER_FULL_2,
+        ):
+            assert len(check_faults(_lr4(status=status))) == 1
+
+    def test_drawer_full_fires_on_all_models(self):
+        for robot in (_lr3, _lr4, _lr5):
+            assert len(check_faults(robot(status=LitterBoxStatus.DRAWER_FULL))) == 1
+
 
 class TestLR4ComponentFaults:
     def test_globe_motor_fault(self):

@@ -91,12 +91,15 @@ class TestLoad:
 
 class TestSave:
     def test_round_trip(self, cfg_path: Path) -> None:
-        settings = {
-            "poll_interval_seconds": 45,
-            "cat_panel_visible": False,
-            "cat_panel_color": "#abc123",
-            "active_pet_index": 1,
-        }
+        settings = dict(_DEFAULTS)
+        settings.update(
+            {
+                "poll_interval_seconds": 45,
+                "cat_panel_visible": False,
+                "cat_panel_color": "#abc123",
+                "active_pet_index": 1,
+            }
+        )
         save(settings)
         on_disk = json.loads(cfg_path.read_text(encoding="utf-8"))
         assert on_disk == settings
@@ -153,6 +156,8 @@ class TestUpdate:
             "cat_panel_visible": False,
             "cat_panel_color": None,
             "active_pet_index": 1,
+            "notifications": True,
+            "notification_sound": False,
         }
 
     def test_update_writes_through_to_disk(self, cfg_path: Path) -> None:
@@ -176,7 +181,7 @@ class TestConfigPath:
 
 class TestAppWiring:
     def test_init_reads_persisted_values(self) -> None:
-        """AsherApp.__init__ should read its four runtime settings from config.load()."""
+        """AsherApp.__init__ should read its runtime settings from config.load()."""
         from asher.app import AsherApp
 
         fake_cfg = {
@@ -184,6 +189,8 @@ class TestAppWiring:
             "cat_panel_visible": False,
             "cat_panel_color": "#deadbe",
             "active_pet_index": 7,
+            "notifications": False,
+            "notification_sound": True,
         }
         with (
             patch("asher.connection._keyring_available", return_value=False),
@@ -195,6 +202,8 @@ class TestAppWiring:
         assert app._cat_panel_visible is False
         assert app._cat_color == "#deadbe"
         assert app._active_pet_idx == 7
+        assert app._notifications_enabled is False
+        assert app._notification_sound is True
 
     def test_init_falls_back_to_defaults_when_load_returns_defaults(self) -> None:
         from asher.app import AsherApp
@@ -318,3 +327,31 @@ class TestSlashCommandPersistence:
             await PetCommand().run(app, ["1"])
         mock_persist.assert_called_once_with(app, active_pet_index=1)
         assert app._active_pet_idx == 1
+
+    async def test_notify_off_persists(self) -> None:
+        from asher.commands import NotifyCommand
+
+        app = _stub_app()
+        with patch("asher.commands._persist") as mock_persist:
+            await NotifyCommand().run(app, ["off"])
+        mock_persist.assert_called_once_with(app, notifications=False)
+        assert app._notifications_enabled is False
+
+    async def test_notify_on_persists(self) -> None:
+        from asher.commands import NotifyCommand
+
+        app = _stub_app()
+        app._notifications_enabled = False
+        with patch("asher.commands._persist") as mock_persist:
+            await NotifyCommand().run(app, ["on"])
+        mock_persist.assert_called_once_with(app, notifications=True)
+        assert app._notifications_enabled is True
+
+    async def test_notify_sound_on_persists(self) -> None:
+        from asher.commands import NotifyCommand
+
+        app = _stub_app()
+        with patch("asher.commands._persist") as mock_persist:
+            await NotifyCommand().run(app, ["sound", "on"])
+        mock_persist.assert_called_once_with(app, notification_sound=True)
+        assert app._notification_sound is True

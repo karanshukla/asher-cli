@@ -21,7 +21,7 @@ A Claude Code-style terminal dashboard for monitoring and controlling Litter Rob
 - Cat panel with mode label + status badges (status chip, lock, night light, sleep, wait time) under the art
 - Scrollable activity-history pager — `history [count|all]` opens a full-screen, paginated view (arrow keys, `Page Up`/`Page Down`, `Home`/`End`); `q`/`Esc`/`Enter` to close
 - Commands: `clean`, `status`, `info`, `lock`, `unlock`, `sleep`, `wake`, `night-light on|off|auto`, `night-light-brightness`, `wait-time`, `power on|off`, `rename`, `insight`, `sleep-schedule`, plus LR5 extras (`privacy`, `volume`, `camera-audio`, `drawer-reset`), `history [count|all]`, `export [days|month]`, `help`, `quit`
-- Slash commands for app management: `/login`, `/logout`, `/robots`, `/robot <index|name>`, `/pets`, `/pet <index|name>`, `/cat on|off|colour <hex>`, `/refresh [seconds|off]`, `/config`, `/version`, `/mcp on|off|status`, `/exit`
+- Slash commands for app management: `/login`, `/logout`, `/robots`, `/robot <index|name>`, `/pets`, `/pet <index|name>`, `/cat on|off|colour <hex>`, `/refresh [seconds|off]`, `/config`, `/notify on|off|sound on|off|test`, `/version`, `/mcp on|off|status`, `/exit`
 - Slash-command tab completion — type `/` and a Claude Code-style overlay lists matching commands; `↑`/`↓` to move, `Tab` or `Enter` to accept, `Esc` to dismiss
 - Inline ghost-text completion for bare commands — type a prefix (`cle`) and the rest (`an`) appears greyed; `Tab` or `→` to accept → `clean`
 - Headless export — `asher --export 7` writes activity history to CSV from cron / Task Scheduler / SSH without launching the TUI
@@ -117,7 +117,8 @@ LITTER_ROBOT_PASSWORD=yourpassword
 | `/cat on\|off` | Show or hide the cat animation panel |
 | `/cat colour <hex>` | Change the cat art colour (e.g. `/cat colour #ff79c6`); `color` also accepted; `/cat reset` to revert |
 | `/refresh [seconds\|off]` | Change the auto-poll interval or disable it (`/refresh 60`, `/refresh off`) |
-| `/config` | Show current runtime settings (robot, refresh rate, cat panel, active pet) |
+| `/config` | Show current runtime settings (robot, refresh rate, cat panel, active pet, notifications) |
+| `/notify on\|off\|sound on\|off\|test` | Toggle desktop toast notifications for fault events (cat detected, pinch, motor fault, drawer full); `test` fires a sample toast |
 | `/version` | Show version info (asher-cli, Python, pylitterbot, textual) |
 | `/mcp on\|off\|status` | Toggle the Litter-Robot MCP server entry in Claude Desktop |
 | `/exit` | Exit Asher CLI |
@@ -158,14 +159,16 @@ asher.exe --export 7 --output C:\Users\me\litter-history.csv
 
 ## Configuration
 
-Runtime settings persist across restarts in `~/.asher-cli/config.json`, so you don't have to re-apply `/refresh 60`, `/cat color #ff79c6`, or `/pet 1` every launch. The file is auto-created on first change and holds four non-secret UI preferences:
+Runtime settings persist across restarts in `~/.asher-cli/config.json`, so you don't have to re-apply `/refresh 60`, `/cat colour #ff79c6`, or `/pet 1` every launch. The file is auto-created on first change and holds six non-secret UI preferences:
 
 | Setting | Slash command | Default |
 |---|---|---|
 | `poll_interval_seconds` | `/refresh <seconds\|off>` | `300` |
 | `cat_panel_visible` | `/cat on\|off` | `true` |
-| `cat_panel_color` | `/cat color <hex>\|reset` | `null` (default palette) |
+| `cat_panel_color` | `/cat colour <hex>\|reset` | `null` (default palette) |
 | `active_pet_index` | `/pet <index\|name>` | `0` |
+| `notifications` | `/notify on\|off` | `true` |
+| `notification_sound` | `/notify sound on\|off` | `false` |
 
 Credentials and the preferred-robot serial stay in the OS keyring; `.env` vars stay as env vars. You generally don't need to edit the file by hand — just use the slash commands — but it's plain JSON and safe to inspect or delete (deleting it restores defaults).
 
@@ -279,7 +282,8 @@ CI runs on Python 3.10 / 3.11 / 3.12 across Ubuntu, Windows, and macOS on every 
 
 ### Unreleased
 
-- **Config persistence** — runtime settings (`/refresh`, `/cat`, `/pet`) now survive restarts via `~/.asher-cli/config.json`. The file is auto-created on first change and holds four non-secret UI preferences; credentials stay in the keyring.
+- **Desktop notifications** — OS-level toast notifications fire on fault state transitions (cat detected, pinch, motor/retract faults, position faults, drawer full, bonnet, laser, gas sensor), so you're alerted even when the terminal isn't focused. `/notify on|off` toggles toasts, `/notify sound on|off` toggles an audible alert, `/notify test` fires a sample, and the settings persist across restarts. Drawer-full is now also treated as a fault (appears in the `#fault-banner`, not just the status bar).
+- **Config persistence** — runtime settings (`/refresh`, `/cat`, `/pet`, `/notify`) now survive restarts via `~/.asher-cli/config.json`. The file is auto-created on first change and holds six non-secret UI preferences; credentials stay in the keyring.
 
 ### v0.2.0 — 2026-07-27
 

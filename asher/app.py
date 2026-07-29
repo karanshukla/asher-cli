@@ -55,6 +55,8 @@ class AsherApp(UIMixin, ConnectionMixin, MonitoringMixin, CommandsMixin, App):  
         self._cat_panel_visible: bool = _cfg["cat_panel_visible"]
         self._cat_color: str | None = _cfg["cat_panel_color"]
         self._active_pet_idx: int = _cfg["active_pet_index"]
+        self._notifications_enabled: bool = _cfg["notifications"]
+        self._notification_sound: bool = _cfg["notification_sound"]
         self._prev_faults: set[str] = set()
         self._fault_dismissed: set[str] = set()
         self._cycle_start: Any = None

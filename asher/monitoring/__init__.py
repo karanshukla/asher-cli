@@ -13,7 +13,7 @@ from textual.css.query import NoMatches
 from textual.widgets import Static
 
 from ..constants import STATUS_COLORS
-from ..faults import SEVERITY_ERROR, check_faults
+from ..faults import SEVERITY_ERROR, Fault, check_faults
 from ..helpers import drawer_bar, fmt_ago, robot_model
 
 if TYPE_CHECKING:
@@ -244,9 +244,11 @@ class MonitoringMixin:
         """Render the fault banner and log transitions. Returns True if any fault active."""
         faults = check_faults(r)
         active_labels = {f.label for f in faults}
+        by_label = {f.label: f for f in faults}
 
         for label in active_labels - self._prev_faults:
             self._log_err(f"FAULT: {label}")  # type: ignore[attr-defined]
+            self._notify_fault(by_label[label])
         for label in self._prev_faults - active_labels:
             self._log_ok(f"Cleared: {label}")  # type: ignore[attr-defined]
 
@@ -274,6 +276,22 @@ class MonitoringMixin:
         banner.update(t)
         banner.display = self._fault_dismissed != active_labels
         return True
+
+    def _notify_fault(self, fault: Fault) -> None:
+        """Fire a toast (+ optional sound) for a newly-appeared fault.
+
+        Gated by the user's ``/notify`` settings — when disabled, faults still
+        log to ``#log`` and surface in the ``#fault-banner``; only the OS toast
+        and audible alert are suppressed.
+        """
+        if not getattr(self, "_notifications_enabled", True):
+            return
+        from ..notifications import beep, fire  # noqa: PLC0415
+
+        name = getattr(getattr(self, "_robot", None), "name", "robot") or "robot"
+        fire(f"Asher — {name}", fault.label)
+        if getattr(self, "_notification_sound", False):
+            beep(critical=fault.severity == SEVERITY_ERROR)
 
     def _cycling_chip(self) -> Text:
         """Build the `⟳ Cycling M:SS` chip using `_cycle_start`."""

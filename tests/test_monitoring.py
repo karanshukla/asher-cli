@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from pylitterbot.enums import LitterBoxStatus
@@ -253,6 +253,86 @@ class TestRefreshFaults:
         MonitoringMixin._refresh_faults(m2, robot)
         m2._log_err.assert_not_called()
         m2._log_ok.assert_not_called()
+
+
+class TestNotifyFault:
+    """The _refresh_faults transition loop calls _notify_fault on newly-appeared
+    faults, gated by the /notify settings."""
+
+    def _mixin(self, prev: set[str] | None = None, notifications: bool = True, sound: bool = False):
+        m = MagicMock()
+        m._prev_faults = prev if prev is not None else set()
+        m._fault_dismissed = set()
+        m._log_err = MagicMock()
+        m._log_ok = MagicMock()
+        m._notifications_enabled = notifications
+        m._notification_sound = sound
+        # Bind the real _notify_fault so it reads the attrs above and calls fire/beep,
+        # rather than being shadowed by MagicMock's auto-created child mock.
+        m._notify_fault = lambda fault: MonitoringMixin._notify_fault(m, fault)
+        m._robot = MagicMock()
+        m._robot.name = "TestBot"
+        m.query_one = MagicMock(side_effect=NoMatches("no DOM"))
+        return m
+
+    def test_refresh_faults_calls_notify_on_new_fault(self):
+        from pylitterbot.enums import GlobeMotorFaultStatus
+
+        m = self._mixin()
+        robot = _healthy_robot()
+        robot.globe_motor_fault_status = GlobeMotorFaultStatus.FAULT_OVERTORQUE_AMP
+        with patch("asher.notifications.fire") as mock_fire:
+            MonitoringMixin._refresh_faults(m, robot)
+        mock_fire.assert_called_once()
+        assert "TestBot" in mock_fire.call_args.args[0]
+        assert "GLOBE MOTOR FAULT" in mock_fire.call_args.args[1]
+
+    def test_no_notify_on_steady_state(self):
+        from pylitterbot.enums import GlobeMotorFaultStatus
+
+        robot = _healthy_robot()
+        robot.globe_motor_fault_status = GlobeMotorFaultStatus.FAULT_OVERTORQUE_AMP
+        m = self._mixin(prev={"GLOBE MOTOR FAULT"})  # already known
+        with patch("asher.notifications.fire") as mock_fire:
+            MonitoringMixin._refresh_faults(m, robot)
+        mock_fire.assert_not_called()
+
+    def test_no_notify_when_disabled(self):
+        from pylitterbot.enums import GlobeMotorFaultStatus
+
+        m = self._mixin(notifications=False)
+        robot = _healthy_robot()
+        robot.globe_motor_fault_status = GlobeMotorFaultStatus.FAULT_OVERTORQUE_AMP
+        with patch("asher.notifications.fire") as mock_fire:
+            MonitoringMixin._refresh_faults(m, robot)
+        mock_fire.assert_not_called()
+
+    def test_sound_fires_when_enabled(self):
+        from pylitterbot.enums import LitterBoxStatus
+
+        m = self._mixin(sound=True)
+        robot = _healthy_robot()
+        robot.status = LitterBoxStatus.CAT_DETECTED
+        with (
+            patch("asher.notifications.fire"),
+            patch("asher.notifications.beep") as mock_beep,
+        ):
+            MonitoringMixin._refresh_faults(m, robot)
+        mock_beep.assert_called_once()
+        assert mock_beep.call_args.kwargs.get("critical") is True
+
+    def test_sound_does_not_fire_when_disabled(self):
+        from pylitterbot.enums import GlobeMotorFaultStatus
+
+        m = self._mixin(sound=False)
+        robot = _healthy_robot()
+        robot.globe_motor_fault_status = GlobeMotorFaultStatus.FAULT_OVERTORQUE_AMP
+        with (
+            patch("asher.notifications.fire"),
+            patch("asher.notifications.beep") as mock_beep,
+        ):
+            MonitoringMixin._refresh_faults(m, robot)
+        mock_beep.assert_not_called()
 
 
 class TestCyclingChip:

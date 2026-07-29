@@ -53,6 +53,9 @@ _SAFETY_STATUSES: dict[LitterBoxStatus, tuple[str, str]] = {
     LitterBoxStatus.DUMP_POSITION_FAULT: ("DUMP POSITION FAULT", SEVERITY_ERROR),
     LitterBoxStatus.DUMP_HOME_POSITION_FAULT: ("DUMP POSITION FAULT", SEVERITY_ERROR),
     LitterBoxStatus.BONNET_REMOVED: ("BONNET OPEN", SEVERITY_WARN),
+    LitterBoxStatus.DRAWER_FULL: ("DRAWER FULL — empty now", SEVERITY_WARN),
+    LitterBoxStatus.DRAWER_FULL_1: ("DRAWER FULL — empty now", SEVERITY_WARN),
+    LitterBoxStatus.DRAWER_FULL_2: ("DRAWER FULL — empty now", SEVERITY_WARN),
 }
 
 

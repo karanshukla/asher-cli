@@ -13,3 +13,4 @@ still pending.
 | 18 | [Cat panel status badges](cat-panel-badges.md) | `#cat-status` widget under the cat art — status chip, lock, sleep, night light, wait |
 | 23 | [Tab completion](tab-completion.md) | Claude Code-style `/` overlay + inline ghost-text completion for bare commands |
 | 25 | [Headless CLI export](headless-export.md) | `asher --export 7` writes CSV without launching the TUI, for cron / Task Scheduler / SSH |
+| 22 | [Desktop notifications](desktop-notifications.md) | `plyer` toasts on fault transitions + `/notify on\|off\|sound on\|off\|test` command; drawer-full promoted to a fault |
