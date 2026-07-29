@@ -33,6 +33,7 @@ def lr5_app():
     robot.set_volume = AsyncMock(return_value=True)
     robot.set_camera_audio = AsyncMock(return_value=True)
     robot.reset_waste_drawer = AsyncMock(return_value=True)
+    robot.set_panel_brightness = AsyncMock(return_value=True)
 
     app = AsherApp()
     app._robot = robot
@@ -262,3 +263,65 @@ async def test_drawer_reset_not_supported_on_lr4(lr4_app):
 
     lr4_app._robot.reset_waste_drawer.assert_not_called()
     assert "LR5" in log
+
+
+# ── panel-brightness (LR4 + LR5) ──────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_panel_brightness_low_lr4(lr4_app):
+    """panel-brightness works on the LR4 (and LR5) via the adapter."""
+    from pylitterbot.enums import BrightnessLevel
+
+    async with lr4_app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#cmd-input")
+        await _type(pilot, "panel-brightness low")
+        await pilot.pause()
+        await pilot.pause()
+
+    lr4_app._robot.set_panel_brightness.assert_called_once_with(BrightnessLevel.LOW)
+
+
+@pytest.mark.asyncio
+async def test_panel_brightness_no_args_shows_usage(lr4_app):
+    async with lr4_app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#cmd-input")
+        await _type(pilot, "panel-brightness")
+        await pilot.pause()
+        await pilot.pause()
+
+        log = _log_text(lr4_app)
+
+    lr4_app._robot.set_panel_brightness.assert_not_called()
+    assert "Usage" in log
+
+
+@pytest.mark.asyncio
+async def test_panel_brightness_invalid_level(lr4_app):
+    async with lr4_app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#cmd-input")
+        await _type(pilot, "panel-brightness dim")
+        await pilot.pause()
+        await pilot.pause()
+
+        log = _log_text(lr4_app)
+
+    lr4_app._robot.set_panel_brightness.assert_not_called()
+    assert "dim" in log
+
+
+@pytest.mark.asyncio
+async def test_panel_brightness_high_lr5(lr5_app):
+    from pylitterbot.enums import BrightnessLevel
+
+    async with lr5_app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#cmd-input")
+        await _type(pilot, "pb high")
+        await pilot.pause()
+        await pilot.pause()
+
+    lr5_app._robot.set_panel_brightness.assert_called_once_with(BrightnessLevel.HIGH)

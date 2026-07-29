@@ -45,7 +45,7 @@ asher/
   robot_adapters.py RobotAdapter ABC + LR3/LR4/LR5 subclasses + make_adapter() factory
   mcp_config.py     Claude Desktop config read/write for the /mcp slash command
   mcp_bridge.py     asher-mcp-launch console script — keyring-backed pylitterbot MCP launcher
-  faults.py         check_faults(robot) — model-scoped safety/component fault detection (status enum + per-model attr allowlist; hopper never a fault)
+  faults.py         check_faults(robot) — model-scoped safety/component fault detection (status enum + per-model attr allowlist incl. LR4 USB power fault; hopper never a fault)
   history_view.py   HistoryScreen (ModalScreen) + format_history_rows() — scrollable activity-history pager pushed by the `history` command
   export.py         shared activity-history CSV core + headless export path: build_history_csv(), resolve_dest(), resolve_robot(), _run_headless_export(), ExportError — no Textual imports; both the TUI `export` command and `asher --export` call build_history_csv()
   completion.py     pure helpers for command completion: slash popup (slash_matches, enter_completes, render_completion) + inline ghost text (CommandSuggester) — fed by _registry, no Textual imports except the Suggester base class
@@ -113,7 +113,7 @@ pylitterbot ships an optional MCP server (`pip install pylitterbot[mcp]`, run vi
 ## Command convention
 
 **Normal commands** (no prefix) — robot actions only:
-`clean`, `status`, `info`, `lock`, `unlock`, `sleep`, `wake`, `night-light on|off|auto`, `night-light-brightness <level>`, `wait-time <minutes>`, `power on|off`, `rename <name>`, `insight [days|month]`, `sleep-schedule`, `privacy on|off`, `volume <0-100>`, `camera-audio on|off`, `drawer-reset`, `history [count|all]`, `export [days|month]`, `clear`, `help`, `quit`
+`clean`, `status`, `info`, `lock`, `unlock`, `sleep`, `wake`, `night-light on|off|auto`, `night-light-brightness <level>`, `panel-brightness <low|medium|high>`, `wait-time <minutes>`, `power on|off`, `rename <name>`, `insight [days|month]`, `sleep-schedule`, `privacy on|off`, `volume <0-100>`, `camera-audio on|off`, `drawer-reset`, `history [count|all]`, `export [days|month]`, `clear`, `help`, `quit`
 
 **Slash commands** (`/` prefix) — app management only:
 `/login`, `/logout`, `/robots`, `/robot <index|name>`, `/pets`, `/pet <index|name>`, `/cat on|off|colour <hex>`, `/refresh [seconds|off]`, `/config`, `/notify on|off|sound on|off|test`, `/version`, `/mcp on|off|status`, `/exit`

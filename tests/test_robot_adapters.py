@@ -17,6 +17,7 @@ def robot():
     r.set_night_light = AsyncMock(return_value=True)
     r.set_night_light_mode = AsyncMock(return_value=True)
     r.set_night_light_brightness = AsyncMock(return_value=True)
+    r.set_panel_brightness = AsyncMock(return_value=True)
     # LR5-only setters (only invoked via LR5Adapter)
     r.set_privacy_mode = AsyncMock(return_value=True)
     r.set_volume = AsyncMock(return_value=True)
@@ -175,6 +176,7 @@ async def test_lr4_sleep_unsupported(robot):
     ok, msg = await LR4Adapter(robot).set_sleep(True)
     assert not ok
     assert "LR4" in msg
+    assert "sleep-schedule" in msg
 
 
 @pytest.mark.asyncio
@@ -182,6 +184,7 @@ async def test_lr4_wake_unsupported(robot):
     ok, msg = await LR4Adapter(robot).set_sleep(False)
     assert not ok
     assert "LR4" in msg
+    assert "sleep-schedule" in msg
 
 
 @pytest.mark.asyncio
@@ -274,6 +277,59 @@ async def test_lr4_brightness_exception(robot):
     ok, msg = await LR4Adapter(robot).set_night_light_brightness(100)
     assert not ok
     assert "bad request" in msg
+
+
+# ── LR4 panel brightness ──────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_lr4_panel_brightness_low(robot):
+    from pylitterbot.enums import BrightnessLevel
+
+    ok, _ = await LR4Adapter(robot).set_panel_brightness("low")
+    assert ok
+    robot.set_panel_brightness.assert_called_once_with(BrightnessLevel.LOW)
+
+
+@pytest.mark.asyncio
+async def test_lr4_panel_brightness_medium(robot):
+    from pylitterbot.enums import BrightnessLevel
+
+    ok, _ = await LR4Adapter(robot).set_panel_brightness("medium")
+    assert ok
+    robot.set_panel_brightness.assert_called_once_with(BrightnessLevel.MEDIUM)
+
+
+@pytest.mark.asyncio
+async def test_lr4_panel_brightness_high(robot):
+    from pylitterbot.enums import BrightnessLevel
+
+    ok, _ = await LR4Adapter(robot).set_panel_brightness("high")
+    assert ok
+    robot.set_panel_brightness.assert_called_once_with(BrightnessLevel.HIGH)
+
+
+@pytest.mark.asyncio
+async def test_lr4_panel_brightness_invalid(robot):
+    ok, msg = await LR4Adapter(robot).set_panel_brightness("dim")
+    assert not ok
+    assert "dim" in msg
+    robot.set_panel_brightness.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_lr4_panel_brightness_rejected(robot):
+    robot.set_panel_brightness.return_value = False
+    ok, _ = await LR4Adapter(robot).set_panel_brightness("high")
+    assert not ok
+
+
+@pytest.mark.asyncio
+async def test_lr3_panel_brightness_unsupported(robot):
+    ok, msg = await LR3Adapter(robot).set_panel_brightness("low")
+    assert not ok
+    assert "LR4" in msg or "LR5" in msg
+    robot.set_panel_brightness.assert_not_called()
 
 
 # ── LR5Adapter ────────────────────────────────────────────────────────────────
@@ -396,6 +452,38 @@ async def test_lr5_brightness_exception(robot):
     ok, msg = await LR5Adapter(robot).set_night_light_brightness(50)
     assert not ok
     assert "api error" in msg
+
+
+# ── LR5 panel brightness ──────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_lr5_panel_brightness_levels(robot):
+    from pylitterbot.enums import BrightnessLevel
+
+    for word, expected in (
+        ("low", BrightnessLevel.LOW),
+        ("medium", BrightnessLevel.MEDIUM),
+        ("high", BrightnessLevel.HIGH),
+    ):
+        robot.set_panel_brightness.reset_mock()
+        ok, _ = await LR5Adapter(robot).set_panel_brightness(word)
+        assert ok
+        robot.set_panel_brightness.assert_called_once_with(expected)
+
+
+@pytest.mark.asyncio
+async def test_lr5_panel_brightness_invalid(robot):
+    ok, msg = await LR5Adapter(robot).set_panel_brightness("max")
+    assert not ok
+    robot.set_panel_brightness.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_lr5_panel_brightness_rejected(robot):
+    robot.set_panel_brightness.return_value = False
+    ok, _ = await LR5Adapter(robot).set_panel_brightness("low")
+    assert not ok
 
 
 # ── LR5-only capabilities: base class "not supported" ─────────────────────────

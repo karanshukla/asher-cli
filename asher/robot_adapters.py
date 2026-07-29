@@ -37,6 +37,10 @@ class RobotAdapter(ABC):
             return False, "Panel lock command rejected by cloud"
         return True, "Panel locked" if enable else "Panel unlocked"
 
+    async def set_panel_brightness(self, level: str) -> tuple[bool, str]:
+        """Set the control-panel brightness ('low', 'medium', 'high'). LR4/LR5 only."""
+        return False, "Panel brightness is only available on the LR4/LR5"
+
     # ── LR5-only capabilities ─────────────────────────────────────────────────
     # The base implementations return "not supported"; LR5Adapter overrides them.
     # Commands detect model via the adapter and surface these messages gracefully.
@@ -85,7 +89,11 @@ class LR3Adapter(RobotAdapter):
 
 class LR4Adapter(RobotAdapter):
     async def set_sleep(self, enable: bool) -> tuple[bool, str]:
-        return False, "LR4 sleep requires a per-day schedule - not yet supported"
+        return (
+            False,
+            "LR4 uses a per-day sleep schedule — use 'sleep-schedule' to view it "
+            "(setting it requires the Whisker app)",
+        )
 
     async def set_night_light(self, mode: str) -> tuple[bool, str]:
         from pylitterbot.enums import NightLightMode  # noqa: PLC0415
@@ -116,6 +124,25 @@ class LR4Adapter(RobotAdapter):
         if not ok:
             return False, "Night light brightness command rejected"
         return True, f"Night light brightness set to {level}%"
+
+    async def set_panel_brightness(self, level: str) -> tuple[bool, str]:
+        from pylitterbot.enums import BrightnessLevel  # noqa: PLC0415
+
+        level_map = {
+            "low": BrightnessLevel.LOW,
+            "medium": BrightnessLevel.MEDIUM,
+            "high": BrightnessLevel.HIGH,
+        }
+        bl = level_map.get(level)
+        if bl is None:
+            return False, f"Unknown brightness '{level}' - use low, medium, or high"
+        try:
+            ok = await self.robot.set_panel_brightness(bl)
+        except Exception as exc:
+            return False, f"Panel brightness command failed: {exc}"
+        if not ok:
+            return False, "Panel brightness command rejected"
+        return True, f"Panel brightness set to {level}"
 
 
 class LR5Adapter(RobotAdapter):
@@ -157,6 +184,25 @@ class LR5Adapter(RobotAdapter):
         if not ok:
             return False, "Night light brightness command rejected"
         return True, f"Night light brightness set to {level}%"
+
+    async def set_panel_brightness(self, level: str) -> tuple[bool, str]:
+        from pylitterbot.enums import BrightnessLevel  # noqa: PLC0415
+
+        level_map = {
+            "low": BrightnessLevel.LOW,
+            "medium": BrightnessLevel.MEDIUM,
+            "high": BrightnessLevel.HIGH,
+        }
+        bl = level_map.get(level)
+        if bl is None:
+            return False, f"Unknown brightness '{level}' - use low, medium, or high"
+        try:
+            ok = await self.robot.set_panel_brightness(bl)
+        except Exception as exc:
+            return False, f"Panel brightness command failed: {exc}"
+        if not ok:
+            return False, "Panel brightness command rejected"
+        return True, f"Panel brightness set to {level}"
 
     # ── LR5-only capabilities ─────────────────────────────────────────────────
 

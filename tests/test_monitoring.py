@@ -174,12 +174,14 @@ def _healthy_robot() -> MagicMock:
     fitted; this must NOT be reported as a fault.
     """
     from pylitterbot.enums import GlobeMotorFaultStatus
+    from pylitterbot.robot.litterrobot4 import UsbFaultStatus
 
     lr4_cls = type("LitterRobot4", (MagicMock,), {})
     r = lr4_cls()
     r.status = LitterBoxStatus.READY
     r.globe_motor_fault_status = GlobeMotorFaultStatus.NONE
     r.globe_motor_retract_fault_status = GlobeMotorFaultStatus.NONE
+    r.usb_fault_status = UsbFaultStatus.NONE
     r.is_hopper_removed = True
     r.is_bonnet_removed = False
     r.is_laser_dirty = False

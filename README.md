@@ -20,7 +20,7 @@ A Claude Code-style terminal dashboard for monitoring and controlling Litter Rob
 - Fault & safety monitoring — model-scoped in-panel alerts for cat detected, pinch, motor/position/gas faults (LR5: bonnet/laser/drawer); press `d` to dismiss
 - Cat panel with mode label + status badges (status chip, lock, night light, sleep, wait time) under the art
 - Scrollable activity-history pager — `history [count|all]` opens a full-screen, paginated view (arrow keys, `Page Up`/`Page Down`, `Home`/`End`); `q`/`Esc`/`Enter` to close
-- Commands: `clean`, `status`, `info`, `lock`, `unlock`, `sleep`, `wake`, `night-light on|off|auto`, `night-light-brightness`, `wait-time`, `power on|off`, `rename`, `insight`, `sleep-schedule`, plus LR5 extras (`privacy`, `volume`, `camera-audio`, `drawer-reset`), `history [count|all]`, `export [days|month]`, `help`, `quit`
+- Commands: `clean`, `status`, `info`, `lock`, `unlock`, `sleep`, `wake`, `night-light on|off|auto`, `night-light-brightness`, `panel-brightness <low|medium|high>` (LR4/LR5), `wait-time`, `power on|off`, `rename`, `insight`, `sleep-schedule`, plus LR5 extras (`privacy`, `volume`, `camera-audio`, `drawer-reset`), `history [count|all]`, `export [days|month]`, `help`, `quit`
 - Slash commands for app management: `/login`, `/logout`, `/robots`, `/robot <index|name>`, `/pets`, `/pet <index|name>`, `/cat on|off|colour <hex>`, `/refresh [seconds|off]`, `/config`, `/notify on|off|sound on|off|test`, `/version`, `/mcp on|off|status`, `/exit`
 - Slash-command tab completion — type `/` and a Claude Code-style overlay lists matching commands; `↑`/`↓` to move, `Tab` or `Enter` to accept, `Esc` to dismiss
 - Inline ghost-text completion for bare commands — type a prefix (`cle`) and the rest (`an`) appears greyed; `Tab` or `→` to accept → `clean`
@@ -89,6 +89,7 @@ LITTER_ROBOT_PASSWORD=yourpassword
 | `sleep` / `wake` | Toggle sleep mode |
 | `night-light on\|off\|auto` | Set night light mode |
 | `night-light-brightness <level>` | Set brightness (LR5: 0-100; LR4: 25/50/100) |
+| `panel-brightness <low\|medium\|high>` | Set control-panel brightness (LR4/LR5 only; shows current if omitted) |
 | `wait-time <minutes>` | Set clean-cycle wait time (shows valid values / current if omitted) |
 | `power on\|off` | Hard-power the unit on or off |
 | `rename <new name>` | Rename the unit in the Whisker cloud |
@@ -282,6 +283,7 @@ CI runs on Python 3.10 / 3.11 / 3.12 across Ubuntu, Windows, and macOS on every 
 
 ### Unreleased
 
+- **LR3/LR4 completion** — `panel-brightness <low|medium|high>` command (LR4/LR5; the library API the roadmap claimed was missing is actually present). The `info` command now shows power source, cycle count, litter level, panel brightness, and Wi-Fi status (LR4). The LR4 USB power-rail fault is now detected (joins `#fault-banner` + notifications). The LR4 `sleep`/`wake` refusal message now points at `sleep-schedule`.
 - **Desktop notifications** — OS-level toast notifications fire on fault state transitions (cat detected, pinch, motor/retract faults, position faults, drawer full, bonnet, laser, gas sensor), so you're alerted even when the terminal isn't focused. `/notify on|off` toggles toasts, `/notify sound on|off` toggles an audible alert, `/notify test` fires a sample, and the settings persist across restarts. Drawer-full is now also treated as a fault (appears in the `#fault-banner`, not just the status bar).
 - **Config persistence** — runtime settings (`/refresh`, `/cat`, `/pet`, `/notify`) now survive restarts via `~/.asher-cli/config.json`. The file is auto-created on first change and holds six non-secret UI preferences; credentials stay in the keyring.
 

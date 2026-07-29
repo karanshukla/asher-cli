@@ -177,18 +177,20 @@ With no argument it prints the current value and the valid set; an out-of-set
 value is rejected before hitting the API. Current value is also surfaced in
 `info` output.
 
-### `panel-brightness <low|medium|high>` — not available in pylitterbot
+### ~~`panel-brightness <low|medium|high>`~~ ✅
 
 ```python
 from pylitterbot.enums import BrightnessLevel
 await robot.set_panel_brightness(BrightnessLevel.LOW)
 ```
 
-Checked directly against `pylitterbot==2025.6.2`: `set_panel_brightness` does
-not exist on `LitterRobot3`, `LitterRobot4`, or `LitterRobot5` (the only
-`panel`/`brightness` attributes are `panel_lock_enabled` and
-`set_panel_lockout`). The `BrightnessLevel` enum exists but nothing consumes
-it. Revisit if a future pylitterbot release exposes this.
+An earlier audit claimed `set_panel_brightness` did not exist in
+`pylitterbot==2025.6.2` — that was wrong. Both the setter and the
+`panel_brightness` reader exist on `LitterRobot4` and `LitterRobot5`
+(`BrightnessLevel`: LOW=25, MEDIUM=50, HIGH=100). The `panel-brightness`
+command (alias `pb`) now routes through `LR4Adapter`/`LR5Adapter` and is
+gracefully refused on the LR3 (no panel) via the base adapter fallback. Bare
+invocation shows the current brightness.
 
 ### ~~`rename <new name>`~~ ✅
 ```python
@@ -456,8 +458,10 @@ A minimal indicator for LR4 could just show a coloured dot:
 
 **Implementation note:** Both properties are only present on their respective
 models — `wifi_rssi` via `LR5Adapter` (or `getattr(robot, "wifi_rssi", None)`),
-`wifi_mode_status` via `LR4Adapter`. Since SSID is unavailable, a tooltip or
-the `info` command output is the natural place to show full WiFi diagnostics.
+`wifi_mode_status` via `LR4Adapter`. Since SSID is unavailable, the `info`
+command is where WiFi status is surfaced: the LR4 `wifi_mode_status` enum now
+renders readably there (connected / connecting / fault / off / —). A
+status-bar dot indicator remains unwired (nice-to-have).
 
 ---
 
@@ -1706,7 +1710,7 @@ Ranked by user-visible impact vs. implementation effort:
 4. ~~**`/cat`, `/refresh`, `/config` slash commands**~~ ✅ (§1) — cat panel toggle + colour, poll interval control, runtime config dump
 5. ~~**Tab-completion for slash commands** (§23)~~ ✅ — Claude Code-style overlay dropdown on `/` keypress; single-source registry drives both dispatch and completion
 6. ~~**`/version` slash command** (§24)~~ ✅ — prints asher-cli / Python / pylitterbot / textual versions to the log via `importlib.metadata`, with a `"?"` fallback when not installed; model badge in the status bar was already done
-7. ~~**`wait-time`, `power`, `rename`, `insight` commands** (§3)~~ ✅ — all four wired up; plus the `status`/`info` split (`status` trimmed to at-a-glance, `info` is the full property dump). `panel-brightness` skipped (not exposed by pylitterbot 2025.6.2); `reset`/`reset-settings`/`firmware`-update deliberately omitted as destructive
+7. ~~**`wait-time`, `power`, `rename`, `insight` commands** (§3)~~ ✅ — all four wired up; plus the `status`/`info` split (`status` trimmed to at-a-glance, `info` is the full property dump with power/cycles/litter/brightness/Wi-Fi). `panel-brightness <low|medium|high>` now wired too (the earlier claim it wasn't exposed was stale — it exists on LR4/LR5); `reset`/`reset-settings`/`firmware`-update deliberately omitted as destructive
 8. ~~**Sleep schedule viewer** (§8)~~ ✅ — `sleep-schedule` (alias `sleepschedule`) renders the per-day sleep/wake window read-only, sorted Mon→Sun, with an active-window `● now` marker; config wizard/set/disable still TODO
 9. ~~**Headless CLI export** (§25)~~ ✅ — `asher --export 7` writes activity history to CSV without launching the TUI, for cron/Task Scheduler/SSH; `--output` and `--robot` flags, documented exit codes; CSV core shared with the TUI `export` command via `build_history_csv()`
 
