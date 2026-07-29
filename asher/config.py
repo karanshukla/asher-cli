@@ -1,10 +1,10 @@
 """Persist a small set of runtime settings across restarts.
 
-Settings written here mirror the four rows the ``/config`` slash command
-displays: poll interval, cat-panel visibility/colour, and the active pet.
-Credentials and the preferred-robot serial stay in the OS keyring; this
-file holds only non-secret UI preferences, so a corrupt or hand-edited
-file degrades to defaults rather than crashing the app.
+Settings written here mirror the rows the ``/config`` slash command displays:
+poll interval, cat-panel visibility/colour, the active pet, and the desktop-
+notification preferences. Credentials and the preferred-robot serial stay in
+the OS keyring; this file holds only non-secret UI preferences, so a corrupt
+or hand-edited file degrades to defaults rather than crashing the app.
 """
 
 from __future__ import annotations
@@ -21,6 +21,8 @@ _DEFAULTS: dict[str, Any] = {
     "cat_panel_visible": True,
     "cat_panel_color": None,
     "active_pet_index": 0,
+    "notifications": True,
+    "notification_sound": False,
 }
 
 

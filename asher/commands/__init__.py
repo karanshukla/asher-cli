@@ -999,6 +999,14 @@ class ConfigCommand(SlashCommand):
             ("refresh", refresh_str),
             ("cat panel", f"{'on' if cat_visible else 'off'}  {cat_color}"),
             ("active pet", pet_str),
+            (
+                "notifications",
+                "on" if getattr(app, "_notifications_enabled", True) else "off",
+            ),
+            (
+                "notif. sound",
+                "on" if getattr(app, "_notification_sound", False) else "off",
+            ),
         ]
         log.write("")
         for k, v in rows:
@@ -1007,6 +1015,49 @@ class ConfigCommand(SlashCommand):
             t.append(v, style="#c9d1d9")
             log.write(t)
         log.write("")
+
+
+class NotifyCommand(SlashCommand):
+    name = "notify"
+    description = "on|off|sound on|off|test  desktop toast settings"
+
+    async def run(self, app: AsherApp, args: list[str]) -> None:
+        if not args:
+            toasts = "on" if getattr(app, "_notifications_enabled", True) else "off"
+            sound = "on" if getattr(app, "_notification_sound", False) else "off"
+            app._log_info(
+                f"Usage: /notify on|off|sound on|off|test  (toasts {toasts}, sound {sound})"
+            )
+            return
+
+        sub = args[0].lower()
+        if sub == "on":
+            app._notifications_enabled = True
+            _persist(app, notifications=True)
+            app._log_ok("Desktop notifications enabled")
+        elif sub == "off":
+            app._notifications_enabled = False
+            _persist(app, notifications=False)
+            app._log_ok("Desktop notifications disabled")
+        elif sub == "sound":
+            if len(args) < 2 or args[1].lower() not in ("on", "off"):
+                app._log_warn("Usage: /notify sound on|off")
+                return
+            enabled = args[1].lower() == "on"
+            app._notification_sound = enabled
+            _persist(app, notification_sound=enabled)
+            app._log_ok(f"Notification sound {'enabled' if enabled else 'disabled'}")
+        elif sub == "test":
+            if not getattr(app, "_notifications_enabled", True):
+                app._log_warn("Notifications are off — /notify on first")
+                return
+            from ..notifications import fire  # noqa: PLC0415
+
+            name = getattr(getattr(app, "_robot", None), "name", "robot") or "robot"
+            fire(f"Asher — {name}", "This is a test notification.")
+            app._log_ok("Test notification fired")
+        else:
+            app._log_warn("Usage: /notify on|off|sound on|off|test")
 
 
 class RobotCommand(SlashCommand):
@@ -1257,6 +1308,7 @@ _registry.register(PetCommand())
 _registry.register(CatCommand())
 _registry.register(RefreshCommand())
 _registry.register(ConfigCommand())
+_registry.register(NotifyCommand())
 _registry.register(McpCommand())
 _registry.register(VersionCommand())
 

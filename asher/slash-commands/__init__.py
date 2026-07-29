@@ -20,6 +20,7 @@ authoritative, always-up-to-date list is the registry itself — run
     /cat on|off|colour ... show/hide the cat panel, or recolour the art
     /refresh [seconds|off] change the auto-poll interval or disable it
     /config                show current runtime settings
+    /notify on|off|sound on|off|test  desktop toast settings for fault events
     /version               show asher-cli / Python / pylitterbot / textual versions
     /mcp on|off|status     manage the Litter-Robot MCP server entry in Claude Desktop
     /exit                  exit Asher CLI
