@@ -1,6 +1,6 @@
 # §10 — Config file persistence ✅
 
-> Archived from `ROADMAP.md` §10. The original section text, preserved verbatim.
+> Archived from [`ROADMAP.md`](../ROADMAP.md) §10. The original section text, preserved verbatim.
 
 Runtime settings now persist to `~/.asher-cli/config.json` and survive
 restarts. `asher/config.py` (modeled on `asher/mcp_config.py`) provides

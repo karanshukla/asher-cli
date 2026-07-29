@@ -1,6 +1,6 @@
 # §22 — Desktop notifications ✅
 
-> Archived from `ROADMAP.md` §22. The original section text, preserved verbatim.
+> Archived from [`ROADMAP.md`](../ROADMAP.md) §22. The original section text, preserved verbatim.
 
 Yes, a CLI app can push OS-level toast notifications — the terminal doesn't need
 to be in focus. The approach depends on platform but `plyer` abstracts it cleanly.

@@ -44,11 +44,26 @@ jobs:
     needs: [build, publish]
     runs-on: ubuntu-latest
     steps:
+      # Full history (fetch-depth: 0) so git-cliff can walk commits/tags.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: dist
           path: dist/
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - name: Install git-cliff
+        run: uv tool install git-cliff
+      - name: Generate release notes with git-cliff
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          # Explicit -c cliff.toml avoids auto-discovering pyproject.toml.
+          # Pin the just-released version so git-cliff groups its commits under
+          # the right heading even before the tag is fetched, then emit only
+          # that section (--latest) with the header stripped.
+          git cliff -c cliff.toml --tag "v${VERSION}" --latest --strip header -o RELEASE_NOTES.md
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -56,5 +71,5 @@ jobs:
         run: |
           gh release create "v${VERSION}" dist/* \
             --title "v${VERSION}" \
-            --generate-notes \
+            --notes-file RELEASE_NOTES.md \
             --verify-tag=false

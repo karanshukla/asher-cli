@@ -1,6 +1,6 @@
 # Roadmap archive — completed sections
 
-Shipped roadmap items, moved out of the main [`ROADMAP.md`](../../ROADMAP.md)
+Shipped roadmap items, moved out of the main [`ROADMAP.md`](../ROADMAP.md)
 so that file reads as a short list of *what's left to build*. Each entry below
 is the original section text preserved verbatim for reference; nothing here is
 still pending.

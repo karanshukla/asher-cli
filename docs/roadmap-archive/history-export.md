@@ -1,6 +1,6 @@
 # §2 — History export to CSV ✅
 
-> Archived from `ROADMAP.md` §2. The original section text, preserved verbatim.
+> Archived from [`ROADMAP.md`](../ROADMAP.md) §2. The original section text, preserved verbatim.
 
 Writes activity history to a CSV file and opens the containing folder in the OS file explorer.
 

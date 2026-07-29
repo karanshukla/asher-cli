@@ -33,6 +33,12 @@ mcp = ["pylitterbot[mcp]==2025.6.2"]
 asher = "asher.__main__:main"
 asher-mcp-launch = "asher.mcp_bridge:main"
 
+[project.urls]
+Homepage = "https://github.com/karanshukla/asher-cli"
+Repository = "https://github.com/karanshukla/asher-cli"
+Issues = "https://github.com/karanshukla/asher-cli/issues"
+Changelog = "https://github.com/karanshukla/asher-cli/blob/main/CHANGELOG.md"
+
 [dependency-groups]
 dev = [
     "pytest>=8.0",
@@ -44,6 +50,7 @@ dev = [
     "poethepoet>=0.27",
     "textual-dev>=1.0",
     "watchfiles>=0.21",
+    "git-cliff>=2.0",
 ]
 
 [tool.poe.tasks]
@@ -54,6 +61,7 @@ test   = "pytest tests/ -v --tb=short"
 fix.sequence = [{cmd = "ruff check --fix ."}, {cmd = "ruff format ."}]
 dev    = "textual run --dev asher/__main__.py"
 watch  = "python watchrun.py"
+changelog = "git cliff -c cliff.toml -o CHANGELOG.md"
 check.sequence = ["lint", "fmt", "types", "test"]
 check.help = "run all CI checks locally"
 

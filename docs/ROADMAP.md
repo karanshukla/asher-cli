@@ -4,7 +4,7 @@ Current state, missing functionality, and suggested additions — grounded in wh
 `pylitterbot` actually exposes today.
 
 > Completed items are marked `~~strikethrough~~ ✅` inline and their full design
-> notes have been moved to [`docs/roadmap-archive/`](docs/roadmap-archive/README.md)
+> notes have been moved to [`roadmap-archive/`](roadmap-archive/README.md)
 > so this file reads as a short list of what's left to build.
 
 ---
@@ -116,7 +116,7 @@ hard-coding `pets[0]`. Supports both index and name lookup.
 
 ---
 
-## ~~2. History export to CSV~~ ✅ → [archived](docs/roadmap-archive/history-export.md)
+## ~~2. History export to CSV~~ ✅ → [archived](roadmap-archive/history-export.md)
 
 `export [days|month]` writes activity history to `~/Downloads/asher-<serial>-<date>.csv` and opens the folder. Shipped — full design notes moved to the archive.
 
@@ -406,13 +406,13 @@ The `sleep` / `wake` commands should detect the robot model and dispatch accordi
 
 ---
 
-## ~~9. Fault monitoring & alerts~~ ✅ → [archived](docs/roadmap-archive/fault-monitoring.md)
+## ~~9. Fault monitoring & alerts~~ ✅ → [archived](roadmap-archive/fault-monitoring.md)
 
 Model-scoped fault detection (`asher/faults.py`) drives the in-panel `#fault-banner`; `d` dismisses. Shipped — full design notes moved to the archive.
 
 ---
 
-## ~~10. Config file persistence~~ ✅ → [archived](docs/roadmap-archive/config-persistence.md)
+## ~~10. Config file persistence~~ ✅ → [archived](roadmap-archive/config-persistence.md)
 
 ~/.asher-cli/config.json persists /refresh, /cat, /pet across restarts. Shipped — full design notes moved to the archive.
 
@@ -823,12 +823,13 @@ and immediately type `asher` in any terminal, with no manual venv or clone requi
 
 ### Publishing to PyPI
 
+Builds use `uv build` (the same command the release workflow runs):
+
 ```bash
 # 1. Build the distribution
-pip install hatch
-hatch build
-# → dist/asher-1.0.0-py3-none-any.whl
-# → dist/asher-cli-1.0.0.tar.gz
+uv build
+# → dist/asher_cli-X.Y.Z-py3-none-any.whl
+# → dist/asher_cli-X.Y.Z.tar.gz
 
 # 2. Test in a clean environment first
 pipx install asher-cli --index-url https://test.pypi.org/simple/
@@ -844,41 +845,19 @@ asher
 
 ### Automate publishing on release branch push (release.yml) ✅
 
-`.github/workflows/release.yml` is live. Triggered by pushing to any
-`release/*` branch (not tags — tags are for git history only, not CI triggers):
+[`.github/workflows/release.yml`](../../.github/workflows/release.yml) is live —
+see that file for the authoritative version (SHA-pinned actions). It is
+triggered by pushing to any `release/*` branch (not tags — tags are for git
+history only, not CI triggers), and runs three jobs:
 
-```yaml
-name: Release
-on:
-  push:
-    branches:
-      - "release/*"
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
-      - run: uv build
-      - uses: actions/upload-artifact@v4
-        with:
-          name: dist
-          path: dist/
-
-  publish:
-    needs: build
-    runs-on: ubuntu-latest
-    environment: pypi
-    permissions:
-      id-token: write   # OIDC trusted publishing — no API token needed
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: dist
-          path: dist/
-      - uses: pypa/gh-action-pypi-publish@release/v1
-```
+1. **build** — `actions/checkout` (full history, `fetch-depth: 0`, for the
+   changelog), `uv build`, uploads the `dist/` artifact.
+2. **publish** — downloads the artifact and uses
+   `pypa/gh-action-pypi-publish@release/v1` with **OIDC trusted publishing**
+   (no stored API token). Runs in the `pypi` environment.
+3. **github-release** — regenerates the release notes with `git-cliff` (same
+   `cliff.toml` as the local `poe changelog` task) and creates the GitHub
+   Release via `gh release create`, attaching the built wheels/sdist.
 
 **Trusted publishing**: PyPI is configured to trust the OIDC token for
 `karanshukla/asher-cli` → `release.yml` → `pypi` environment. No stored API
@@ -888,18 +867,20 @@ token needed.
 `main`:
 
 ```bash
-git checkout release/1.0.0
-git checkout -b release/1.0.1
+git checkout release/X.Y.Z
+git checkout -b release/X.Y.(Z+1)
 # cherry-pick fix, bump version in pyproject.toml
-git push origin release/1.0.1   # → triggers publish
-git tag v1.0.1                  # optional, for git history only
+git push origin release/X.Y.(Z+1)   # → triggers publish
+git tag vX.Y.(Z+1)                  # optional, for git history only
 ```
 
 ### Package release checklist
 
-- [ ] `hatch version minor` — bump version in `pyproject.toml`
-- [ ] `CHANGELOG.md` updated
-- [ ] `README.md` has `pip install asher-cli` install instructions
+- [x] `bump-my-version bump minor|patch|major` — bumps version in `pyproject.toml`
+  (auto-commits + tags)
+- [x] `CHANGELOG.md` regenerated via `uv run poe changelog` (committed before
+  the version bump)
+- [x] `README.md` has `pip install asher-cli` install instructions
 - [ ] Tested in a clean venv: `pip install .` then `asher`
 - [ ] `git checkout -b release/X.Y.Z && git push origin release/X.Y.Z`
 
@@ -967,8 +948,8 @@ Run with `uv run app.py` — no venv setup needed, `uv` handles it.
 
 ### Distribution checklist
 
-- [ ] `pyproject.toml` with version, dependencies, entry point
-- [ ] `CHANGELOG.md`
+- [x] `pyproject.toml` with version, dependencies, entry point
+- [x] `CHANGELOG.md` (auto-generated by git-cliff)
 - [ ] GitHub Release with attached `.exe` / binary built by CI
 - [ ] GitHub Actions workflow: `build.yml` running PyInstaller on
   ubuntu-latest, windows-latest, macos-latest
@@ -1124,7 +1105,7 @@ remaining item from the original suggestion that isn't yet in place.
 
 ---
 
-## ~~18. Cat panel — robot status badges underneath the art~~ ✅ → [archived](docs/roadmap-archive/cat-panel-badges.md)
+## ~~18. Cat panel — robot status badges underneath the art~~ ✅ → [archived](roadmap-archive/cat-panel-badges.md)
 
 #cat-status widget under the cat art (status chip, lock, sleep, night light, wait). Shipped — full design notes moved to the archive.
 
@@ -1242,10 +1223,10 @@ Version lives in exactly one place — `pyproject.toml` — and is read everywhe
 # pyproject.toml
 [project]
 name = "asher-cli"
-version = "1.0.0"
+version = "0.2.0"
 ```
 
-`app.py` reads it at runtime instead of hard-coding `VERSION = "1.0.0"`:
+`asher/ui/__init__.py` reads it at runtime instead of hard-coding a version:
 
 ```python
 from importlib.metadata import version, PackageNotFoundError
@@ -1279,62 +1260,55 @@ Rules of thumb:
 
 ### Bumping the version ✅
 
-The project uses `bump-my-version` (more configurable than `hatch version`),
+The project uses [`bump-my-version`](https://github.com/callowayproject/bump-my-version),
 configured in `pyproject.toml`:
 
 ```bash
-uv run bump-my-version bump patch    # 0.0.5 → 0.0.6
-uv run bump-my-version bump minor    # 0.0.5 → 0.1.0
-uv run bump-my-version bump major    # 0.0.5 → 1.0.0
+uv run bump-my-version bump patch    # 0.2.0 → 0.2.1
+uv run bump-my-version bump minor    # 0.2.0 → 0.3.0
+uv run bump-my-version bump major    # 0.2.0 → 1.0.0
 ```
 
 The `[tool.bumpversion]` block rewrites the version in `pyproject.toml`, and is
-configured with `commit = true`, `tag = true`, `tag_name = "v{new_version}"` —
-so a single bump command commits, tags, and signs in one step (the README
-"Releasing" section documents the full flow). This is live and used for every
-release.
+configured with `commit = true`, `tag = true`, `tag_name = "v{new_version}"`,
+plus a `pre_commit_hooks` step that re-locks with `uv lock` — so a single bump
+command rewrites the version, re-locks, commits, and tags in one step (the
+README "Releasing" section documents the full flow). This is live and used for
+every release.
 
 ### Git tagging convention
 
-Every release gets a signed tag:
+Every release gets a `v`-prefixed tag (created automatically by bump-my-version):
 
 ```bash
-git tag -s v1.1.0 -m "release: v1.1.0"
-git push origin v1.1.0
+# created automatically by `bump-my-version bump ...`; push it manually:
+git push origin vX.Y.Z
 ```
 
-The `v` prefix is conventional and lets GitHub Actions trigger release workflows
-on `v*` tag pushes.
+The `v` prefix is conventional. The release workflow keys off the
+`release/*` *branch* name (not the tag) for the published version.
 
-### Changelog — not yet in place
+### Changelog — automated via git-cliff ✅
 
-No `CHANGELOG.md` exists yet. The plan is to keep one in
-[Keep a Changelog](https://keepachangelog.com) format, with each PR merging
-under `## [Unreleased]` and that section becoming `## [x.y.z] — YYYY-MM-DD` on
-release.
+[`CHANGELOG.md`](../../CHANGELOG.md) is generated by
+[git-cliff](https://git-cliff.org) from conventional-commit history, in
+[Keep a Changelog](https://keepachangelog.com) format. The config lives in
+[`cliff.toml`](../../cliff.toml) and groups commits by prefix (`feat` →
+Features, `fix` → Bug Fixes, etc.), skipping merge/bump/Renovate noise.
 
-```markdown
-## [Unreleased]
-### Added
-- Cat panel status badges (lock, sleep, night light, wait time)
-- `/robot` slash command for switching active robot
-
-### Fixed
-- `history` command using wrong method name (`get_activity` → `get_activity_history`)
-- `quit`/`exit` crash in async worker (`call_from_thread` on same thread)
-
-## [1.0.0] — 2026-06-14
-### Added
-- Initial release
-```
-
-**Automation option:** `git-cliff` auto-generates changelog entries from
-conventional commit messages (`feat:`, `fix:`, `chore:` prefixes):
+**Local** — regenerate before cutting a release (idempotent; committed before
+the version bump):
 
 ```bash
-pip install git-cliff
-git cliff --tag v1.1.0 -o CHANGELOG.md
+uv run poe changelog        # git cliff -o CHANGELOG.md
 ```
+
+**CI** — the `github-release` job in `release.yml` runs
+`git cliff --latest --strip header` to produce the GitHub Release body, so the
+release notes always match the changelog. See §15 above for the workflow.
+
+Because the same `cliff.toml` drives both, the GitHub Release body and
+`CHANGELOG.md` cannot drift apart.
 
 ---
 
@@ -1397,59 +1371,22 @@ jobs:
 
 ### `.github/workflows/release.yml` ✅ — triggered on `release/*` branch push
 
-```yaml
-name: Release
-on:
-  push:
-    branches:
-      - "release/*"
+The live, SHA-pinned workflow is at
+[`../../.github/workflows/release.yml`](../../.github/workflows/release.yml) —
+read that file for the authoritative version rather than a copy here (a pasted
+YAML in docs drifts from the real one). The previous design that embedded a
+hypothetical PyInstaller-matrix + `softprops/action-gh-release` flow here was
+aspirational and did not match what actually ships. The real workflow:
 
-jobs:
-  build:
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            artifact: asher-linux
-            binary: dist/asher
-          - os: windows-latest
-            artifact: asher-windows
-            binary: dist/asher.exe
-          - os: macos-latest
-            artifact: asher-macos
-            binary: dist/asher
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
-      - run: uv sync
-      - run: uv run pyinstaller --onefile --name asher asher/__main__.py
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact }}
-          path: ${{ matrix.binary }}
+1. **build** — `uv build` (wheel + sdist), uploads `dist/` as an artifact.
+2. **publish** — OIDC trusted publishing to PyPI (no API token).
+3. **github-release** — regenerates release notes with `git cliff --latest`
+   (same `cliff.toml` as `poe changelog`) and creates the GitHub Release,
+   attaching the built wheels/sdist.
 
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0          # needed for git-cliff changelog
-      - uses: actions/download-artifact@v4
-        with:
-          path: artifacts/
-      - name: Generate changelog
-        run: |
-          pip install git-cliff
-          git cliff --latest --strip header -o RELEASE_NOTES.md
-      - uses: softprops/action-gh-release@v2
-        with:
-          body_path: RELEASE_NOTES.md
-          files: artifacts/**/*
-```
+A standalone-binary build (PyInstaller/Nuitka matrix attaching `.exe`/binary
+artifacts to the release) is described in §16 but not yet wired — that's a
+stretch goal.
 
 ### Dependency automation ✅ (Renovate)
 
@@ -1488,8 +1425,8 @@ Protect `main`:
 ## Test plan
 - [ ] Ran `pytest tests/` locally — all green
 - [ ] Tested in terminal (ran `asher` and exercised changed commands)
-- [ ] Updated CHANGELOG.md under [Unreleased]
 - [ ] No new hard-coded `VERSION` strings (use `importlib.metadata`)
+- [ ] Commit message follows conventional format (so git-cliff can group it)
 ```
 
 ### Code quality gates
@@ -1525,23 +1462,24 @@ testpaths = ["tests"]
 
 ### Release checklist (manual steps)
 
-1. `uv run pytest` — all green
-2. `hatch version minor` (or patch/major)
-3. Update `CHANGELOG.md` — move `[Unreleased]` → `[x.y.z] — YYYY-MM-DD`
-4. `git add pyproject.toml CHANGELOG.md && git commit -m "release: vX.Y.Z"`
-5. `git tag -s vX.Y.Z -m "release: vX.Y.Z"`
-6. `git push origin main --tags`
-7. GitHub Actions builds binaries and creates the release automatically
+1. `uv run poe check` — all green
+2. `uv run poe changelog` — regenerate `CHANGELOG.md`, then
+   `git add CHANGELOG.md && git commit -m "docs(changelog): update for vX.Y.Z"`
+3. `uv run bump-my-version bump minor|patch|major` — bumps `pyproject.toml`,
+   re-locks, commits, and tags `vX.Y.Z` in one step
+4. `git push origin main --tags`
+5. `git checkout -b release/X.Y.Z && git push origin release/X.Y.Z` — triggers
+   PyPI publish (OIDC) + GitHub Release (notes from git-cliff) automatically
 
 ---
 
-## ~~22. Desktop notifications~~ ✅ → [archived](docs/roadmap-archive/desktop-notifications.md)
+## ~~22. Desktop notifications~~ ✅ → [archived](roadmap-archive/desktop-notifications.md)
 
 OS-level toast notifications on fault state transitions (cat detected, pinch, motor/retract faults, drawer full), plus an audible alert and a `/notify on|off|sound on|off|test` slash command that persists. Shipped — full design notes moved to the archive.
 
 ---
 
-## ~~23. Tab completion for slash commands~~ ✅ → [archived](docs/roadmap-archive/tab-completion.md)
+## ~~23. Tab completion for slash commands~~ ✅ → [archived](roadmap-archive/tab-completion.md)
 
 Claude Code-style / overlay + inline ghost-text completion. Shipped — full design notes moved to the archive.
 
@@ -1553,7 +1491,7 @@ Claude Code-style / overlay + inline ghost-text completion. Shipped — full des
 chip of the status bar:
 
 ```
-◆ Asher CLI v1.0.0   [robot name]   ● ONLINE   [Ready]
+◆ Asher CLI v0.2.0   [robot name]   ● ONLINE   [Ready]
 ```
 
 The `_refresh_title()` method in `asher/ui/__init__.py` builds this; version
@@ -1567,10 +1505,10 @@ runtime versions to the log via `importlib.metadata.version()` with a
 source without `pip install -e .`:
 
 ```
-  Asher CLI v1.0.0
+  Asher CLI v0.2.0
   Python 3.12.3
-  pylitterbot 3.x.x
-  textual 0.x.x
+  pylitterbot 2025.6.2
+  textual 8.x.x
 ```
 
 ### ~~Status bar title — model badge~~ ✅
@@ -1578,14 +1516,14 @@ source without `pip install -e .`:
 The `#robot-lbl` widget already shows the model type appended to the robot name:
 
 ```
-◆ Asher CLI v1.0.0   Idiot Box  LR4   ● ONLINE   ⟳ Cycling
+◆ Asher CLI v0.2.0   Idiot Box  LR4   ● ONLINE   ⟳ Cycling
 ```
 
 Implemented via `robot_model(r)` in `asher/helpers.py`, called from `_refresh_status()` in `asher/monitoring/__init__.py`.
 
 ---
 
-## ~~25. Headless CLI export — automate history without the TUI or MCP~~ ✅ → [archived](docs/roadmap-archive/headless-export.md)
+## ~~25. Headless CLI export — automate history without the TUI or MCP~~ ✅ → [archived](roadmap-archive/headless-export.md)
 
 asher --export 7 writes CSV without launching the TUI, for cron/Task Scheduler/SSH. Shipped — full design notes moved to the archive.
 
@@ -1718,7 +1656,7 @@ Ranked by user-visible impact vs. implementation effort:
 
 1. ~~**PyPI publish**~~ (§15) ✅ — `release.yml` live; push `release/x.y.z` branch to publish
 2. ~~**CI/CD pipeline**~~ ✅ — lint + test + release workflows in `.github/workflows/`
-3. ~~**Versioning discipline** (§20)~~ ✅ — `bump-my-version` configured with auto-commit + signed tags (`v{x.y.z}`); only `CHANGELOG.md` remains undone
+3. ~~**Versioning discipline** (§20)~~ ✅ — `bump-my-version` configured with auto-commit + auto-tag (`v{x.y.z}`); `CHANGELOG.md` auto-generated from conventional commits via git-cliff (`cliff.toml` + `poe changelog` task + CI release notes)
 4. **Standalone binary** (§16) — PyInstaller `.exe` + macOS/Linux builds via CI matrix
 5. ~~**Dependabot / Renovate** (§21)~~ ✅ — Renovate (`renovate.json`) live, weekly, `pylitterbot` pinned to manual review
 
