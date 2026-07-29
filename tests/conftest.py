@@ -11,6 +11,7 @@ import pytest
 @pytest.fixture
 def mock_robot():
     from pylitterbot.enums import GlobeMotorFaultStatus, LitterBoxStatus
+    from pylitterbot.robot.litterrobot4 import UsbFaultStatus
 
     # Named subclass so type(r).__name__ == "LitterRobot4" (check_faults dispatch).
     lr4_cls = type("LitterRobot4", (MagicMock,), {})
@@ -29,6 +30,7 @@ def mock_robot():
     # when healthy, so they must be set explicitly to avoid false positives).
     r.globe_motor_fault_status = GlobeMotorFaultStatus.NONE
     r.globe_motor_retract_fault_status = GlobeMotorFaultStatus.NONE
+    r.usb_fault_status = UsbFaultStatus.NONE
     r.is_hopper_removed = False
     r.is_bonnet_removed = False
     r.is_laser_dirty = False

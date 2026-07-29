@@ -25,6 +25,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from pylitterbot.enums import GlobeMotorFaultStatus, LitterBoxStatus
+from pylitterbot.robot.litterrobot4 import UsbFaultStatus
 
 if TYPE_CHECKING:
     from .robot_protocol import RobotProtocol
@@ -33,6 +34,7 @@ SEVERITY_ERROR = "error"
 SEVERITY_WARN = "warn"
 
 _GLOBE_HEALTHY = frozenset({GlobeMotorFaultStatus.NONE, GlobeMotorFaultStatus.FAULT_CLEAR})
+_USB_HEALTHY = frozenset({UsbFaultStatus.NONE, UsbFaultStatus.CLEAR})
 
 
 @dataclass(frozen=True)
@@ -87,6 +89,7 @@ _MODEL_ENUM_FAULTS: dict[str, tuple[_EnumCheck, ...]] = {
             SEVERITY_ERROR,
             _GLOBE_HEALTHY,
         ),
+        _EnumCheck("usb_fault_status", "USB POWER FAULT", SEVERITY_ERROR, _USB_HEALTHY),
     ),
     "LitterRobot5": (
         _EnumCheck("globe_motor_fault_status", "GLOBE MOTOR FAULT", SEVERITY_ERROR, _GLOBE_HEALTHY),

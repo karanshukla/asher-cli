@@ -5,11 +5,13 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 from pylitterbot.enums import GlobeMotorFaultStatus, LitterBoxStatus
+from pylitterbot.robot.litterrobot4 import UsbFaultStatus
 
 from asher.faults import SEVERITY_ERROR, SEVERITY_WARN, Fault, check_faults
 
 _OK_GLOBE = GlobeMotorFaultStatus.NONE
 _FAULT_GLOBE = GlobeMotorFaultStatus.FAULT_OVERTORQUE_AMP
+_OK_USB = UsbFaultStatus.NONE
 
 
 def _robot(model: str, **overrides: object) -> MagicMock:
@@ -26,6 +28,7 @@ def _robot(model: str, **overrides: object) -> MagicMock:
     r.status = LitterBoxStatus.READY
     r.globe_motor_fault_status = _OK_GLOBE
     r.globe_motor_retract_fault_status = _OK_GLOBE
+    r.usb_fault_status = _OK_USB
     r.is_hopper_removed = True
     r.is_bonnet_removed = False
     r.is_laser_dirty = False
@@ -127,6 +130,14 @@ class TestLR4ComponentFaults:
     def test_globe_motor_retract_fault(self):
         faults = check_faults(_lr4(globe_motor_retract_fault_status=_FAULT_GLOBE))
         assert any("RETRACT FAULT" in f.label for f in faults)
+
+    def test_usb_fault_is_error(self):
+        faults = check_faults(_lr4(usb_fault_status=UsbFaultStatus.SET))
+        assert any(f.label == "USB POWER FAULT" and f.severity == SEVERITY_ERROR for f in faults)
+
+    def test_usb_healthy_is_not_a_fault(self):
+        assert check_faults(_lr4(usb_fault_status=UsbFaultStatus.NONE)) == []
+        assert check_faults(_lr4(usb_fault_status=UsbFaultStatus.CLEAR)) == []
 
     def test_lr4_ignores_lr5_only_bool_attrs(self):
         """LR4 allowlist must not check bonnet/laser/gas/drawer-removed."""

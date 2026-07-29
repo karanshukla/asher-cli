@@ -58,6 +58,31 @@ def _status_text(status: object) -> str:
     return str(status)
 
 
+_POWER_LABELS = {"AC": "AC (mains)", "DC": "Battery", "NC": "Off/unknown"}
+
+
+def _fmt_power(power_type: object) -> str:
+    """Render a power source string ('AC'/'DC'/'NC') readably."""
+    return _POWER_LABELS.get(str(power_type) if power_type else "", "—")
+
+
+def _fmt_wifi(status: object) -> str:
+    """Render an LR4 WifiModeStatus enum readably; '—' when absent/unknown."""
+    name: str | None = getattr(status, "name", None)
+    if not name or name == "NONE":
+        return "—"
+    suffix = name.split("_", 1)[-1].lower()
+    if name == "OFF":
+        return "off"
+    if suffix == "connected":
+        return "connected"
+    if suffix == "waiting":
+        return "connecting"
+    if suffix == "fault":
+        return "fault"
+    return suffix
+
+
 def _persist(app: AsherApp, **changes: object) -> None:
     """Persist a runtime setting to ``~/.asher-cli/config.json``.
 
@@ -200,16 +225,27 @@ class InfoCommand(Command):
             nl_mode.value.lower() if nl_mode is not None else ("on" if nl_enabled else "off")
         )
         last_seen = getattr(app, "_last_cat_seen", None) or getattr(r, "last_seen", None)
+        litter = getattr(r, "litter_level", None)
+        litter_str = f"{float(litter):.0f}%" if litter is not None else "—"
+        brightness = getattr(r, "panel_brightness", None)
+        brightness_str = str(brightness).split(".")[-1].lower() if brightness else "—"
+        cycles = getattr(r, "cycle_count", None)
+        cycles_str = str(cycles) if cycles is not None else "—"
         rows = [
             ("Name", getattr(r, "name", "—")),
             ("Model", robot_model(r)),
             ("Serial", getattr(r, "serial", "—")),
             ("Firmware", getattr(r, "firmware", "—") or "—"),
+            ("Power", _fmt_power(getattr(r, "power_type", None))),
             ("Wait time", _fmt_wait_time(getattr(r, "clean_cycle_wait_time_minutes", None))),
             ("Sleeping", _yn(getattr(r, "sleep_mode_enabled", False))),
             ("Panel locked", _yn(getattr(r, "panel_lock_enabled", False))),
+            ("Panel bright", brightness_str),
             ("Night light", night_str),
             ("Drawer", f"{float(getattr(r, 'waste_drawer_level', 0) or 0):.0f}%"),
+            ("Litter", litter_str),
+            ("Cycles", cycles_str),
+            ("Wi-Fi", _fmt_wifi(getattr(r, "wifi_mode_status", None))),
             ("Online", _yn(getattr(r, "is_online", False))),
             ("Last seen", fmt_ago(last_seen)),
         ]
@@ -369,6 +405,25 @@ class NightLightBrightnessCommand(Command):
             if mode_str != "off":
                 nl.append(f"  {level}%", style="#484f58")
             app.query_one("#nightlight-lbl", Static).update(nl)
+        else:
+            app._log_warn(msg)
+
+
+class PanelBrightnessCommand(Command):
+    name = "panel-brightness"
+    aliases = ("pb",)
+    description = "<low|medium|high>  set control-panel brightness (LR4/LR5)"
+    requires_robot = True
+
+    async def run(self, app: AsherApp, args: list[str]) -> None:
+        assert app._adapter is not None
+        if not args:
+            current = getattr(app._robot, "panel_brightness", None)
+            app._log_info(f"Usage: panel-brightness <low|medium|high>  (current: {current or '—'})")
+            return
+        ok, msg = await app._adapter.set_panel_brightness(args[0].lower())
+        if ok:
+            app._log_ok(msg)
         else:
             app._log_warn(msg)
 
@@ -1285,6 +1340,7 @@ _registry.register(SleepCommand())
 _registry.register(WakeCommand())
 _registry.register(NightLightCommand())
 _registry.register(NightLightBrightnessCommand())
+_registry.register(PanelBrightnessCommand())
 _registry.register(HistoryCommand())
 _registry.register(WaitTimeCommand())
 _registry.register(PowerCommand())
