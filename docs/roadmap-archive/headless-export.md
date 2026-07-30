@@ -1,6 +1,6 @@
 # §25 — Headless CLI export — automate history without the TUI or MCP ✅
 
-> Archived from `ROADMAP.md` §25. The original section text, preserved verbatim.
+> Archived from [`ROADMAP.md`](../ROADMAP.md) §25. The original section text, preserved verbatim.
 
 `asher --export 7` writes activity history to CSV **without launching the
 TUI** — for cron, Windows Task Scheduler, systemd timers, SSH, containers.

@@ -1,6 +1,6 @@
 # §23 — Tab completion for slash commands ✅
 
-> Archived from `ROADMAP.md` §23. The original section text, preserved verbatim.
+> Archived from [`ROADMAP.md`](../ROADMAP.md) §23. The original section text, preserved verbatim.
 
 Inspired by Claude Code's `/` menu — when the user types `/` into the command
 input, a completion overlay appears listing all slash commands and narrows in

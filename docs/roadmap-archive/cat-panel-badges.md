@@ -1,6 +1,6 @@
 # §18 — Cat panel — robot status badges underneath the art ✅
 
-> Archived from `ROADMAP.md` §18. The original section text, preserved verbatim.
+> Archived from [`ROADMAP.md`](../ROADMAP.md) §18. The original section text, preserved verbatim.
 
 A `#cat-label` widget renders the mode label (`connected`, `cycling…`,
 `fault!`, …) and a `#cat-status` widget below it shows **complementary** info

@@ -1,6 +1,6 @@
 # §9 — Fault monitoring & alerts ✅
 
-> Archived from `ROADMAP.md` §9. The original section text, preserved verbatim.
+> Archived from [`ROADMAP.md`](../ROADMAP.md) §9. The original section text, preserved verbatim.
 
 Live fault detection lives in `asher/faults.py` (`check_faults(robot)`), called
 from `MonitoringMixin._refresh_faults` on every status refresh (WebSocket push
