@@ -293,13 +293,7 @@ CI runs on Python 3.10 / 3.11 / 3.12 across Ubuntu, Windows, and macOS on every 
 ## Changelog
 
 The full, maintained release history lives in [CHANGELOG.md](CHANGELOG.md),
-auto-generated from conventional commits by
-[git-cliff](https://git-cliff.org). Highlights:
-
-- **[Unreleased](CHANGELOG.md#unreleased)** — LR3/LR4 completion (`panel-brightness`, new `info` fields, USB-fault detection), desktop fault notifications, runtime config persistence.
-- **[0.2.0](CHANGELOG.md#020---2026-07-27)** — headless `--export`, activity-history pager, slash-command tab completion.
-- **[0.1.1](CHANGELOG.md#011---2026-07-21)** — token persistence, `/version`, sleep-schedule viewer, cat-panel badges, fault banner.
-- **[0.1.0](CHANGELOG.md#010---2026-07-20)** — readable status/history, missing robot commands, LR5 extras, MCP bridge.
+auto-generated from conventional commits by [git-cliff](https://git-cliff.org).
 
 ## Notes
 
