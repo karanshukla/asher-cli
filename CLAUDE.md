@@ -46,7 +46,7 @@ asher/
   mcp_config.py     Claude Desktop config read/write for the /mcp slash command
   mcp_bridge.py     asher-mcp-launch console script — keyring-backed pylitterbot MCP launcher
   faults.py         check_faults(robot) — model-scoped safety/component fault detection (status enum + per-model attr allowlist incl. LR4 USB power fault; hopper never a fault)
-  history_view.py   HistoryScreen (ModalScreen) + format_history_rows() — scrollable activity-history pager pushed by the `history` command
+  history_view.py   HistoryScreen (ModalScreen) + format_history_rows()/format_history_text() — scrollable activity-history pager pushed by the `history` command; `c` copies the full history (plain text) to the clipboard via action_copy_all()
   export.py         shared activity-history CSV core + headless export path: build_history_csv(), resolve_dest(), resolve_robot(), _run_headless_export(), ExportError — no Textual imports; both the TUI `export` command and `asher --export` call build_history_csv()
   completion.py     pure helpers for command completion: slash popup (slash_matches, enter_completes, render_completion) + inline ghost text (CommandSuggester) — fed by _registry, no Textual imports except the Suggester base class
   __main__.py       main() entry point
@@ -75,7 +75,7 @@ tests/
   test_mcp_bridge.py      mcp_bridge launcher credential/subprocess handling
   test_mcp_command.py     /mcp slash command dispatch
   test_faults.py          check_faults() — safety statuses, attribute faults, graceful degradation
-  test_history_view.py    format_history_rows() + HistoryScreen structure + Pilot push/dismiss
+  test_history_view.py    format_history_rows()/format_history_text() + HistoryScreen structure, copy-all + Pilot push/dismiss
   test_export.py          build_history_csv/resolve_dest/resolve_robot/parse_days (pure) + headless _run_headless_export (no Pilot, mocks _connect_headless)
   test_completion.py      slash_matches/enter_completes/render_completion (pure) + Pilot overlay visibility/navigation/accept
 
