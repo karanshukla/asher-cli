@@ -1522,6 +1522,11 @@ class CommandsMixin:
         return False
 
     def on_key(self, event) -> None:  # type: ignore[override]
+        # A pushed modal (history pager, login modal, …) owns its keys. The base
+        # screen's `focused` still points at #cmd-input under a modal, so
+        # has_focus alone would let us hijack arrows/special keys from the overlay.
+        if len(self.screen_stack) > 1:  # type: ignore[attr-defined]
+            return
         cmd_input = self.query_one("#cmd-input", Input)  # type: ignore[attr-defined]
         if not cmd_input.has_focus:
             return

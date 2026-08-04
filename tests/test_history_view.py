@@ -21,7 +21,7 @@ from textual.app import App
 from textual.containers import ScrollableContainer
 from textual.widgets import Static
 
-from asher.history_view import HistoryScreen, format_history_rows
+from asher.history_view import HistoryScreen, format_history_rows, format_history_text
 
 
 def _act(action: Any, *, timestamp: datetime | None = None) -> SimpleNamespace:
@@ -110,6 +110,35 @@ class TestFormatHistoryRows:
 
     def test_empty_input_returns_empty_list(self):
         assert format_history_rows([]) == []
+
+
+# ── format_history_text (clipboard payload) ─────────────────────────────────
+
+
+class TestFormatHistoryText:
+    def test_plain_text_includes_title_summary_and_rows(self):
+        acts = [
+            _act(
+                LitterBoxStatus.CLEAN_CYCLE_COMPLETE,
+                timestamp=datetime(2026, 6, 14, 14, 0, tzinfo=timezone.utc),
+            ),
+            _act(
+                LitterBoxStatus.READY, timestamp=datetime(2026, 6, 14, 10, 0, tzinfo=timezone.utc)
+            ),
+        ]
+        text = format_history_text(acts, None, "TestBot")
+        assert "Activity history" in text
+        assert "TestBot" in text
+        assert "2 events" in text
+        assert "TIME" in text and "EVENT" in text
+        assert "Clean cycle complete" in text
+        assert "Ready" in text
+        assert "\n" in text
+
+    def test_empty_history_text(self):
+        text = format_history_text([], None, "TestBot")
+        assert "0 events" in text
+        assert "No activity history" in text
 
 
 # ── HistoryScreen ────────────────────────────────────────────────────────────
@@ -237,6 +266,44 @@ async def test_history_screen_enter_dismisses():
 
 
 @pytest.mark.asyncio
+async def test_history_screen_c_copies_all_events_to_clipboard(monkeypatch):
+    """`c` copies the full history to the clipboard and flashes the footer."""
+    captured: dict[str, str] = {}
+    monkeypatch.setattr(
+        App,
+        "copy_to_clipboard",
+        lambda self, text: captured.setdefault("text", text),
+    )
+    screen = _screen()
+    app = _ShellApp(screen)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("c")
+        await pilot.pause()
+        # The whole history was sent to the clipboard.
+        assert "TestBot" in captured["text"]
+        assert "Clean cycle complete" in captured["text"]
+        # Footer flashes a confirmation.
+        assert "Copied" in str(screen.query_one("#history-footer", Static).render())
+
+
+@pytest.mark.asyncio
+async def test_history_screen_copy_footer_restores_after_flash(monkeypatch):
+    monkeypatch.setattr(App, "copy_to_clipboard", lambda self, text: None)
+    screen = _screen()
+    app = _ShellApp(screen)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("c")
+        await pilot.pause()
+        # Advance past the 1.5s restore timer.
+        await pilot.pause(delay=1.6)
+        footer = str(screen.query_one("#history-footer", Static).render())
+        assert "Copied" not in footer
+        assert "scroll" in footer  # back to the hint line
+
+
+@pytest.mark.asyncio
 async def test_history_command_pushes_screen_with_default_limit():
     """End-to-end: typing `history` fetches with the default and pushes the pager."""
     from unittest.mock import AsyncMock, MagicMock
@@ -274,3 +341,52 @@ async def test_history_command_pushes_screen_with_default_limit():
         title = app.screen.query_one("#history-title", Static)
         assert "TestBot" in str(title.render())
         assert "1 event" in str(title.render())
+
+
+@pytest.mark.asyncio
+async def test_history_screen_arrow_keys_scroll_through_asher_app():
+    """Regression: AsherApp.on_key used to hijack ↑/↓ for command-history nav even
+    while the history pager modal was open (the base screen's `focused` still
+    pointed at #cmd-input, so a has_focus guard lied). Arrow keys must scroll the
+    pager instead.
+    """
+    from unittest.mock import AsyncMock, MagicMock
+
+    from asher.app import AsherApp
+    from asher.robot_adapters import LR3Adapter
+
+    robot = MagicMock()
+    robot.name = "TestBot"
+    robot.is_online = True
+    robot.status = MagicMock(value="Ready")
+    robot.last_seen = datetime.now(timezone.utc)
+    robot.get_activity_history = AsyncMock(
+        return_value=[
+            SimpleNamespace(
+                timestamp=datetime(2026, 7, i % 28 + 1, 12, 0, tzinfo=timezone.utc),
+                action=LitterBoxStatus.CLEAN_CYCLE_COMPLETE,
+            )
+            for i in range(40)
+        ]
+    )
+
+    app = AsherApp()
+    app._robot = robot
+    app._adapter = LR3Adapter(robot)
+    app._account = MagicMock()
+    app._account.disconnect = AsyncMock()
+    app._pets = []
+    app._connect_worker = lambda **kwargs: None  # type: ignore[method-assign]
+
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause()
+        await pilot.click("#cmd-input")
+        await pilot.press("h", "i", "s", "t", "o", "r", "y")
+        await pilot.press("enter")
+        await pilot.pause()
+        scroll = app.screen.query_one("#history-scroll", ScrollableContainer)
+        before = scroll.scroll_y
+        await pilot.press("down", "down", "down")
+        await pilot.pause()
+        # Arrow keys reached the pager, not the app's command-history nav.
+        assert scroll.scroll_y > before

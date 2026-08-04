@@ -13,7 +13,7 @@ Layout (top to bottom):
 * summary line — a compact event-type breakdown (cleans, cat visits, …)
 * column header — pinned ``TIME`` / ``EVENT`` row aligned with the data
 * scroll area — one styled row per event, newest first, fixed-width timestamps
-* footer — navigation + close hints
+* footer — navigation, copy, and close hints (``c`` copies the whole history to the clipboard)
 
 Timestamps are rendered at a fixed width so the event column lines up
 vertically regardless of an event's age — every event shows its date.
@@ -46,6 +46,13 @@ _TS_WIDTH = 11
 # Keywords used to bucket events into the summary line — kept loose so unknown
 # raw strings still fall into "other" rather than mislabeling.
 _ALERT_KEYWORDS = ("offline", "fault", "pinch", "power", "motor", "timing")
+
+# Footer hint line shown at the bottom of the pager and restored after the
+# post-copy confirmation flash.
+_FOOTER_HINT = (
+    "  \u2191/\u2193 scroll   PgUp/PgDn page   Home/End jump   "
+    "c copy   q \u00b7 Esc \u00b7 Enter close"
+)
 
 
 def _localize(ts: object) -> datetime | None:
@@ -83,6 +90,32 @@ def format_history_rows(acts: list[Activity], pets: list[Any] | None = None) -> 
         row.append(label, style=colour)
         rows.append(row)
     return rows
+
+
+def format_history_text(
+    acts: list[Activity], pets: list[Any] | None = None, robot_name: str = ""
+) -> str:
+    """Plain-text rendering of the history, for clipboard copying.
+
+    Self-contained: title line, event-type summary, column header, and one row
+    per event (newest first) — mirrors what the on-screen pager shows so a pasted
+    copy reads the same as the view.
+    """
+    count = len(acts)
+    lines = [
+        f"Activity history \u2014 {robot_name}   {_plural(count, 'event')}   {_date_range(acts)}"
+    ]
+    if not count:
+        lines.append("No activity history available.")
+        return "\n".join(lines)
+    lines.append(_summarize(acts, pets))
+    lines.append("")
+    lines.append(f"  {'TIME'.ljust(_TS_WIDTH)}  EVENT")
+    for act in acts:
+        ts_str = _ts_str(_localize(getattr(act, "timestamp", None)))
+        label, _ = format_activity(act, pets)
+        lines.append(f"  {ts_str.ljust(_TS_WIDTH)}  {label}")
+    return "\n".join(lines)
 
 
 def _category(label: str) -> str:
@@ -147,7 +180,7 @@ class HistoryScreen(ModalScreen[None]):
 
     #history-meta {
         dock: top;
-        height: 1;
+        height: 2;
         background: #161b22;
         border-bottom: solid #30363d;
         padding: 0 2;
@@ -165,11 +198,11 @@ class HistoryScreen(ModalScreen[None]):
 
     #history-footer {
         dock: bottom;
-        height: 1;
+        height: 2;
         background: #161b22;
         border-top: solid #30363d;
         padding: 0 2;
-        color: #484f58;
+        color: #c9d1d9;
     }
 
     #history-scroll {
@@ -188,6 +221,7 @@ class HistoryScreen(ModalScreen[None]):
 
     BINDINGS = [
         Binding("escape,q,enter", "dismiss", "Close", show=False, priority=True),
+        Binding("c", "copy_all", "Copy all", show=False, priority=True),
     ]
 
     def __init__(self, acts: list[Activity], pets: list[Any] | None, robot_name: str) -> None:
@@ -195,6 +229,7 @@ class HistoryScreen(ModalScreen[None]):
         self._acts = acts
         self._pets = pets
         self._robot_name = robot_name
+        self._restore_timer: Any = None
 
     def compose(self) -> ComposeResult:
         count = len(self._acts)
@@ -209,12 +244,34 @@ class HistoryScreen(ModalScreen[None]):
             else:
                 yield Static("No activity history available for this robot.", id="history-empty")
         yield Static(
-            "  ↑/↓ scroll   PgUp/PgDn page   Home/End jump   q · Esc · Enter close",
+            _FOOTER_HINT,
             id="history-footer",
         )
 
     def on_mount(self) -> None:
         self.query_one("#history-scroll", ScrollableContainer).focus()
+
+    def action_copy_all(self) -> None:
+        """Copy the full history (plain text) to the OS clipboard.
+
+        Flashes the footer with a confirmation, then restores the hint line.
+        ``copy_to_clipboard`` uses OSC52 under the hood and silently no-ops on
+        terminals that don't support it, so we optimistically report success.
+        """
+        text = format_history_text(self._acts, self._pets, self._robot_name)
+        try:
+            self.app.copy_to_clipboard(text)
+        except Exception:
+            message = "  Clipboard unavailable in this terminal"
+        else:
+            message = f"  ✓ Copied {_plural(len(self._acts), 'event')} to clipboard"
+        self.query_one("#history-footer", Static).update(message)
+        if self._restore_timer is not None:
+            self._restore_timer.stop()
+        self._restore_timer = self.set_timer(1.5, self._restore_footer)
+
+    def _restore_footer(self) -> None:
+        self.query_one("#history-footer", Static).update(_FOOTER_HINT)
 
     def _title_line(self, count: int) -> str:
         return f"  Activity history — {self._robot_name}   {_plural(count, 'event')}   {_date_range(self._acts)}"
