@@ -33,7 +33,9 @@ def main() -> None:
     env["LITTER_ROBOT_USERNAME"] = email
     env["LITTER_ROBOT_PASSWORD"] = password
 
-    result = subprocess.run([sys.executable, "-m", "pylitterbot.mcp"], env=env, check=False)
+    result = subprocess.run(  # nosec B603 # fixed argv on this interpreter, no shell
+        [sys.executable, "-m", "pylitterbot.mcp"], env=env, check=False
+    )
     sys.exit(result.returncode)
 
 

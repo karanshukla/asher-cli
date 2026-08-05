@@ -288,6 +288,16 @@ uv run poe types   # mypy
 uv run poe check   # run all of the above + tests (same as CI)
 ```
 
+### 6. Security scan
+
+```bash
+uv run poe security # bandit, same config the Bandit workflow uses
+```
+
+Scan settings live in `[tool.bandit]` in `pyproject.toml`, so local runs and the
+Bandit workflow report identical findings. Results from `main` and pull requests
+are published to the repository's **Security → Code scanning** tab.
+
 CI runs on Python 3.10 / 3.11 / 3.12 across Ubuntu, Windows, and macOS on every push.
 
 ## Changelog

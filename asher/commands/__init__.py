@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import os
+import shutil
 import subprocess
 import sys
 from datetime import time
@@ -178,12 +179,10 @@ class StatusCommand(Command):
             return
         r = app._robot
         weight = "—"
-        try:
+        with contextlib.suppress(Exception):
             w = getattr(r, "pet_weight", None)
             if w is not None and float(w) > 0:
                 weight = f"{float(w):.1f} lb"
-        except Exception:
-            pass
         last_seen = getattr(app, "_last_cat_seen", None) or getattr(r, "last_seen", None)
         rows = [
             ("Online", "yes" if getattr(r, "is_online", False) else "no"),
@@ -618,6 +617,19 @@ def _dow_to_weekday(day: int) -> int:
     return (day - 1) % 7
 
 
+def _parse_sleep_day(day: Any) -> tuple[int, bool, object, object] | None:
+    """Read one schedule day, or None when the API returns a shape we can't read."""
+    try:
+        return (
+            _dow_to_weekday(int(getattr(day, "day", 0))),
+            bool(getattr(day, "is_enabled", False)),
+            getattr(day, "sleep_time", None),
+            getattr(day, "wake_time", None),
+        )
+    except Exception:
+        return None
+
+
 class SleepScheduleCommand(Command):
     name = "sleep-schedule"
     aliases = ("sleepschedule",)
@@ -663,23 +675,18 @@ class SleepScheduleCommand(Command):
         log = app.query_one("#log", RichLog)
         active_day_indices = set()
         if window is not None:
-            try:
+            with contextlib.suppress(Exception):
                 start_dt, end_dt = window
                 # Sleep windows can wrap past midnight, so flag both the start
                 # and end day as "active now" for the user-facing marker.
                 active_day_indices.add(start_dt.weekday())
                 active_day_indices.add(end_dt.weekday())
-            except Exception:
-                pass
 
         for day in days:
-            try:
-                idx = _dow_to_weekday(int(getattr(day, "day", 0)))
-                day_enabled = bool(getattr(day, "is_enabled", False))
-                sleep_t = getattr(day, "sleep_time", None)
-                wake_t = getattr(day, "wake_time", None)
-            except Exception:
+            parsed = _parse_sleep_day(day)
+            if parsed is None:
                 continue
+            idx, day_enabled, sleep_t, wake_t = parsed
 
             name = _DAY_NAMES[idx]
             t = Text()
@@ -1287,11 +1294,14 @@ class VersionCommand(SlashCommand):
 
 def _open_folder(path: Path) -> None:
     if sys.platform == "win32":
-        subprocess.Popen(["explorer", "/select,", str(path)])
+        argv = ["explorer", "/select,", str(path)]
     elif sys.platform == "darwin":
-        subprocess.Popen(["open", "-R", str(path)])
+        argv = ["open", "-R", str(path)]
     else:
-        subprocess.Popen(["xdg-open", str(path.parent)])
+        argv = ["xdg-open", str(path.parent)]
+
+    argv[0] = shutil.which(argv[0]) or argv[0]
+    subprocess.Popen(argv)  # nosec B603 # fixed argv, no shell, path is not user-controlled
 
 
 async def _run_export(app: AsherApp, days: int) -> None:
