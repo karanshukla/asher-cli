@@ -233,6 +233,12 @@ uv run poe security      # bandit scan (same config the Bandit workflow uses)
 
 Pre-push hook (`.githooks/pre-push`) runs: ruff check → ruff format --check → mypy. Tests are not in the hook — run them manually.
 
+## Releasing
+
+Follow [README § Releasing](README.md#releasing) exactly, in order: commit the regenerated `CHANGELOG.md` → `uv run bump-my-version bump <part>` (this commits **and tags**) → `git push && git push --tags` → only then cut and push `release/X.Y.Z`.
+
+Do not skip the tag or cut the release branch first. The release workflow builds its notes with `git cliff --latest`, which resolves against tags already present in the checkout — with no `vX.Y.Z` tag pushed, it silently emits the *previous* version's notes. Everything else (PyPI upload, release assets, tag target) still succeeds, so the only symptom is a wrong release body.
+
 ## Testing notes
 
 - Pilot-based integration tests use `app.run_test()` with `await pilot.pause()` before querying widgets
