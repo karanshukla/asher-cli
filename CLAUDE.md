@@ -4,21 +4,9 @@ Terminal dashboard for Litter Robot (LR3/LR4/LR5) via the Whisker cloud API.
 
 ## Stack
 
-- **Python 3.10+**
-- **Textual** — async TUI framework (`textual>=0.47`)
-- **pylitterbot** — unofficial Whisker API wrapper (`pylitterbot>=3.0`)
-- **python-dotenv** — credential loading (`.env` fallback)
-- **keyring>=24** — OS credential store (Windows Credential Manager / macOS Keychain / Linux Secret Service)
+- **keyring** resolves to the OS-native credential store: Windows Credential Manager / macOS Keychain / Linux Secret Service.
 
-## Tooling
-
-- **uv** — dependency management and task runner (`uv sync`, `uv run`)
-- **poethepoet** — task aliases via `uv run poe <task>`
-- **ruff** — linter and formatter
-- **mypy** — static type checking
-- **pytest + pytest-asyncio + pytest-cov** — tests
-- **textual-dev** — CSS hot reload devtools
-- **watchfiles** — Python auto-restart on file change
+See `pyproject.toml` for the full dependency and dev-tooling list (`[project].dependencies`, `[dependency-groups].dev`, `[tool.poe.tasks]`).
 
 ## Entry points
 
@@ -101,32 +89,20 @@ LITTER_ROBOT_PASSWORD=...
 Keyring service name: `asher-cli`, keys `email` and `password`.
 Helper functions in `asher/connection/__init__.py`: `_keyring_load()`, `_keyring_save()`, `_keyring_delete()`.
 
-## MCP bridge (`/mcp`)
-
-pylitterbot ships an optional MCP server (`pip install pylitterbot[mcp]`, run via `python -m pylitterbot.mcp`) that lets an MCP client like Claude Desktop monitor/control the robot directly. Its own docs configure it with plaintext credentials in the client's JSON config — asher-cli avoids that:
-
-- `/mcp on|off|status` (in `asher/commands/__init__.py`, logic in `asher/mcp_config.py`) adds/removes an entry (named by `mcp_config._SERVER_NAME`) in every `claude_desktop_config.json` this OS's Claude Desktop might read (`mcp_config.config_paths()` — on Windows this includes both the standard installer path and any MSIX/Microsoft Store virtualized path). The entry's `command` is `sys.executable -m asher.mcp_bridge` — never the credentials themselves.
-- `/mcp on` also auto-installs pylitterbot's `mcp` extra via `sys.executable -m pip install "pylitterbot[mcp]==<installed version>"` if the `mcp` package isn't importable yet.
-- `asher/mcp_bridge.py` (console script `asher-mcp-launch`) is what Claude Desktop actually spawns. It reads email/password from the OS keyring at process start, sets them as `LITTER_ROBOT_USERNAME`/`LITTER_ROBOT_PASSWORD` (pylitterbot's expected names — note these differ from asher-cli's own `.env` var `LITTER_ROBOT_USER`) in that process's environment only, then execs `python -m pylitterbot.mcp`. No credentials ever touch the on-disk MCP config.
-- `/mcp on` requires keyring credentials. If none are found but `.env` fallback credentials are set, it copies them into the keyring automatically (since the bridge process can't reliably discover a project-relative `.env` — Claude Desktop controls its working directory, not asher-cli).
-- Requires the `mcp` extra: `uv sync --extra mcp` / `pip install asher-cli[mcp]`. Restart Claude Desktop after toggling for the change to take effect.
-
 ## Command convention
 
-**Normal commands** (no prefix) — robot actions only:
-`clean`, `status`, `info`, `lock`, `unlock`, `sleep`, `wake`, `night-light on|off|auto`, `night-light-brightness <level>`, `panel-brightness <low|medium|high>`, `wait-time <minutes>`, `power on|off`, `rename <name>`, `insight [days|month]`, `sleep-schedule`, `privacy on|off`, `volume <0-100>`, `camera-audio on|off`, `drawer-reset`, `history [count|all]`, `export [days|month]`, `clear`, `help`, `quit`
+Command names, slash-command names, and their args are not listed here — see the `_registry` in `asher/commands/__init__.py`, which is authoritative; `/help` renders it at runtime. `/mcp`'s credential-bridging design is documented in the `mcp-bridge` skill.
 
-**Slash commands** (`/` prefix) — app management only:
-`/login`, `/logout`, `/robots`, `/robot <index|name>`, `/pets`, `/pet <index|name>`, `/cat on|off|colour <hex>`, `/refresh [seconds|off]`, `/config`, `/notify on|off|sound on|off|test`, `/version`, `/mcp on|off|status`, `/exit`
+**Normal commands** (no prefix) are robot actions only; **slash commands** (`/` prefix) are app management only.
 
 `/refresh`, `/cat`, `/pet`, and `/notify` persist their settings to `~/.asher-cli/config.json` (via `asher.config.update()`), so they survive restarts. Credentials and the preferred-robot serial stay in the OS keyring; the config file holds only non-secret UI preferences.
 
-> The authoritative list is the `_registry` in `asher/commands/__init__.py`; `/help` renders it at runtime. If you add a command, update the tables in `README.md` and the list in `asher/slash-commands/__init__.py`.
+Do not add robot-control commands as slash commands, and do not add app-management commands as bare commands.
 
 **Special cases** (accepted both with and without `/`):
 `exit`, `quit`, `q` — exit the app
 
-Do not add robot-control commands as slash commands, and do not add app-management commands as bare commands.
+> If you add a command, update the tables in `README.md` and the list in `asher/slash-commands/__init__.py`.
 
 ## Architecture
 
@@ -175,17 +151,7 @@ LoginScreen (ModalScreen) — available in auth.py but not the primary auth path
 
 ## Robot compatibility
 
-pylitterbot auto-detects robot type. Commands that differ per model are handled by `RobotAdapter` subclasses in `robot_adapters.py` — `make_adapter(robot)` returns the right one based on `type(robot).__name__`. Status-bar reads use `getattr(..., default)` for graceful degradation on older models. Tested API surface:
-
-- `robot.name`, `robot.serial`, `robot.is_online`
-- `robot.status` (LitterBoxStatus enum)
-- `robot.waste_drawer_level` (0–100)
-- `robot.sleep_mode_enabled`, `robot.panel_lock_enabled`, `robot.night_light_mode_enabled`
-- `robot.last_seen` (datetime)
-- `robot.refresh()`, `robot.start_cleaning()`
-- `robot.set_sleep_mode(bool)`, `robot.set_panel_lockout(bool)`
-- `robot.set_night_light_brightness(int)` or `robot.set_night_light_mode(NightLightMode)`
-- `robot.get_activity_history(limit=int)` → list of `Activity` objects with `.timestamp` and `.action` (`LitterBoxStatus` enum)
+pylitterbot auto-detects robot type. Commands that differ per model are handled by `RobotAdapter` subclasses in `robot_adapters.py` — `make_adapter(robot)` returns the right one based on `type(robot).__name__`. Status-bar reads use `getattr(..., default)` for graceful degradation on older models. See the `pylitterbot-ref` skill for the confirmed API surface.
 
 ## Code comments
 
@@ -221,15 +187,7 @@ Commands that need a confirmed cloud state before showing a result (e.g. sleep/w
 
 ## Dev workflow
 
-```bash
-uv sync                  # install all deps (including dev group)
-uv run poe dev           # run with CSS hot reload (textual --dev)
-uv run poe watch         # run with Python auto-restart on file change (watchfiles)
-uv run poe test          # run test suite
-uv run poe check         # ruff + mypy + pytest (same as CI)
-uv run poe fix           # auto-fix ruff issues
-uv run poe security      # bandit scan (same config the Bandit workflow uses)
-```
+See `[tool.poe.tasks]` in `pyproject.toml` for the full task list (`uv run poe <task>`).
 
 Pre-push hook (`.githooks/pre-push`) runs: ruff check → ruff format --check → mypy. Tests are not in the hook — run them manually.
 

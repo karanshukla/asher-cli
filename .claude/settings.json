@@ -37,7 +37,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell -NonInteractive -ExecutionPolicy Bypass -File .claude/hooks/block-env.ps1"
+            "command": "uv run python .claude/hooks/block-env.py"
           }
         ]
       }
