@@ -197,6 +197,7 @@ Don't add comments above functions or inline unless the WHY is genuinely non-obv
 - All command execution runs in `@work` async workers to keep the UI responsive
 - Cat modes: `idle`, `happy`, `cleaning` (animated), `sleeping`, `error`, `full`
 - `VERSION` is read from `importlib.metadata.version("asher-cli")` — falls back to `"dev"` when running from source
+- **No `assert` in `asher/`** — Bandit enforces this (B101 is enabled; only `tests/` is exempt, via `exclude_dirs`). For a `requires_robot` command, narrow with `if app._robot is None: return` rather than an assert: `_dispatch_command` already rejects the disconnected case, and unlike `assert` the guard survives `python -O`
 - The primary login path is the inline flow in `login_flow.py` (`LoginFlow` state machine: `IDLE` → `AWAITING_EMAIL` → `AWAITING_PASSWORD`). `LoginScreen` (`auth.py`) still exists as a modal but is not used in the current main flow.
 - `LoginScreen` uses `event.stop()` on `Input.Submitted` and `Button.Pressed` to prevent bubbling to the App's `on_input_submitted` (relevant if re-activating the modal path)
 

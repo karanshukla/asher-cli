@@ -122,7 +122,8 @@ class CleanCommand(Command):
     requires_robot = True
 
     async def run(self, app: AsherApp, args: list[str]) -> None:
-        assert app._robot is not None
+        if app._robot is None:
+            return
         app._set_cat("cleaning", "cleaning…")
 
         done: asyncio.Event = asyncio.Event()
@@ -170,7 +171,8 @@ class StatusCommand(Command):
     requires_robot = True
 
     async def run(self, app: AsherApp, args: list[str]) -> None:
-        assert app._robot is not None
+        if app._robot is None:
+            return
         try:
             await app._robot.refresh()
             await app._refresh_status()
@@ -205,7 +207,8 @@ class InfoCommand(Command):
     requires_robot = True
 
     async def run(self, app: AsherApp, args: list[str]) -> None:
-        assert app._robot is not None
+        if app._robot is None:
+            return
         try:
             await app._robot.refresh()
         except Exception as exc:
@@ -266,7 +269,8 @@ class LockCommand(Command):
         return "lock / unlock"
 
     async def run(self, app: AsherApp, args: list[str]) -> None:
-        assert app._adapter is not None
+        if app._adapter is None:
+            return
         ok, msg = await app._adapter.set_panel_lockout(True)
         if ok:
             app.query_one("#lock-lbl", Static).update(Text("⊘ Locked", style="bold #d29922"))
@@ -285,7 +289,8 @@ class UnlockCommand(Command):
         return "lock / unlock"
 
     async def run(self, app: AsherApp, args: list[str]) -> None:
-        assert app._adapter is not None
+        if app._adapter is None:
+            return
         ok, msg = await app._adapter.set_panel_lockout(False)
         if ok:
             app.query_one("#lock-lbl", Static).update(Text("□ Unlocked", style="#484f58"))
@@ -304,7 +309,8 @@ class SleepCommand(Command):
         return "sleep / wake"
 
     async def run(self, app: AsherApp, args: list[str]) -> None:
-        assert app._adapter is not None
+        if app._adapter is None:
+            return
         ok, msg = await app._adapter.set_sleep(True)
         if ok:
             app._log_ok(msg)
@@ -326,7 +332,8 @@ class WakeCommand(Command):
         return "sleep / wake"
 
     async def run(self, app: AsherApp, args: list[str]) -> None:
-        assert app._adapter is not None
+        if app._adapter is None:
+            return
         ok, msg = await app._adapter.set_sleep(False)
         if ok:
             app._log_ok(msg)
@@ -349,7 +356,8 @@ class NightLightCommand(Command):
         return "night-light on|off|auto"
 
     async def run(self, app: AsherApp, args: list[str]) -> None:
-        assert app._adapter is not None
+        if app._adapter is None:
+            return
         arg = args[0].lower() if args else ""
         if arg not in ("on", "off", "auto"):
             app._log_warn("Usage: night-light on|off|auto")
@@ -379,7 +387,8 @@ class NightLightBrightnessCommand(Command):
         return "night-light-brightness"
 
     async def run(self, app: AsherApp, args: list[str]) -> None:
-        assert app._adapter is not None
+        if app._adapter is None:
+            return
         if not args or not args[0].isdigit():
             app._log_warn("Usage: night-light-brightness <level>")
             return
@@ -415,7 +424,8 @@ class PanelBrightnessCommand(Command):
     requires_robot = True
 
     async def run(self, app: AsherApp, args: list[str]) -> None:
-        assert app._adapter is not None
+        if app._adapter is None:
+            return
         if not args:
             current = getattr(app._robot, "panel_brightness", None)
             app._log_info(f"Usage: panel-brightness <low|medium|high>  (current: {current or '—'})")
@@ -434,7 +444,8 @@ class HistoryCommand(Command):
     requires_robot = True
 
     async def run(self, app: AsherApp, args: list[str]) -> None:
-        assert app._robot is not None
+        if app._robot is None:
+            return
         raw = args[0].lower() if args else ""
         if raw in ("all", "max"):
             limit = 500
@@ -466,7 +477,8 @@ class WaitTimeCommand(Command):
         return "wait-time <minutes>"
 
     async def run(self, app: AsherApp, args: list[str]) -> None:
-        assert app._robot is not None
+        if app._robot is None:
+            return
         valid = sorted(getattr(app._robot, "VALID_WAIT_TIMES", []))
         if not args or not args[0].isdigit():
             current = getattr(app._robot, "clean_cycle_wait_time_minutes", "?")
@@ -507,7 +519,8 @@ class PowerCommand(Command):
         return "power on|off"
 
     async def run(self, app: AsherApp, args: list[str]) -> None:
-        assert app._robot is not None
+        if app._robot is None:
+            return
         arg = args[0].lower() if args else ""
         if arg not in ("on", "off"):
             app._log_warn("Usage: power on|off")
@@ -535,7 +548,8 @@ class RenameCommand(Command):
         return "rename <name>"
 
     async def run(self, app: AsherApp, args: list[str]) -> None:
-        assert app._robot is not None
+        if app._robot is None:
+            return
         if not args:
             app._log_warn(f"Usage: rename <new name>  (current: {app._robot.name})")
             return
@@ -562,7 +576,8 @@ class InsightCommand(Command):
     requires_robot = True
 
     async def run(self, app: AsherApp, args: list[str]) -> None:
-        assert app._robot is not None
+        if app._robot is None:
+            return
         raw = args[0].lower() if args else "30"
         if raw == "month":
             days = 30
@@ -641,7 +656,8 @@ class SleepScheduleCommand(Command):
         return "sleep-schedule"
 
     async def run(self, app: AsherApp, args: list[str]) -> None:
-        assert app._robot is not None
+        if app._robot is None:
+            return
         try:
             schedule = getattr(app._robot, "sleep_schedule", None)
         except Exception as exc:
@@ -719,7 +735,8 @@ class PrivacyCommand(Command):
         return "privacy on|off"
 
     async def run(self, app: AsherApp, args: list[str]) -> None:
-        assert app._adapter is not None
+        if app._adapter is None:
+            return
         arg = args[0].lower() if args else ""
         if arg not in ("on", "off"):
             app._log_warn("Usage: privacy on|off")
@@ -742,7 +759,8 @@ class VolumeCommand(Command):
         return "volume <0-100>"
 
     async def run(self, app: AsherApp, args: list[str]) -> None:
-        assert app._adapter is not None
+        if app._adapter is None:
+            return
         if not args or not args[0].lstrip("-").isdigit():
             current = getattr(app._robot, "sound_volume", None)
             extra = f"  (current: {current})" if current is not None else ""
@@ -767,7 +785,8 @@ class CameraAudioCommand(Command):
         return "camera-audio on|off"
 
     async def run(self, app: AsherApp, args: list[str]) -> None:
-        assert app._adapter is not None
+        if app._adapter is None:
+            return
         arg = args[0].lower() if args else ""
         if arg not in ("on", "off"):
             app._log_warn("Usage: camera-audio on|off")
@@ -791,7 +810,8 @@ class DrawerResetCommand(Command):
         return "drawer-reset"
 
     async def run(self, app: AsherApp, args: list[str]) -> None:
-        assert app._adapter is not None
+        if app._adapter is None:
+            return
         ok, msg = await app._adapter.reset_waste_drawer()
         if ok:
             app._log_ok(msg)
@@ -1305,7 +1325,8 @@ def _open_folder(path: Path) -> None:
 
 
 async def _run_export(app: AsherApp, days: int) -> None:
-    assert app._robot is not None
+    if app._robot is None:
+        return
     dest = resolve_dest(app._robot, None)
     app._log_info(f"Fetching history (last {days} days)…")
     try:
