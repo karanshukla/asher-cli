@@ -2,17 +2,21 @@
 
 import contextlib
 import os
+import shutil
 import signal
 import subprocess
 import sys
 
 from watchfiles import PythonFilter, watch
 
+_UV = shutil.which("uv") or "uv"
+
 if sys.platform == "win32":
+    _TASKKILL = shutil.which("taskkill") or "taskkill"
 
     def _start() -> subprocess.Popen:  # type: ignore[misc]
-        return subprocess.Popen(
-            ["uv", "run", "--no-sync", "python", "-m", "asher"],
+        return subprocess.Popen(  # nosec B603 # fixed argv, no shell
+            [_UV, "run", "--no-sync", "python", "-m", "asher"],
             creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
         )
 
@@ -24,14 +28,16 @@ if sys.platform == "win32":
         with contextlib.suppress(subprocess.TimeoutExpired):
             proc.wait(timeout=3)
         if proc.poll() is None:
-            subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)], capture_output=True)
+            subprocess.run(  # nosec B603 # fixed argv, no shell
+                [_TASKKILL, "/T", "/F", "/PID", str(proc.pid)], capture_output=True
+            )
             proc.wait()
 
 else:
 
     def _start() -> subprocess.Popen:
-        return subprocess.Popen(
-            ["uv", "run", "--no-sync", "python", "-m", "asher"],
+        return subprocess.Popen(  # nosec B603 # fixed argv, no shell
+            [_UV, "run", "--no-sync", "python", "-m", "asher"],
             start_new_session=True,
         )
 

@@ -81,6 +81,7 @@ tests/
 
 .github/workflows/
   ci.yml            ruff + mypy + pytest on every push/PR
+  bandit.yml        bandit security scan → SARIF → code scanning (config: [tool.bandit] in pyproject.toml)
 ```
 
 ## Credentials
@@ -226,6 +227,7 @@ uv run poe watch         # run with Python auto-restart on file change (watchfil
 uv run poe test          # run test suite
 uv run poe check         # ruff + mypy + pytest (same as CI)
 uv run poe fix           # auto-fix ruff issues
+uv run poe security      # bandit scan (same config the Bandit workflow uses)
 ```
 
 Pre-push hook (`.githooks/pre-push`) runs: ruff check → ruff format --check → mypy. Tests are not in the hook — run them manually.

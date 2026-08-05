@@ -58,6 +58,8 @@ lint   = "ruff check ."
 fmt    = "ruff format --check ."
 types  = "mypy asher/ --ignore-missing-imports"
 test   = "pytest tests/ -v --tb=short"
+security.cmd = "uvx --from bandit[toml] bandit -c pyproject.toml -r ."
+security.help = "run the same Bandit scan as the Bandit workflow"
 fix.sequence = [{cmd = "ruff check --fix ."}, {cmd = "ruff format ."}]
 dev    = "textual run --dev asher/__main__.py"
 watch  = "python watchrun.py"
@@ -110,6 +112,21 @@ pre_commit_hooks = ["uv lock", "git add uv.lock"]
 filename = "pyproject.toml"
 search = 'version = "{current_version}"'
 replace = 'version = "{new_version}"'
+
+# ── Bandit ────────────────────────────────────────────────────────────────────
+
+# Read with `bandit -c pyproject.toml` (needs the `toml` extra). The GitHub
+# Bandit workflow passes the same flag so CI and local runs agree.
+[tool.bandit]
+exclude_dirs = ["tests", ".venv", ".git", "build", "dist"]
+skips = [
+    # assert_used — every hit is an `assert x is not None` for mypy narrowing,
+    # not a runtime security check.
+    "B101",
+    # blacklist — flags the `import subprocess` line itself. Each call site is
+    # reviewed individually by B602-B607.
+    "B404",
+]
 
 # ── Pytest ────────────────────────────────────────────────────────────────────
 

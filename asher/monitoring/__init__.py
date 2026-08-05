@@ -42,11 +42,9 @@ class MonitoringMixin:
 
         if self._robot is None:
             return
-        try:
+        with contextlib.suppress(Exception):
             self._robot.on(EVENT_UPDATE, self._on_robot_update)
             await self._robot.subscribe()
-        except Exception:
-            pass
 
     def _on_robot_update(self) -> None:
         """Sync callback fired by pylitterbot when robot state changes via WebSocket."""
@@ -62,7 +60,7 @@ class MonitoringMixin:
         """Cache the timestamp of the most recent cat-detection event from activity history."""
         if self._robot is None:
             return
-        try:
+        with contextlib.suppress(Exception):
             acts = await self._robot.get_activity_history(limit=50)
             for act in acts:
                 if getattr(act, "action", None) == LitterBoxStatus.CAT_DETECTED:
@@ -70,8 +68,6 @@ class MonitoringMixin:
                     if ts_dt is not None:
                         self._last_cat_seen = ts_dt
                         return
-        except Exception:
-            pass
 
     async def _refresh_status(self) -> None:
         r = self._robot
@@ -85,12 +81,10 @@ class MonitoringMixin:
         last_seen = self._last_cat_seen or getattr(r, "last_seen", None)
 
         weight_val = "—"
-        try:
+        with contextlib.suppress(Exception):
             w = getattr(r, "pet_weight", None)
             if w is not None and float(w) > 0:
                 weight_val = f"{float(w):.1f} lb"
-        except Exception:
-            pass
 
         active_pet_idx = getattr(self, "_active_pet_idx", 0)
         pet = (
@@ -327,9 +321,7 @@ class MonitoringMixin:
     async def _poll_status_interval(self) -> None:
         if self._robot is None:
             return
-        try:
+        with contextlib.suppress(Exception):
             await self._robot.refresh()
             await self._update_last_cat_seen()
             await self._refresh_status()
-        except Exception:
-            pass
