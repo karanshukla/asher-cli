@@ -78,6 +78,9 @@ commit_parsers = [
   # "chore(deps): update ..." form). Regex is case-sensitive by default.
   { message = "^Merge (pull request|branch|remote-tracking branch)", skip = true },
   { message = "^Bump version:", skip = true },
+  # The commit that cuts a release is bookkeeping about the changelog itself —
+  # it would otherwise appear as a Documentation entry in the very section it cut.
+  { message = "^docs\\(changelog\\)", skip = true },
   { message = "^chore\\(deps\\)", skip = true },
   { message = "^[Uu]pdate (dependency|actions?|.*digest)", skip = true },
   # Then group the remaining conventional commits into Keep a Changelog buckets.

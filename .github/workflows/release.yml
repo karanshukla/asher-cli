@@ -44,29 +44,29 @@ jobs:
     needs: [build, publish]
     runs-on: ubuntu-latest
     steps:
-      # Full history (fetch-depth: 0) so git-cliff can walk commits/tags.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          fetch-depth: 0
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: dist
           path: dist/
-      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
-      - name: Install git-cliff
-        run: uv tool install git-cliff
-      - name: Generate release notes with git-cliff
+      - name: Extract release notes from CHANGELOG.md
         env:
           VERSION: ${{ needs.build.outputs.version }}
         run: |
-          # Explicit -c cliff.toml avoids auto-discovering pyproject.toml.
-          #
-          # --latest resolves against tags that exist in the checkout, and --tag
-          # does NOT promote the unreleased section to "latest" on its own. When
-          # no v${VERSION} tag has been pushed yet the notes silently come out
-          # one release stale, so materialize the tag before generating.
-          git tag -f "v${VERSION}" "${GITHUB_SHA}"
-          git cliff -c cliff.toml --latest --strip header -o RELEASE_NOTES.md
+          # CHANGELOG.md is the single source of release prose: it is generated
+          # by git-cliff (see `poe changelog-release`) but may be hand-refined
+          # before the release is cut, and re-deriving the notes from commits
+          # here would silently discard those edits.
+          awk -v hdr="## [${VERSION}]" '
+            index($0, hdr) == 1              { found = 1; next }
+            found && index($0, "## [") == 1  { exit }
+            found                            { print }
+          ' CHANGELOG.md > RELEASE_NOTES.md
+          if [ ! -s RELEASE_NOTES.md ]; then
+            echo "::error::CHANGELOG.md has no '## [${VERSION}]' section." \
+                 "Run 'uv run poe changelog-release ${VERSION}' and commit it before releasing."
+            exit 1
+          fi
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}

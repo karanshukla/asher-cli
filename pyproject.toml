@@ -64,6 +64,9 @@ fix.sequence = [{cmd = "ruff check --fix ."}, {cmd = "ruff format ."}]
 dev    = "textual run --dev asher/__main__.py"
 watch  = "python watchrun.py"
 changelog = "git cliff -c cliff.toml -o CHANGELOG.md"
+changelog-release.cmd = "git cliff -c cliff.toml --tag v${version} -o CHANGELOG.md"
+changelog-release.help = "regenerate CHANGELOG.md with the pending commits filed under vX.Y.Z instead of [Unreleased]"
+changelog-release.args = [{ name = "version", positional = true, required = true }]
 check.sequence = ["lint", "fmt", "types", "test"]
 check.help = "run all CI checks locally"
 

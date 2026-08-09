@@ -208,9 +208,9 @@ Pre-push hook (`.githooks/pre-push`) runs: ruff check → ruff format --check �
 
 ## Releasing
 
-Follow [README § Releasing](README.md#releasing) exactly, in order: commit the regenerated `CHANGELOG.md` → `uv run bump-my-version bump <part>` (this commits **and tags**) → `git push && git push --tags` → only then cut and push `release/X.Y.Z`.
+Follow [README § Releasing](README.md#releasing) exactly, in order: `uv run poe changelog-release X.Y.Z` and commit the result → `uv run bump-my-version bump <part>` (this commits **and tags**) → `git push && git push --tags` → only then cut and push `release/X.Y.Z`.
 
-Do not skip the tag or cut the release branch first. The release workflow builds its notes with `git cliff --latest`, which resolves against tags already present in the checkout — with no `vX.Y.Z` tag pushed, it silently emits the *previous* version's notes. Everything else (PyPI upload, release assets, tag target) still succeeds, so the only symptom is a wrong release body.
+Regenerate with `changelog-release X.Y.Z`, never plain `changelog` — the workflow lifts the `## [X.Y.Z]` section out of the committed `CHANGELOG.md` verbatim for the GitHub Release body, and a file still saying `## [Unreleased]` fails the release job. That extraction is also why hand-refinements to a section survive into the release notes, and why re-running either changelog task afterwards silently discards them: regeneration always re-derives from commits. Refine last.
 
 ## Testing notes
 
