@@ -26,12 +26,14 @@ if TYPE_CHECKING:
 _FETCH_LIMIT = 500
 _MAX_DAYS = 30
 
-# Exit codes (see ROADMAP §25).
+# Exit codes — the scripting contract for every headless command, not just export
+# (see ROADMAP §25 and README § "Headless commands").
 EXIT_OK = 0
 EXIT_NO_CREDENTIALS = 1
 EXIT_CONNECTION_FAILURE = 2
 EXIT_WRITE_FAILURE = 3
 EXIT_NO_ROBOT_MATCH = 4
+EXIT_COMMAND_REJECTED = 5
 
 
 class ExportError(Exception):
@@ -186,51 +188,24 @@ def resolve_robot(
 
 
 async def _run_headless_export(args: argparse.Namespace) -> int:
-    """Connect headlessly, fetch history, write CSV. Returns a process exit code."""
-    # Local import keeps Textual/Account import cost off the happy path of users
-    # who never run the TUI, and avoids a circular import at module load time.
-    from .connection import (  # noqa: PLC0415
-        HeadlessAuthError,
-        _connect_headless,
-        _keyring_load_robot,
+    """Legacy ``asher --export`` entry point — delegates to the headless runner.
+
+    ``asher export 7`` and ``asher --export 7`` must produce byte-identical CSVs,
+    so the flag form is a thin translation onto the ``export`` command rather
+    than a second implementation. Imported locally because :mod:`asher.headless`
+    imports this module for the CSV core.
+    """
+    from .headless import run  # noqa: PLC0415
+
+    try:
+        parse_days(args.export)
+    except ExportError as exc:
+        print(str(exc), file=sys.stderr)
+        return exc.code
+
+    return await run(
+        "export",
+        [args.export] if args.export else [],
+        robot=args.robot,
+        output=args.output,
     )
-
-    try:
-        days = parse_days(args.export)
-    except ExportError as exc:
-        print(str(exc), file=sys.stderr)
-        return exc.code
-
-    try:
-        account = await _connect_headless()
-    except HeadlessAuthError as exc:
-        print(str(exc), file=sys.stderr)
-        return exc.code
-
-    robots = list(getattr(account, "robots", []))
-    pets = list(getattr(account, "pets", []))
-    if not robots:
-        print("No Litter Robots found on this account.", file=sys.stderr)
-        return EXIT_CONNECTION_FAILURE
-
-    robot = resolve_robot(robots, args.robot, _keyring_load_robot())
-    if robot is None:
-        print(
-            f"No robot matching '{args.robot}'. Available:",
-            file=sys.stderr,
-        )
-        for i, rb in enumerate(robots):
-            print(f"  [{i}] {getattr(rb, 'name', '?')}", file=sys.stderr)
-        return EXIT_NO_ROBOT_MATCH
-
-    dest = resolve_dest(robot, args.output)
-    print(f"Fetching history (last {days} days)…", file=sys.stderr)
-
-    try:
-        count = await build_history_csv(robot, pets, days, dest)
-    except ExportError as exc:
-        print(str(exc), file=sys.stderr)
-        return exc.code
-
-    print(f"Wrote {count} events to {dest}")
-    return EXIT_OK

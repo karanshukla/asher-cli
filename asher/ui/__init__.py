@@ -15,6 +15,7 @@ from textual.containers import Container
 from textual.css.query import NoMatches
 from textual.widgets import Input, RichLog, Static
 
+from .. import theme
 from ..cats import CATS
 from ..completion import CommandSuggester
 from ..helpers import ts
@@ -30,21 +31,18 @@ class CmdInput(Input):
     Textual's default ``action_cursor_right``).
     """
 
-    DEFAULT_CSS = (
-        Input.DEFAULT_CSS
-        + """
+    DEFAULT_CSS = Input.DEFAULT_CSS + theme.apply("""
     CmdInput {
         border: none !important;
         height: 1;
         padding: 0;
-        background: #161b22;
+        background: $asher-panel;
         &:focus {
             border: none !important;
             background-tint: 0%;
         }
     }
-    """
-    )
+    """)
 
     BINDINGS = [
         Binding("tab", "accept_suggestion", "Accept suggestion", show=False),
@@ -84,12 +82,12 @@ def _build_command_suggester() -> CommandSuggester:
 
 
 _CAT_PALETTES: dict[str, list[str]] = {
-    "idle": ["#58a6ff", "#6cb0ff", "#7db8ff", "#6cb0ff"],
-    "happy": ["#3fb950", "#4bc45a", "#56cf64", "#4bc45a"],
-    "sleeping": ["#8b949e", "#9fa8b1", "#b0b8c1", "#9fa8b1"],
-    "cleaning": ["#58a6ff", "#6cb0ff", "#7db8ff", "#6cb0ff"],
-    "error": ["#f85149", "#ff7b72", "#f85149", "#ff7b72"],
-    "full": ["#d29922", "#e3b341", "#d29922", "#e3b341"],
+    "idle": theme.ACCENT_PULSE,
+    "happy": theme.OK_PULSE,
+    "sleeping": theme.SUBTLE_PULSE,
+    "cleaning": theme.ACCENT_PULSE,
+    "error": theme.DANGER_PULSE,
+    "full": theme.WARN_PULSE,
 }
 
 _CAT_FX: dict[str, list[str]] = {
@@ -182,16 +180,16 @@ class UIMixin:
 
     def _refresh_title(self) -> None:
         t = Text()
-        t.append("◆ ", style="bold #58a6ff")
-        t.append("Asher CLI", style="bold #e6edf3")
-        t.append(f" v{VERSION}", style="#484f58")
+        t.append("◆ ", style=f"bold {theme.ACCENT}")
+        t.append("Asher CLI", style=f"bold {theme.FOREGROUND_BRIGHT}")
+        t.append(f" v{VERSION}", style=theme.MUTED)
         self.query_one("#title-lbl", Static).update(t)  # type: ignore[attr-defined]
 
     def _show_loading_state(self) -> None:
         self.query_one("#online-lbl", Static).update(  # type: ignore[attr-defined]
-            Text(f"{_SPINNER[0]} connecting…", style="#484f58")
+            Text(f"{_SPINNER[0]} connecting…", style=theme.MUTED)
         )
-        dash = Text("—", style="#30363d")
+        dash = Text("—", style=theme.DIM)
         for wid in (
             "#robot-lbl",
             "#nightlight-lbl",
@@ -205,49 +203,48 @@ class UIMixin:
 
     def _show_signed_out_state(self) -> None:
         self.query_one("#online-lbl", Static).update(  # type: ignore[attr-defined]
-            Text("not signed in", style="#484f58")
+            Text("not signed in", style=theme.MUTED)
         )
 
         self.query_one("#robot-lbl", Static).update(  # type: ignore[attr-defined]
-            Text("—", style="#30363d")
+            Text("—", style=theme.DIM)
         )
         self.query_one("#nightlight-lbl", Static).update(  # type: ignore[attr-defined]
-            Text("○", style="#484f58")
+            Text("○", style=theme.MUTED)
         )
-        self.query_one("#lock-lbl", Static).update(Text("□", style="#484f58"))  # type: ignore[attr-defined]
+        self.query_one("#lock-lbl", Static).update(Text("□", style=theme.MUTED))  # type: ignore[attr-defined]
 
         drawer = Text()
-        drawer.append("Drawer ", style="#484f58")
-        drawer.append("—", style="#30363d")
+        drawer.append("Drawer ", style=theme.MUTED)
+        drawer.append("—", style=theme.DIM)
         self.query_one("#drawer-lbl", Static).update(drawer)  # type: ignore[attr-defined]
 
         litter = Text()
-        litter.append("Litter ", style="#484f58")
-        litter.append("—", style="#30363d")
+        litter.append("Litter ", style=theme.MUTED)
+        litter.append("—", style=theme.DIM)
         self.query_one("#litter-lbl", Static).update(litter)  # type: ignore[attr-defined]
 
         weight = Text()
-        weight.append("cat ", style="#484f58")
-        weight.append("—", style="#30363d")
+        weight.append("cat ", style=theme.MUTED)
+        weight.append("—", style=theme.DIM)
         self.query_one("#weight-lbl", Static).update(weight)  # type: ignore[attr-defined]
 
         self.query_one("#clean-lbl", Static).update(  # type: ignore[attr-defined]
-            Text("Last visit —", style="#484f58")
+            Text("Last visit —", style=theme.MUTED)
         )
 
     def _show_welcome(self) -> None:
         log = self.query_one("#log", RichLog)  # type: ignore[attr-defined]
         log.write("")
-        log.write(
-            Text.from_markup(" [bold #58a6ff]◆ Asher CLI[/] [#484f58]— Litter Robot Dashboard[/]")
-        )
-        log.write(Text.from_markup(" [#484f58]Connecting to Whisker cloud API…[/]"))
-        log.write(
-            Text.from_markup(
-                " [#484f58]Type [/][#3fb950]help[/][#484f58] to see available commands.[/]"
-            )
-        )
-        log.write(Text.from_markup(" [#21262d]" + "─" * 52 + "[/]"))
+        banner = Text(" ◆ Asher CLI", style=f"bold {theme.ACCENT}")
+        banner.append(" — Litter Robot Dashboard", style=theme.MUTED)
+        log.write(banner)
+        log.write(Text(" Connecting to Whisker cloud API…", style=theme.MUTED))
+        hint = Text(" Type ", style=theme.MUTED)
+        hint.append("help", style=theme.OK)
+        hint.append(" to see available commands.", style=theme.MUTED)
+        log.write(hint)
+        log.write(Text(" " + "─" * 52, style=theme.BORDER_SUBTLE))
         log.write("")
 
     def _set_cat(self, mode: str, label: str = "") -> None:
@@ -257,12 +254,12 @@ class UIMixin:
         self._cat_fx_idx = 0
         cats = CATS.get(mode, CATS["idle"])
         frame = cats[0]
-        palette = _CAT_PALETTES.get(mode, ["#58a6ff"])
+        palette = _CAT_PALETTES.get(mode, [theme.ACCENT])
         color = getattr(self, "_cat_color", None) or palette[0]
         self.query_one("#cat-art", Static).update(Text(frame, style=color))  # type: ignore[attr-defined]
         fx = _CAT_FX.get(mode, [""])
         self.query_one("#cat-fx", Static).update(Text(fx[0], style=color))  # type: ignore[attr-defined]
-        label_txt = Text(label, style="#8b949e") if label else Text("")
+        label_txt = Text(label, style=theme.SUBTLE) if label else Text("")
         self.query_one("#cat-label", Static).update(label_txt)  # type: ignore[attr-defined]
 
     def _tick_cat(self) -> None:
@@ -270,44 +267,44 @@ class UIMixin:
             if self._is_loading:
                 self._spinner_idx = (self._spinner_idx + 1) % len(_SPINNER)
                 self.query_one("#online-lbl", Static).update(  # type: ignore[attr-defined]
-                    Text(f"{_SPINNER[self._spinner_idx]} connecting…", style="#484f58")
+                    Text(f"{_SPINNER[self._spinner_idx]} connecting…", style=theme.MUTED)
                 )
 
                 # shimmer placeholders
                 shimmer = _SPINNER[self._spinner_idx]
                 bar = Text()
-                bar.append("Drawer ", style="#484f58")
-                bar.append(f"{shimmer} —", style="#30363d")
+                bar.append("Drawer ", style=theme.MUTED)
+                bar.append(f"{shimmer} —", style=theme.DIM)
                 self.query_one("#drawer-lbl", Static).update(bar)  # type: ignore[attr-defined]
 
                 lit = Text()
-                lit.append("Litter ", style="#484f58")
-                lit.append(f"{shimmer}", style="#30363d")
+                lit.append("Litter ", style=theme.MUTED)
+                lit.append(f"{shimmer}", style=theme.DIM)
                 self.query_one("#litter-lbl", Static).update(lit)  # type: ignore[attr-defined]
 
                 wt = Text()
-                wt.append("cat 🐱 ", style="#484f58")
-                wt.append(f"{shimmer}", style="#30363d")
+                wt.append("cat 🐱 ", style=theme.MUTED)
+                wt.append(f"{shimmer}", style=theme.DIM)
                 self.query_one("#weight-lbl", Static).update(wt)  # type: ignore[attr-defined]
 
                 self.query_one("#clean-lbl", Static).update(  # type: ignore[attr-defined]
-                    Text(f"Last visit {shimmer}", style="#484f58")
+                    Text(f"Last visit {shimmer}", style=theme.MUTED)
                 )
 
                 self.query_one("#robot-lbl", Static).update(  # type: ignore[attr-defined]
-                    Text(f"{shimmer}", style="#30363d")
+                    Text(f"{shimmer}", style=theme.DIM)
                 )
                 self.query_one("#nightlight-lbl", Static).update(  # type: ignore[attr-defined]
-                    Text(f"○ {shimmer}", style="#30363d")
+                    Text(f"○ {shimmer}", style=theme.DIM)
                 )
                 self.query_one("#lock-lbl", Static).update(  # type: ignore[attr-defined]
-                    Text(f"{shimmer}", style="#30363d")
+                    Text(f"{shimmer}", style=theme.DIM)
                 )
 
             cats = CATS.get(self._cat_mode, CATS["idle"])
             self._cat_frame = (self._cat_frame + 1) % len(cats)
             frame = cats[self._cat_frame]
-            palette = _CAT_PALETTES.get(self._cat_mode, ["#58a6ff"])
+            palette = _CAT_PALETTES.get(self._cat_mode, [theme.ACCENT])
             color = getattr(self, "_cat_color", None) or palette[self._cat_frame % len(palette)]
             self.query_one("#cat-art", Static).update(Text(frame, style=color))  # type: ignore[attr-defined]
 
@@ -319,22 +316,22 @@ class UIMixin:
 
     def _log_ok(self, msg: str) -> None:
         t = ts()
-        t.append(f"✓ {msg}", style="#3fb950")
+        t.append(f"✓ {msg}", style=theme.OK)
         self.query_one("#log", RichLog).write(t)  # type: ignore[attr-defined]
 
     def _log_err(self, msg: str) -> None:
         t = ts()
-        t.append(f"✖ {msg}", style="#f85149")
+        t.append(f"✖ {msg}", style=theme.DANGER)
         self.query_one("#log", RichLog).write(t)  # type: ignore[attr-defined]
 
     def _log_warn(self, msg: str) -> None:
         t = ts()
-        t.append(f"⚠ {msg}", style="#d29922")
+        t.append(f"⚠ {msg}", style=theme.WARN)
         self.query_one("#log", RichLog).write(t)  # type: ignore[attr-defined]
 
     def _log_info(self, msg: str) -> None:
         t = ts()
-        t.append(f"  {msg}", style="#8b949e")
+        t.append(f"  {msg}", style=theme.SUBTLE)
         self.query_one("#log", RichLog).write(t)  # type: ignore[attr-defined]
 
     def action_clear_log(self) -> None:

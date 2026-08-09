@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from asher import theme
 from asher.auth import LoginScreen
 
 
@@ -55,7 +56,17 @@ class TestLoginScreenCSS:
     def test_css_has_focus_styles(self):
         assert ":focus" in LoginScreen.CSS
 
-    def test_css_uses_expected_colors(self):
-        expected_colors = ["#161b22", "#30363d", "#58a6ff", "#484f58", "#8b949e", "#0d1117"]
-        for color in expected_colors:
-            assert color in LoginScreen.CSS, f"Color {color} should be in CSS"
+    def test_css_uses_theme_roles(self):
+        expected = [
+            theme.PANEL,
+            theme.BORDER,
+            theme.ACCENT,
+            theme.MUTED,
+            theme.SUBTLE,
+            theme.BACKGROUND,
+        ]
+        for colour in expected:
+            assert colour in LoginScreen.CSS, f"Colour {colour} should be in CSS"
+
+    def test_css_has_no_unresolved_variables(self):
+        assert "$asher-" not in LoginScreen.CSS

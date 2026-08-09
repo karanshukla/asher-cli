@@ -7,25 +7,27 @@ from textual.containers import Container
 from textual.screen import ModalScreen
 from textual.widgets import Button, Input, Label, Static
 
+from . import theme
+
 
 class LoginScreen(ModalScreen[tuple[str, str]]):
     """Prompts for Whisker account credentials and returns (email, password)."""
 
-    CSS = """
+    CSS = theme.apply("""
     LoginScreen {
         align: center middle;
     }
 
     #login-box {
-        background: #161b22;
-        border: solid #30363d;
+        background: $asher-panel;
+        border: solid $asher-border;
         padding: 2 4;
         width: 52;
         height: auto;
     }
 
     #login-title {
-        color: #58a6ff;
+        color: $asher-accent;
         text-style: bold;
         text-align: center;
         padding-bottom: 0;
@@ -33,27 +35,27 @@ class LoginScreen(ModalScreen[tuple[str, str]]):
     }
 
     #login-note {
-        color: #484f58;
+        color: $asher-muted;
         text-align: center;
         width: 100%;
         padding-bottom: 1;
     }
 
     .field-label {
-        color: #8b949e;
+        color: $asher-subtle;
         padding: 1 0 0 0;
         height: 1;
     }
 
     #login-box Input {
-        border: solid #30363d;
-        background: #0d1117;
+        border: solid $asher-border;
+        background: $asher-bg;
         padding: 0 1;
         margin-top: 0;
     }
 
     #login-box Input:focus {
-        border: solid #58a6ff;
+        border: solid $asher-accent;
     }
 
     #login-btn {
@@ -62,12 +64,12 @@ class LoginScreen(ModalScreen[tuple[str, str]]):
     }
 
     #login-error {
-        color: #f85149;
+        color: $asher-danger;
         text-align: center;
         height: 1;
         padding-top: 1;
     }
-    """
+    """)
 
     def compose(self) -> ComposeResult:
         with Container(id="login-box"):

@@ -25,6 +25,7 @@ from textual import work
 from textual.css.query import NoMatches
 from textual.widgets import Input, RichLog, Static
 
+from .. import theme
 from ..completion import enter_completes, render_completion, slash_matches
 from ..export import ExportError, build_history_csv, resolve_dest
 from ..helpers import fmt_ago, robot_model, ts
@@ -196,8 +197,8 @@ class StatusCommand(Command):
         log = app.query_one("#log", RichLog)
         for k, v in rows:
             t = Text()
-            t.append(f"  {k:<14}", style="#484f58")
-            t.append(str(v), style="#c9d1d9")
+            t.append(f"  {k:<14}", style=theme.MUTED)
+            t.append(str(v), style=theme.FOREGROUND)
             log.write(t)
 
 
@@ -254,8 +255,8 @@ class InfoCommand(Command):
         log = app.query_one("#log", RichLog)
         for k, v in rows:
             t = Text()
-            t.append(f"  {k:<14}", style="#484f58")
-            t.append(str(v), style="#c9d1d9")
+            t.append(f"  {k:<14}", style=theme.MUTED)
+            t.append(str(v), style=theme.FOREGROUND)
             log.write(t)
 
 
@@ -273,7 +274,7 @@ class LockCommand(Command):
             return
         ok, msg = await app._adapter.set_panel_lockout(True)
         if ok:
-            app.query_one("#lock-lbl", Static).update(Text("⊘ Locked", style="bold #d29922"))
+            app.query_one("#lock-lbl", Static).update(Text("⊘ Locked", style=f"bold {theme.WARN}"))
             app._log_ok(msg)
         else:
             app._log_err(msg)
@@ -293,7 +294,7 @@ class UnlockCommand(Command):
             return
         ok, msg = await app._adapter.set_panel_lockout(False)
         if ok:
-            app.query_one("#lock-lbl", Static).update(Text("□ Unlocked", style="#484f58"))
+            app.query_one("#lock-lbl", Static).update(Text("□ Unlocked", style=theme.MUTED))
             app._log_ok(msg)
         else:
             app._log_err(msg)
@@ -366,11 +367,11 @@ class NightLightCommand(Command):
         if ok:
             app._log_ok(msg)
             if arg == "off":
-                nl = Text("○", style="#484f58")
+                nl = Text("○", style=theme.MUTED)
             elif arg == "auto":
-                nl = Text("◐", style="#58a6ff")
+                nl = Text("◐", style=theme.ACCENT)
             else:
-                nl = Text("☀", style="#d29922")
+                nl = Text("☀", style=theme.WARN)
             app.query_one("#nightlight-lbl", Static).update(nl)
         else:
             app._log_warn(msg)
@@ -403,15 +404,15 @@ class NightLightBrightnessCommand(Command):
                 nl_mode.value.lower() if nl_mode is not None else ("on" if nl_enabled else "off")
             )
             if mode_str == "off":
-                nl_emoji, nl_color = "○", "#484f58"
+                nl_emoji, nl_color = "○", theme.MUTED
             elif mode_str == "auto":
-                nl_emoji, nl_color = "◐", "#58a6ff"
+                nl_emoji, nl_color = "◐", theme.ACCENT
             else:
-                nl_emoji, nl_color = "☀", "#d29922"
+                nl_emoji, nl_color = "☀", theme.WARN
             nl = Text()
             nl.append(nl_emoji, style=nl_color)
             if mode_str != "off":
-                nl.append(f"  {level}%", style="#484f58")
+                nl.append(f"  {level}%", style=theme.MUTED)
             app.query_one("#nightlight-lbl", Static).update(nl)
         else:
             app._log_warn(msg)
@@ -611,8 +612,8 @@ class InsightCommand(Command):
 
         for k, v in rows:
             t = Text()
-            t.append(f"  {k:<14}", style="#484f58")
-            t.append(str(v), style="#c9d1d9")
+            t.append(f"  {k:<14}", style=theme.MUTED)
+            t.append(str(v), style=theme.FOREGROUND)
             log.write(t)
 
 
@@ -706,14 +707,14 @@ class SleepScheduleCommand(Command):
 
             name = _DAY_NAMES[idx]
             t = Text()
-            t.append(f"  {name} ", style="#484f58")
+            t.append(f"  {name} ", style=theme.MUTED)
             if day_enabled:
                 window_str = f"{_fmt_sleep_time(sleep_t)} → {_fmt_sleep_time(wake_t)}"
-                t.append(window_str, style="#c9d1d9")
+                t.append(window_str, style=theme.FOREGROUND)
                 if idx in active_day_indices:
-                    t.append("   ● now", style="bold #d29922")
+                    t.append("   ● now", style=f"bold {theme.WARN}")
             else:
-                t.append("off", style="#484f58")
+                t.append("off", style=theme.MUTED)
             log.write(t)
 
         if is_enabled and not active_day_indices:
@@ -904,10 +905,13 @@ class RobotsCommand(SlashCommand):
         for idx, robot in enumerate(robots):
             active = robot is app._robot
             t = ts()
-            t.append("  ● " if active else "    ", style="#3fb950" if active else "#484f58")
-            t.append(f"[{idx}] ", style="#484f58")
-            t.append(getattr(robot, "name", "-"), style="#e6edf3" if active else "#c9d1d9")
-            t.append(f"  {robot_model(robot)}", style="#484f58")
+            t.append("  ● " if active else "    ", style=theme.OK if active else theme.MUTED)
+            t.append(f"[{idx}] ", style=theme.MUTED)
+            t.append(
+                getattr(robot, "name", "-"),
+                style=theme.FOREGROUND_BRIGHT if active else theme.FOREGROUND,
+            )
+            t.append(f"  {robot_model(robot)}", style=theme.MUTED)
             log.write(t)
 
 
@@ -925,9 +929,12 @@ class PetsCommand(SlashCommand):
         for idx, pet in enumerate(pets):
             active = idx == active_idx
             t = ts()
-            t.append("  ● " if active else "    ", style="#3fb950" if active else "#484f58")
-            t.append(f"[{idx}] ", style="#484f58")
-            t.append(getattr(pet, "name", "-"), style="#e6edf3" if active else "#c9d1d9")
+            t.append("  ● " if active else "    ", style=theme.OK if active else theme.MUTED)
+            t.append(f"[{idx}] ", style=theme.MUTED)
+            t.append(
+                getattr(pet, "name", "-"),
+                style=theme.FOREGROUND_BRIGHT if active else theme.FOREGROUND,
+            )
             log.write(t)
 
 
@@ -993,7 +1000,7 @@ class CatCommand(SlashCommand):
             app._log_ok("Cat panel visible")
         elif sub in ("colour", "color"):
             if len(args) < 2:
-                app._log_warn("Usage: /cat colour <hex>  e.g. /cat colour #ff79c6")
+                app._log_warn(f"Usage: /cat colour <hex>  e.g. /cat colour {theme.PINK}")
                 return
             color = args[1]
             if not color.startswith("#"):
@@ -1065,7 +1072,7 @@ class ConfigCommand(SlashCommand):
         refresh_str = f"{interval}s" if interval else "off"
 
         cat_visible = getattr(app, "_cat_panel_visible", True)
-        cat_color = getattr(app, "_cat_color", None) or "#58a6ff (default)"
+        cat_color = getattr(app, "_cat_color", None) or f"{theme.ACCENT} (default)"
 
         pets = app._pets
         active_pet_idx = getattr(app, "_active_pet_idx", 0)
@@ -1093,8 +1100,8 @@ class ConfigCommand(SlashCommand):
         log.write("")
         for k, v in rows:
             t = Text()
-            t.append(f"  {k:<14}", style="#484f58")
-            t.append(v, style="#c9d1d9")
+            t.append(f"  {k:<14}", style=theme.MUTED)
+            t.append(v, style=theme.FOREGROUND)
             log.write(t)
         log.write("")
 
@@ -1437,14 +1444,14 @@ class CommandsMixin:
         # Login flow intercepts before history/echo
         if self._login.state is LoginState.AWAITING_EMAIL:
             t = ts()
-            t.append(f"  {raw}", style="#e6edf3")
+            t.append(f"  {raw}", style=theme.FOREGROUND_BRIGHT)
             log.write(t)
             self._handle_login_email(raw)
             return
 
         if self._login.state is LoginState.AWAITING_PASSWORD:
             t = ts()
-            t.append("  ••••••••", style="#484f58")
+            t.append("  ••••••••", style=theme.MUTED)
             log.write(t)
             self._handle_login_password(raw)
             return
@@ -1454,8 +1461,8 @@ class CommandsMixin:
         self._hist_idx = -1
 
         t = ts()
-        t.append("> ", style="bold #3fb950")
-        t.append(raw, style="#e6edf3")
+        t.append("> ", style=f"bold {theme.OK}")
+        t.append(raw, style=theme.FOREGROUND_BRIGHT)
         log.write(t)
 
         parts = raw.strip().split()
@@ -1670,21 +1677,23 @@ class CommandsMixin:
     def _show_help(self) -> None:
         log = self.query_one("#log", RichLog)  # type: ignore[attr-defined]
         log.write("")
-        log.write(Text.from_markup("[bold #58a6ff]Robot commands[/]"))
+        log.write(Text("Robot commands", style=f"bold {theme.ACCENT}"))
         seen: set[str] = set()
         for cmd in _registry.robot:
             if cmd.display_name in seen:
                 continue
             seen.add(cmd.display_name)
             t = Text()
-            t.append(f"  {cmd.help_name:<24}", style="#3fb950")
-            t.append(cmd.description, style="#8b949e")
+            t.append(f"  {cmd.help_name:<24}", style=theme.OK)
+            t.append(cmd.description, style=theme.SUBTLE)
             log.write(t)
         log.write("")
-        log.write(Text.from_markup("[bold #58a6ff]Slash commands[/]  [#484f58](app management)[/]"))
+        heading = Text("Slash commands", style=f"bold {theme.ACCENT}")
+        heading.append("  (app management)", style=theme.MUTED)
+        log.write(heading)
         for cmd in _registry.slash:
             t = Text()
-            t.append(f"  {cmd.help_name:<24}", style="#d29922")
-            t.append(cmd.description, style="#8b949e")
+            t.append(f"  {cmd.help_name:<24}", style=theme.WARN)
+            t.append(cmd.description, style=theme.SUBTLE)
             log.write(t)
         log.write("")

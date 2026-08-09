@@ -33,6 +33,7 @@ from textual.screen import ModalScreen
 from textual.widgets import Static
 from tzlocal import get_localzone
 
+from . import theme
 from .activity_labels import format_activity
 
 if TYPE_CHECKING:
@@ -86,7 +87,7 @@ def format_history_rows(acts: list[Activity], pets: list[Any] | None = None) -> 
         ts_str = _ts_str(_localize(getattr(act, "timestamp", None)))
         label, colour = format_activity(act, pets)
         row = Text()
-        row.append(f"  {ts_str.ljust(_TS_WIDTH)}  ", style="#484f58")
+        row.append(f"  {ts_str.ljust(_TS_WIDTH)}  ", style=theme.MUTED)
         row.append(label, style=colour)
         rows.append(row)
     return rows
@@ -164,60 +165,60 @@ def _plural(n: int, noun: str) -> str:
 class HistoryScreen(ModalScreen[None]):
     """Full-screen, scrollable view of recent activity history."""
 
-    CSS = """
+    CSS = theme.apply("""
     HistoryScreen {
-        background: #0d1117;
+        background: $asher-bg;
     }
 
     #history-title {
         dock: top;
         height: 1;
-        background: #161b22;
+        background: $asher-panel;
         padding: 0 2;
-        color: #58a6ff;
+        color: $asher-accent;
         text-style: bold;
     }
 
     #history-meta {
         dock: top;
         height: 2;
-        background: #161b22;
-        border-bottom: solid #30363d;
+        background: $asher-panel;
+        border-bottom: solid $asher-border;
         padding: 0 2;
-        color: #8b949e;
+        color: $asher-subtle;
     }
 
     #history-colhead {
         dock: top;
         height: 1;
-        background: #0d1117;
+        background: $asher-bg;
         padding: 0 2;
-        color: #484f58;
+        color: $asher-muted;
         text-style: italic;
     }
 
     #history-footer {
         dock: bottom;
         height: 2;
-        background: #161b22;
-        border-top: solid #30363d;
+        background: $asher-panel;
+        border-top: solid $asher-border;
         padding: 0 2;
-        color: #c9d1d9;
+        color: $asher-fg;
     }
 
     #history-scroll {
         height: 1fr;
         padding: 0 0 1 0;
-        scrollbar-background: #161b22;
-        scrollbar-color: #30363d;
-        scrollbar-color-hover: #58a6ff;
+        scrollbar-background: $asher-panel;
+        scrollbar-color: $asher-border;
+        scrollbar-color-hover: $asher-accent;
     }
 
     #history-empty {
-        color: #8b949e;
+        color: $asher-subtle;
         padding: 1 2;
     }
-    """
+    """)
 
     BINDINGS = [
         Binding("escape,q,enter", "dismiss", "Close", show=False, priority=True),

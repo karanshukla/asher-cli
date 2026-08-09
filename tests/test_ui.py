@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from asher.ui import _SPINNER, VERSION, UIMixin
@@ -87,11 +88,14 @@ class TestCSS:
     def test_css_contains_cmd_input(self):
         assert "#cmd-input" in _CSS
 
-    def test_css_uses_expected_background_color(self):
-        assert "#0d1117" in _CSS
+    def test_css_uses_theme_background_variable(self):
+        assert "$asher-bg" in _CSS
 
-    def test_css_uses_expected_foreground_color(self):
-        assert "#c9d1d9" in _CSS
+    def test_css_uses_theme_foreground_variable(self):
+        assert "$asher-fg" in _CSS
+
+    def test_css_declares_no_raw_hex_colours(self):
+        assert re.search(r"#[0-9a-fA-F]{6}\b", _CSS) is None
 
     def test_css_has_srow_class(self):
         assert ".srow" in _CSS

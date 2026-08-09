@@ -1,8 +1,13 @@
 """Entry point — `asher` CLI command and `python -m asher`.
 
-No flags launches the interactive TUI. ``--export`` runs headlessly (no TUI,
-no terminal required) so activity history can be exported from cron, Task
-Scheduler, or SSH — see ``asher --export --help``.
+No arguments launches the interactive TUI. A subcommand (``asher status``,
+``asher clean``, ``asher night-light auto``, …) runs headlessly — no TUI, no
+terminal required — so the robot can be driven from cron, Task Scheduler, or an
+SSH session. ``asher --help`` lists the commands; :mod:`asher.headless` owns
+what each one does.
+
+``--export`` is kept as a flag alongside the ``export`` subcommand so existing
+cron entries keep working unchanged.
 """
 
 from __future__ import annotations
@@ -11,11 +16,14 @@ import argparse
 import asyncio
 import sys
 
+from .headless import COMMANDS
+
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="asher",
-        description="Terminal dashboard for Litter Robot (LR3/LR4/LR5).",
+        description="Terminal dashboard for Litter Robot (LR3/LR4/LR5). "
+        "Run with no arguments for the dashboard, or with a command to run headlessly.",
     )
     parser.add_argument(
         "--export",
@@ -23,7 +31,7 @@ def _build_parser() -> argparse.ArgumentParser:
         const="month",
         default=None,
         metavar="[days|month]",
-        help="export activity history to CSV and exit (no TUI). "
+        help="deprecated alias for `asher export` — export activity history to CSV and exit. "
         "Bare --export = 30 days (Whisker ceiling); --export 7 = last 7 days.",
     )
     parser.add_argument(
@@ -39,11 +47,61 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="INDEX|NAME",
         help="with --export: pick the robot by index or partial name (default: preferred/first).",
     )
+
+    # SUPPRESS keeps an unused subcommand flag from overwriting the top-level one
+    # of the same name, so `asher --robot X status` and `asher status --robot X`
+    # are equivalent instead of the subparser clobbering it back to None.
+    shared = argparse.ArgumentParser(add_help=False)
+    shared.add_argument(
+        "--robot",
+        default=argparse.SUPPRESS,
+        metavar="INDEX|NAME",
+        help="pick the robot by index or partial name (default: preferred/first).",
+    )
+    shared.add_argument(
+        "--json",
+        action="store_true",
+        help="print the result as JSON instead of aligned text.",
+    )
+
+    subparsers = parser.add_subparsers(dest="command", metavar="<command>")
+    for command in COMMANDS:
+        sub = subparsers.add_parser(
+            command.name,
+            parents=[shared],
+            help=command.summary,
+            description=f"{command.summary}  (usage: {command.usage})",
+        )
+        sub.add_argument("args", nargs="*", metavar="ARG", help=f"usage: {command.usage}")
+        if command.name == "export":
+            sub.add_argument(
+                "--output",
+                "-o",
+                default=argparse.SUPPRESS,
+                metavar="PATH",
+                help="write to this path instead of ~/Downloads.",
+            )
     return parser
 
 
 def main() -> None:
     args = _build_parser().parse_args()
+
+    if args.command is not None:
+        from .headless import run  # noqa: PLC0415
+
+        sys.exit(
+            asyncio.run(
+                run(
+                    args.command,
+                    args.args,
+                    robot=args.robot,
+                    output=args.output,
+                    as_json=getattr(args, "json", False),
+                )
+            )
+        )
+
     if args.export is not None:
         from .export import _run_headless_export  # noqa: PLC0415
 

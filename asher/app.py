@@ -12,6 +12,7 @@ from textual.app import App
 from textual.binding import Binding
 from textual.widgets import Input
 
+from . import theme
 from .commands import CommandsMixin
 from .connection import ConnectionMixin
 from .monitoring import MonitoringMixin
@@ -63,6 +64,14 @@ class AsherApp(UIMixin, ConnectionMixin, MonitoringMixin, CommandsMixin, App):  
         self._cycle_timer: Timer | None = None
         self._completion_matches: list = []
         self._completion_idx: int = 0
+
+    def get_css_variables(self) -> dict[str, str]:
+        """Expose the Catppuccin roles to every stylesheet as ``$asher-*``.
+
+        Covers ``ui/style.tcss`` and the screen-level ``CSS`` blocks alike, so a
+        re-flavour touches only ``asher/theme.py``.
+        """
+        return {**super().get_css_variables(), **theme.CSS_VARIABLES}
 
     def on_mount(self) -> None:
         self._refresh_title()

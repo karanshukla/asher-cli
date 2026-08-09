@@ -9,34 +9,36 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from . import theme
+
 if TYPE_CHECKING:
     from pylitterbot.activity import Activity
 
 # Raw lowercased activity text → (human-readable label, colour).
-# Colours match the GitHub-dark palette used elsewhere in the TUI.
+# Colours are theme roles, so the palette stays consistent with the rest of the TUI.
 ACTION_LABELS: dict[str, tuple[str, str]] = {
-    "ready": ("Ready", "#484f58"),
-    "litter robot is ready.": ("Ready", "#484f58"),
-    "clean cycle complete": ("Clean cycle complete", "#3fb950"),
-    "clean cycle in progress": ("Cleaning…", "#58a6ff"),
-    "cat detected": ("Cat detected", "#d29922"),
-    "cat sensor interrupted": ("Cat sensor tripped", "#d29922"),
-    "drawer full": ("Drawer full — empty now", "#f85149"),
-    "drawer full cleared": ("Drawer emptied", "#3fb950"),
-    "sleep mode on": ("Sleep mode on", "#484f58"),
-    "sleep mode off": ("Sleep mode off", "#484f58"),
-    "panel locked": ("Panel locked", "#484f58"),
-    "panel unlocked": ("Panel unlocked", "#484f58"),
-    "offline": ("Offline", "#f85149"),
-    "power off": ("Powered off", "#f85149"),
-    "power on": ("Powered on", "#3fb950"),
-    "motor fault": ("Motor fault", "#f85149"),
-    "pinch detect": ("Pinch detected", "#f85149"),
-    "timing fault": ("Timing fault", "#d29922"),
+    "ready": ("Ready", theme.MUTED),
+    "litter robot is ready.": ("Ready", theme.MUTED),
+    "clean cycle complete": ("Clean cycle complete", theme.OK),
+    "clean cycle in progress": ("Cleaning…", theme.ACCENT),
+    "cat detected": ("Cat detected", theme.WARN),
+    "cat sensor interrupted": ("Cat sensor tripped", theme.WARN),
+    "drawer full": ("Drawer full — empty now", theme.DANGER),
+    "drawer full cleared": ("Drawer emptied", theme.OK),
+    "sleep mode on": ("Sleep mode on", theme.MUTED),
+    "sleep mode off": ("Sleep mode off", theme.MUTED),
+    "panel locked": ("Panel locked", theme.MUTED),
+    "panel unlocked": ("Panel unlocked", theme.MUTED),
+    "offline": ("Offline", theme.DANGER),
+    "power off": ("Powered off", theme.DANGER),
+    "power on": ("Powered on", theme.OK),
+    "motor fault": ("Motor fault", theme.DANGER),
+    "pinch detect": ("Pinch detected", theme.DANGER),
+    "timing fault": ("Timing fault", theme.WARN),
 }
 
 # Fallback colour for unknown event types — muted grey rather than crashing.
-UNKNOWN_COLOUR = "#8b949e"
+UNKNOWN_COLOUR = theme.SUBTLE
 
 
 def activity_raw_text(act: Activity) -> str:
