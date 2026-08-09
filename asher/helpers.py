@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 
 from rich.text import Text
 
+from . import theme
 from .constants import ROBOT_MODELS
 
 
@@ -27,17 +28,17 @@ def fmt_ago(dt: datetime | None) -> str:
 def drawer_bar(pct: float, width: int = 14) -> Text:
     filled = max(0, min(width, int(width * pct / 100)))
     bar = "█" * filled + "░" * (width - filled)
-    color = "#f85149" if pct >= 85 else "#d29922" if pct >= 60 else "#3fb950"
+    color = theme.DANGER if pct >= 85 else theme.WARN if pct >= 60 else theme.OK
     t = Text()
-    t.append("[", style="#484f58")
+    t.append("[", style=theme.MUTED)
     t.append(bar, style=color)
-    t.append("]", style="#484f58")
+    t.append("]", style=theme.MUTED)
     return t
 
 
 def ts() -> Text:
     t = Text()
-    t.append(f"[{datetime.now().strftime('%H:%M:%S')}] ", style="#484f58")
+    t.append(f"[{datetime.now().strftime('%H:%M:%S')}] ", style=theme.MUTED)
     return t
 
 

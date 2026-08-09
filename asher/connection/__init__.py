@@ -17,6 +17,7 @@ from dotenv import load_dotenv
 from textual import work
 from textual.widgets import RichLog
 
+from .. import theme
 from ..helpers import robot_model, ts
 
 load_dotenv()
@@ -262,10 +263,10 @@ class ConnectionMixin:
         await self._refresh_status()  # type: ignore[attr-defined]
 
         t = ts()
-        t.append("✓ Connected to ", style="#3fb950")
+        t.append("✓ Connected to ", style=theme.OK)
         name = getattr(self._robot, "name", "robot")
-        t.append(name, style="bold #e6edf3")
-        t.append(f" ({robot_model(self._robot)})", style="#484f58")
+        t.append(name, style=f"bold {theme.FOREGROUND_BRIGHT}")
+        t.append(f" ({robot_model(self._robot)})", style=theme.MUTED)
         log.write(t)
         self._set_cat("happy", "connected!")  # type: ignore[attr-defined]
         return True

@@ -1651,6 +1651,7 @@ Ranked by user-visible impact vs. implementation effort:
 7. ~~**`wait-time`, `power`, `rename`, `insight` commands** (§3)~~ ✅ — all four wired up; plus the `status`/`info` split (`status` trimmed to at-a-glance, `info` is the full property dump with power/cycles/litter/brightness/Wi-Fi). `panel-brightness <low|medium|high>` now wired too (the earlier claim it wasn't exposed was stale — it exists on LR4/LR5); `reset`/`reset-settings`/`firmware`-update deliberately omitted as destructive
 8. ~~**Sleep schedule viewer** (§8)~~ ✅ — `sleep-schedule` (alias `sleepschedule`) renders the per-day sleep/wake window read-only, sorted Mon→Sun, with an active-window `● now` marker; config wizard/set/disable still TODO
 9. ~~**Headless CLI export** (§25)~~ ✅ — `asher --export 7` writes activity history to CSV without launching the TUI, for cron/Task Scheduler/SSH; `--output` and `--robot` flags, documented exit codes; CSV core shared with the TUI `export` command via `build_history_csv()`
+10. ~~**Full headless command surface** (issue #60)~~ ✅ — every robot command is now an `asher <command>` subcommand backed by the `COMMANDS` registry in `asher/headless.py`, with `--robot`/`--json` and exit code 5 for a rejected command; `--export` stays as a deprecated alias. Slash commands stay TUI-only by design
 
 ### Release pipeline
 
@@ -1671,7 +1672,8 @@ Ranked by user-visible impact vs. implementation effort:
 1. ~~**Config persistence** (`config.json`, §10)~~ ✅ — runtime settings (`/refresh`, `/cat`, `/pet`) survive restarts via `~/.asher-cli/config.json`; `asher/config.py` provides load/save/update over a defaults dict (no Textual/pylitterbot deps); `_persist()` helper in `commands/__init__.py` wires each slash command to `config.update()`
 2. **Weight sparkline in cat panel** (§7) — 7-day ASCII chart; delightful but non-essential
 3. ~~**Desktop notifications** (§22)~~ ✅ — `plyer` toasts + `winsound` bell on fault transitions (cat-detected, pinch, motor/retract faults, position faults, drawer full, bonnet, laser, gas sensor); `/notify on|off|sound on|off|test` command with persistence; drawer-full promoted to a fault so it fires notifications and appears in `#fault-banner`
-4. **Dark/light theme toggle** (§12) — CSS variable swap; nice-to-have but not critical
+4. **Dark/light theme toggle** (§12) — CSS variable swap; the groundwork is done (`asher/theme.py` holds semantic roles behind `$asher-*` variables), so this is now repointing the roles at Catppuccin Latte and a command to switch
+9. ~~**Catppuccin palette** (issue #61)~~ ✅ — the ad-hoc GitHub-dark hexes are consolidated into `asher/theme.py` as Catppuccin Mocha swatches plus semantic roles; `AsherApp.get_css_variables()` feeds `ui/style.tcss` and `theme.apply()` bakes the roles into screen-level CSS blocks
 5. **E2E test harness** (§17) — Textual Pilot tests for critical user flows; good for preventing regressions but requires maintenance
 6. **Refactor to be more clean code** — base command class with a property to distinguish slash vs bare commands; reduces duplication and makes adding commands easier
 7. **LR5/Evo specific features** — camera snapshots, night light color control, hopper management (whatever pylitterbot exposes)

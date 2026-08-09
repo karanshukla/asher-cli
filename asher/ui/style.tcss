@@ -1,13 +1,13 @@
 Screen {
-    background: #0d1117;
-    color: #c9d1d9;
+    background: $asher-bg;
+    color: $asher-fg;
 }
 
 /* ── Status bar ── */
 #status-bar {
-    background: #161b22;
+    background: $asher-panel;
     height: 4;
-    border-bottom: solid #30363d;
+    border-bottom: solid $asher-border;
     dock: top;
     padding: 0;
     layout: vertical;
@@ -21,11 +21,11 @@ Screen {
 }
 
 .srow:first-child {
-    border-bottom: solid #30363d;
+    border-bottom: solid $asher-border;
 }
 
 .sep {
-    color: #30363d;
+    color: $asher-border;
     width: auto;
     height: 1;
     padding: 0 1;
@@ -47,12 +47,12 @@ Screen {
 #log {
     width: 1fr;
     height: 1fr;
-    background: #0d1117;
+    background: $asher-bg;
     padding: 1 2;
     overflow-x: hidden;
-    scrollbar-background: #161b22;
-    scrollbar-color: #30363d;
-    scrollbar-color-hover: #58a6ff;
+    scrollbar-background: $asher-panel;
+    scrollbar-color: $asher-border;
+    scrollbar-color-hover: $asher-accent;
 }
 
 /* ── Slash-command completion overlay ── */
@@ -65,8 +65,8 @@ Screen {
     min-width: 0;
     height: auto;
     max-height: 8;
-    background: #161b22;
-    border: solid #30363d;
+    background: $asher-panel;
+    border: solid $asher-border;
     padding: 0 1;
     display: none;
 }
@@ -74,8 +74,8 @@ Screen {
 /* ── Cat panel ── */
 #cat-panel {
     width: 30;
-    background: #0d1117;
-    border-left: solid #21262d;
+    background: $asher-bg;
+    border-left: solid $asher-border-subtle;
     align: center middle;
     padding: 1 2;
     height: 1fr;
@@ -85,20 +85,20 @@ Screen {
 #cat-fx {
     width: 26;
     height: 5;
-    color: #58a6ff;
+    color: $asher-accent;
     text-align: center;
     content-align: center middle;
 }
 
 #cat-art {
-    color: #58a6ff;
+    color: $asher-accent;
     text-align: center;
     width: 26;
     content-align: center middle;
 }
 
 #cat-label {
-    color: #8b949e;
+    color: $asher-subtle;
     text-align: center;
     width: 26;
     height: 1;
@@ -108,7 +108,7 @@ Screen {
     width: 26;
     height: auto;
     text-align: left;
-    color: #8b949e;
+    color: $asher-subtle;
 }
 
 /* ── Fault banner — inside cat panel, under the status badges ── */
@@ -116,7 +116,7 @@ Screen {
     width: 26;
     height: auto;
     text-align: left;
-    color: #f85149;
+    color: $asher-danger;
     display: none;
 }
 
@@ -124,16 +124,16 @@ Screen {
 #bottom-dock {
     dock: bottom;
     height: 4;
-    background: #161b22;
+    background: $asher-panel;
     layout: vertical;
     padding: 0 0 0 0;
 }
 
 #input-bar {
-    background: #161b22;
+    background: $asher-panel;
     height: 3;
-    border-top: solid #30363d;
-    border-bottom: solid #30363d;
+    border-top: solid $asher-border;
+    border-bottom: solid $asher-border;
     layout: vertical;
     padding: 0 2;
 }
@@ -145,7 +145,7 @@ Screen {
 }
 
 #prompt {
-    color: #3fb950;
+    color: $asher-ok;
     width: auto;
     text-style: bold;
     padding: 0 1 0 0;
@@ -153,12 +153,12 @@ Screen {
 }
 
 #hint-bar {
-    color: #484f58;
+    color: $asher-muted;
     height: 1;
     padding: 0 2;
 }
 
 #cmd-input {
     width: 1fr;
-    color: #e6edf3;
+    color: $asher-fg-bright;
 }

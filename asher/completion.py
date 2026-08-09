@@ -13,6 +13,8 @@ from typing import TYPE_CHECKING
 from rich.text import Text
 from textual.suggester import Suggester
 
+from . import theme
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
@@ -80,11 +82,11 @@ def render_completion(matches: Sequence[Command], selected_idx: int) -> Text:
         name = f"/{cmd.name}".ljust(_NAME_COL)
         line = Text()
         if i == selected_idx:
-            line.append(name, style="bold #f0f6fc on #1f6feb")
-            line.append(f"  {cmd.description}", style="#c9d1d9 on #1f6feb")
+            line.append(name, style=f"bold {theme.SELECTION_FG} on {theme.SELECTION_BG}")
+            line.append(f"  {cmd.description}", style=f"{theme.FOREGROUND} on {theme.SELECTION_BG}")
         else:
-            line.append(name, style="#58a6ff")
-            line.append(f"  {cmd.description}", style="#484f58")
+            line.append(name, style=theme.ACCENT)
+            line.append(f"  {cmd.description}", style=theme.MUTED)
         lines.append(line)
     return Text("\n").join(lines)
 

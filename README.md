@@ -24,7 +24,8 @@ A Claude Code-style terminal dashboard for monitoring and controlling Litter Rob
 - Slash commands for app management: `/login`, `/logout`, `/robots`, `/robot <index|name>`, `/pets`, `/pet <index|name>`, `/cat on|off|colour <hex>`, `/refresh [seconds|off]`, `/config`, `/notify on|off|sound on|off|test`, `/version`, `/mcp on|off|status`, `/exit`
 - Slash-command tab completion — type `/` and a Claude Code-style overlay lists matching commands; `↑`/`↓` to move, `Tab` or `Enter` to accept, `Esc` to dismiss
 - Inline ghost-text completion for bare commands — type a prefix (`cle`) and the rest (`an`) appears greyed; `Tab` or `→` to accept → `clean`
-- Headless export — `asher --export 7` writes activity history to CSV from cron / Task Scheduler / SSH without launching the TUI
+- Headless mode — every robot command also runs without the TUI (`asher status`, `asher clean`, `asher night-light auto`, `asher export 7`), with `--json` output and documented exit codes for cron / Task Scheduler / SSH
+- Catppuccin Mocha throughout — one palette in `asher/theme.py` drives the TUI stylesheet and every Rich style
 - Cat animation panel that reacts to robot state
 - Command history (↑/↓ arrows)
 - Real-time updates via WebSocket; 5-minute poll fallback
@@ -126,37 +127,60 @@ LITTER_ROBOT_PASSWORD=yourpassword
 
 **Keyboard shortcuts:** `Ctrl+L` clears the log, `Ctrl+C` quits. While typing a `/` slash command, `↑`/`↓` move through completions, `Tab` or `Enter` accepts, `Esc` dismisses. While typing a bare command, a greyed ghost suggestion appears — `Tab` or `→` accepts it.
 
-### Headless export (cron / Task Scheduler / SSH)
+### Headless commands (cron / Task Scheduler / SSH)
 
-`--export` writes the same CSV as the `export` command **without launching the TUI** — so you can script activity-history exports from cron, Windows Task Scheduler, or a server over SSH. No flags launches the interactive dashboard as before.
+Every robot action the dashboard offers is also a subcommand that runs **without launching the TUI** — `asher` with no arguments still opens the interactive dashboard.
 
 ```bash
-asher --export 7                         export last 7 days to ~/Downloads
-asher --export 7 --output ~/hist.csv     explicit output path
-asher --export month --robot "Asher 2"   30 days (Whisker ceiling) for a specific robot
+asher status                             at-a-glance state
+asher info                               model, serial, firmware, settings
+asher clean                              start a clean cycle
+asher night-light auto                   set night light mode
+asher wait-time 7                        set the clean-cycle wait time
+asher history 20                         recent activity, newest first
+asher insight 7                          cycle-usage statistics
+asher export 7 --output ~/hist.csv       activity history to CSV
 ```
 
-`--robot` accepts an index or a partial, case-insensitive name (defaults to your saved preferred robot, else the first). Credentials use the same keyring → `.env` priority as the TUI, but with **no interactive login prompt** — a scheduled task can't type a password, so sign in once with `/login` first.
+`asher --help` lists every command; `asher <command> --help` shows its arguments. The full set: `status`, `info`, `robots`, `pets`, `history`, `insight`, `sleep-schedule`, `clean`, `lock`, `unlock`, `sleep`, `wake`, `night-light`, `night-light-brightness`, `panel-brightness`, `wait-time`, `power`, `rename`, `privacy`, `volume`, `camera-audio`, `drawer-reset`, `export`.
+
+Two flags apply to all of them:
+
+- `--robot <index|name>` — an index or a partial, case-insensitive name (defaults to your saved preferred robot, else the first)
+- `--json` — machine-readable output instead of aligned text, for piping into `jq`
+
+```bash
+asher status --json | jq -r '.drawer'
+asher history 50 --json | jq '[.events[] | select(.event | startswith("Cat"))] | length'
+```
+
+Credentials use the same keyring → `.env` priority as the TUI, but with **no interactive login prompt** — a scheduled task can't type a password, so sign in once with `/login` first.
 
 Exit codes for scripting:
 
 | Code | Meaning |
 |---|---|
-| `0` | export succeeded |
+| `0` | command succeeded |
 | `1` | no credentials found (keyring or `.env`) |
 | `2` | connection or API failure |
 | `3` | failed to write the CSV (permissions, disk full) |
 | `4` | `--robot` matched no robot on the account |
+| `5` | bad argument, or the robot/cloud rejected the command |
 
 ```bash
 # crontab — nightly export at 03:00
-0 3 * * * /usr/bin/env asher --export 7 --output /home/me/litter-history.csv >> /var/log/asher-export.log 2>&1
+0 3 * * * /usr/bin/env asher export 7 --output /home/me/litter-history.csv >> /var/log/asher-export.log 2>&1
+
+# alert when the drawer passes 85%
+0 * * * * [ "$(asher status --json | jq -r '.drawer' | tr -d %)" -gt 85 ] && notify-send "Litter drawer full"
 ```
 
 ```powershell
 # Windows Task Scheduler action
-asher.exe --export 7 --output C:\Users\me\litter-history.csv
+asher.exe export 7 --output C:\Users\me\litter-history.csv
 ```
+
+`asher --export [days]` remains as a deprecated alias for `asher export [days]`, so existing cron entries keep working.
 
 ## Configuration
 

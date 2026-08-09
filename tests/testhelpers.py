@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
+from asher import theme
 from asher.helpers import drawer_bar, fmt_ago, ts
 
 
@@ -48,15 +49,15 @@ class TestDrawerBar:
     def test_full_is_red(self):
         text = drawer_bar(90)
         # second span is the bar fill; should be red at 90%
-        assert text._spans[1].style == "#f85149"
+        assert text._spans[1].style == theme.DANGER
 
     def test_warning_is_amber(self):
         text = drawer_bar(70)
-        assert text._spans[1].style == "#d29922"
+        assert text._spans[1].style == theme.WARN
 
     def test_ok_is_green(self):
         text = drawer_bar(30)
-        assert text._spans[1].style == "#3fb950"
+        assert text._spans[1].style == theme.OK
 
     def test_brackets_present(self):
         text = drawer_bar(50)
@@ -89,4 +90,4 @@ class TestTs:
 
     def test_span_style_is_gray(self):
         result = ts()
-        assert result._spans[0].style == "#484f58"
+        assert result._spans[0].style == theme.MUTED

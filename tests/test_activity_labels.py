@@ -12,6 +12,7 @@ from types import SimpleNamespace
 
 from pylitterbot.enums import LitterBoxStatus
 
+from asher import theme
 from asher.activity_labels import (
     ACTION_LABELS,
     UNKNOWN_COLOUR,
@@ -61,22 +62,22 @@ class TestFormatActivityKnownEvents:
     def test_clean_cycle_complete_is_green(self):
         label, colour = format_activity(_act("Clean Cycle Complete"))
         assert label == "Clean cycle complete"
-        assert colour == "#3fb950"
+        assert colour == theme.OK
 
     def test_cat_detected_is_amber(self):
         label, colour = format_activity(_act("Cat Detected"))
         assert label == "Cat detected"
-        assert colour == "#d29922"
+        assert colour == theme.WARN
 
     def test_drawer_full_is_red(self):
         label, colour = format_activity(_act("Drawer Full"))
         assert label == "Drawer full — empty now"
-        assert colour == "#f85149"
+        assert colour == theme.DANGER
 
     def test_ready_is_muted(self):
         label, colour = format_activity(_act("Ready"))
         assert label == "Ready"
-        assert colour == "#484f58"
+        assert colour == theme.MUTED
 
     def test_case_insensitive_lookup(self):
         label, _ = format_activity(_act("CLEAN CYCLE COMPLETE"))
@@ -86,7 +87,7 @@ class TestFormatActivityKnownEvents:
         # Status enum members carry the same text strings the API returns.
         label, colour = format_activity(_act(LitterBoxStatus.CLEAN_CYCLE))
         assert label == "Cleaning…"
-        assert colour == "#58a6ff"
+        assert colour == theme.ACCENT
 
 
 class TestFormatActivityCatSuffix:

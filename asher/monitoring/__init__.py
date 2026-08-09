@@ -12,6 +12,7 @@ from textual import work
 from textual.css.query import NoMatches
 from textual.widgets import Static
 
+from .. import theme
 from ..constants import STATUS_COLORS
 from ..faults import SEVERITY_ERROR, Fault, check_faults
 from ..helpers import drawer_bar, fmt_ago, robot_model
@@ -94,39 +95,39 @@ class MonitoringMixin:
         )
         pet_name = pet.name if pet else None
 
-        robot_txt = Text(name, style="bold #e6edf3")
-        robot_txt.append(f"  {robot_model(r)}", style="#484f58")
+        robot_txt = Text(name, style=f"bold {theme.FOREGROUND_BRIGHT}")
+        robot_txt.append(f"  {robot_model(r)}", style=theme.MUTED)
         self.query_one("#robot-lbl", Static).update(robot_txt)  # type: ignore[attr-defined]
 
         robot_status = getattr(r, "status", None)
         online_lbl = self.query_one("#online-lbl", Static)  # type: ignore[attr-defined]
         if not online:
-            online_lbl.update(Text("○ OFFLINE", style="bold #f85149"))
+            online_lbl.update(Text("○ OFFLINE", style=f"bold {theme.DANGER}"))
             self._stop_cycle_timer()
         elif robot_status is LitterBoxStatus.CAT_DETECTED:
-            online_lbl.update(Text("~ Cat inside", style="bold #3fb950"))
+            online_lbl.update(Text("~ Cat inside", style=f"bold {theme.OK}"))
             self._stop_cycle_timer()
         elif robot_status is LitterBoxStatus.CAT_SENSOR_TIMING:
-            online_lbl.update(Text("⏱ Cat delay", style="bold #d29922"))
+            online_lbl.update(Text("⏱ Cat delay", style=f"bold {theme.WARN}"))
             self._stop_cycle_timer()
         elif robot_status in _CYCLING_STATUSES:
             self._start_cycle_timer()
             online_lbl.update(self._cycling_chip())
         elif robot_status is LitterBoxStatus.PAUSED:
-            online_lbl.update(Text("⏸ Paused", style="bold #d29922"))
+            online_lbl.update(Text("⏸ Paused", style=f"bold {theme.WARN}"))
             self._stop_cycle_timer()
         elif robot_status is LitterBoxStatus.CLEAN_CYCLE_COMPLETE:
-            online_lbl.update(Text("✓ Cycle done", style="bold #3fb950"))
+            online_lbl.update(Text("✓ Cycle done", style=f"bold {theme.OK}"))
             self._stop_cycle_timer()
         elif robot_status in (
             LitterBoxStatus.DRAWER_FULL,
             LitterBoxStatus.DRAWER_FULL_1,
             LitterBoxStatus.DRAWER_FULL_2,
         ):
-            online_lbl.update(Text("⚠ Drawer full", style="bold #f85149"))
+            online_lbl.update(Text("⚠ Drawer full", style=f"bold {theme.DANGER}"))
             self._stop_cycle_timer()
         else:
-            online_lbl.update(Text("● ONLINE", style="bold #3fb950"))
+            online_lbl.update(Text("● ONLINE", style=f"bold {theme.OK}"))
             self._stop_cycle_timer()
 
         nl_mode = getattr(r, "night_light_mode", None)
@@ -135,54 +136,54 @@ class MonitoringMixin:
 
         mode_str = nl_mode.value.lower() if nl_mode is not None else ("on" if nl_enabled else "off")
         if mode_str == "off":
-            nl_emoji, nl_color = "○", "#484f58"
+            nl_emoji, nl_color = "○", theme.MUTED
         elif mode_str == "auto":
-            nl_emoji, nl_color = "◐", "#58a6ff"
+            nl_emoji, nl_color = "◐", theme.ACCENT
         else:
-            nl_emoji, nl_color = "☀", "#d29922"
+            nl_emoji, nl_color = "☀", theme.WARN
 
         nl = Text()
         nl.append(nl_emoji, style=nl_color)
         if nl_brightness and mode_str != "off":
-            nl.append(f"  {nl_brightness}%", style="#484f58")
+            nl.append(f"  {nl_brightness}%", style=theme.MUTED)
         self.query_one("#nightlight-lbl", Static).update(nl)  # type: ignore[attr-defined]
 
         panel_locked = getattr(r, "panel_lock_enabled", False)
         lock_text = Text()
         if panel_locked:
-            lock_text.append("⊘ Locked", style="bold #d29922")
+            lock_text.append("⊘ Locked", style=f"bold {theme.WARN}")
         else:
-            lock_text.append("□ Unlocked", style="#484f58")
+            lock_text.append("□ Unlocked", style=theme.MUTED)
         self.query_one("#lock-lbl", Static).update(lock_text)  # type: ignore[attr-defined]
 
         bar = drawer_bar(drawer)
         dt = Text()
-        dt.append("Drawer ", style="#484f58")
+        dt.append("Drawer ", style=theme.MUTED)
         dt.append_text(bar)
-        dt.append(f" {drawer:.0f}%", style="#8b949e")
+        dt.append(f" {drawer:.0f}%", style=theme.SUBTLE)
         self.query_one("#drawer-lbl", Static).update(dt)  # type: ignore[attr-defined]
 
         litter_raw = getattr(r, "litter_level", None)
         lt = Text()
-        lt.append("Litter ", style="#484f58")
+        lt.append("Litter ", style=theme.MUTED)
         if litter_raw is not None:
-            lt.append(f"{float(litter_raw):.0f}%", style="#8b949e")
+            lt.append(f"{float(litter_raw):.0f}%", style=theme.SUBTLE)
         else:
-            lt.append("—", style="#30363d")
+            lt.append("—", style=theme.DIM)
         self.query_one("#litter-lbl", Static).update(lt)  # type: ignore[attr-defined]
 
         visit_label = "Last visit" if self._last_cat_seen else "Last seen"
         self.query_one("#clean-lbl", Static).update(  # type: ignore[attr-defined]
-            Text(f"{visit_label} {fmt_ago(last_seen)}", style="#484f58")
+            Text(f"{visit_label} {fmt_ago(last_seen)}", style=theme.MUTED)
         )
 
         wt_text = Text()
         if pet_name:
-            wt_text.append(pet_name, style="#8b949e")
-            wt_text.append(" / ", style="#484f58")
+            wt_text.append(pet_name, style=theme.SUBTLE)
+            wt_text.append(" / ", style=theme.MUTED)
         else:
-            wt_text.append("cat ", style="#484f58")
-        wt_text.append(weight_val, style="#8b949e")
+            wt_text.append("cat ", style=theme.MUTED)
+        wt_text.append(weight_val, style=theme.SUBTLE)
         self.query_one("#weight-lbl", Static).update(wt_text)  # type: ignore[attr-defined]
 
         self._update_cat_panel(r)
@@ -214,23 +215,23 @@ class MonitoringMixin:
         wait = getattr(r, "clean_cycle_wait_time_minutes", None)
 
         status_str = status.value if status is not None and hasattr(status, "value") else "—"
-        status_color = STATUS_COLORS.get(status_str, "#3fb950" if online else "#f85149")
+        status_color = STATUS_COLORS.get(status_str, theme.OK if online else theme.DANGER)
 
         t = Text()
         t.append(f"status   {status_str}\n", style=status_color)
 
         if power_type == "AC":
-            t.append("power    mains\n", style="#3fb950")
+            t.append("power    mains\n", style=theme.OK)
         elif power_type == "DC":
-            t.append("power    battery\n", style="#d29922")
+            t.append("power    battery\n", style=theme.WARN)
         else:
-            t.append("power    off\n", style="#484f58")
+            t.append("power    off\n", style=theme.MUTED)
 
         if cycle_count is not None:
-            t.append(f"cycles   {cycle_count}\n", style="#8b949e")
+            t.append(f"cycles   {cycle_count}\n", style=theme.SUBTLE)
 
         if wait:
-            t.append(f"wait     {wait}m\n", style="#484f58")
+            t.append(f"wait     {wait}m\n", style=theme.MUTED)
 
         self.query_one("#cat-status", Static).update(t)  # type: ignore[attr-defined]
 
@@ -265,7 +266,7 @@ class MonitoringMixin:
             if i:
                 t.append("\n")
             prefix = "✖ " if f.severity == SEVERITY_ERROR else "⚠ "
-            color = "#f85149" if f.severity == SEVERITY_ERROR else "#d29922"
+            color = theme.DANGER if f.severity == SEVERITY_ERROR else theme.WARN
             t.append(f"{prefix}{f.label}", style=color)
         banner.update(t)
         banner.display = self._fault_dismissed != active_labels
@@ -291,10 +292,10 @@ class MonitoringMixin:
         """Build the `⟳ Cycling M:SS` chip using `_cycle_start`."""
         base = "⟳ Cycling"
         if self._cycle_start is None:
-            return Text(base, style="bold #58a6ff")
+            return Text(base, style=f"bold {theme.ACCENT}")
         elapsed = int((datetime.now() - self._cycle_start).total_seconds())
         mm, ss = divmod(elapsed, 60)
-        return Text(f"{base}  {mm}:{ss:02d}", style="bold #58a6ff")
+        return Text(f"{base}  {mm}:{ss:02d}", style=f"bold {theme.ACCENT}")
 
     def _start_cycle_timer(self) -> None:
         """Begin tracking an active clean cycle (idempotent)."""

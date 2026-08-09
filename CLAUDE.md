@@ -25,6 +25,7 @@ asher/
   auth.py           LoginScreen modal (ModalScreen[tuple[str,str]]) — available, not primary flow
   helpers.py        fmt_ago(), drawer_bar(), ts(), robot_model()  (pure, testable)
   constants.py      STATUS_COLORS, ROBOT_MODELS
+  theme.py          Catppuccin Mocha palette + semantic roles (BACKGROUND, MUTED, DANGER, …) + CSS_VARIABLES/apply() — the only place a hex literal belongs
   config.py         runtime settings persistence — load()/save()/update() over ~/.asher-cli/config.json; holds poll interval, cat-panel visibility/colour, active pet index, notification settings (non-secret UI prefs only; credentials stay in keyring)
   notifications.py  desktop toast + audible alert façade over plyer (fire/beep, always-safe no-op on failure/headless)
   cats.py           CATS dict (ASCII art)
@@ -35,9 +36,10 @@ asher/
   mcp_bridge.py     asher-mcp-launch console script — keyring-backed pylitterbot MCP launcher
   faults.py         check_faults(robot) — model-scoped safety/component fault detection (status enum + per-model attr allowlist incl. LR4 USB power fault; hopper never a fault)
   history_view.py   HistoryScreen (ModalScreen) + format_history_rows()/format_history_text() — scrollable activity-history pager pushed by the `history` command; `c` copies the full history (plain text) to the clipboard via action_copy_all()
-  export.py         shared activity-history CSV core + headless export path: build_history_csv(), resolve_dest(), resolve_robot(), _run_headless_export(), ExportError — no Textual imports; both the TUI `export` command and `asher --export` call build_history_csv()
+  export.py         shared activity-history CSV core + exit-code contract: build_history_csv(), resolve_dest(), resolve_robot(), parse_days(), EXIT_*, ExportError — no Textual imports; the TUI `export` command and `asher export` both call build_history_csv()
+  headless.py       headless command surface for `asher <command>` — Session/Result/CommandError, the COMMANDS registry, and run(); plain strings only, no Textual, routes model differences through RobotAdapter
   completion.py     pure helpers for command completion: slash popup (slash_matches, enter_completes, render_completion) + inline ghost text (CommandSuggester) — fed by _registry, no Textual imports except the Suggester base class
-  __main__.py       main() entry point
+  __main__.py       main() entry point — argparse subcommands (headless) vs no-args (TUI); `--export` kept as a deprecated alias
   commands/
     base.py         Command ABC, SlashCommand, CommandRegistry
     __init__.py     CommandsMixin — all command classes + registry + dispatch
@@ -64,7 +66,8 @@ tests/
   test_mcp_command.py     /mcp slash command dispatch
   test_faults.py          check_faults() — safety statuses, attribute faults, graceful degradation
   test_history_view.py    format_history_rows()/format_history_text() + HistoryScreen structure, copy-all + Pilot push/dismiss
-  test_export.py          build_history_csv/resolve_dest/resolve_robot/parse_days (pure) + headless _run_headless_export (no Pilot, mocks _connect_headless)
+  test_export.py          build_history_csv/resolve_dest/resolve_robot/parse_days (pure) + the legacy `--export` flag path (no Pilot, mocks _connect_headless)
+  test_headless.py        headless registry/rendering (pure) + every command handler against mock robots + run() exit codes + the argparse subcommand surface
   test_completion.py      slash_matches/enter_completes/render_completion (pure) + Pilot overlay visibility/navigation/accept
 
 .github/workflows/
@@ -102,7 +105,9 @@ Do not add robot-control commands as slash commands, and do not add app-manageme
 **Special cases** (accepted both with and without `/`):
 `exit`, `quit`, `q` — exit the app
 
-> If you add a command, update the tables in `README.md` and the list in `asher/slash-commands/__init__.py`.
+**Headless commands** (`asher <command>`) are a parallel registry in `asher/headless.py`: same robot actions, no Textual, plain-string + JSON output. Slash commands have no headless equivalent — they configure the TUI, which isn't running. A robot command worth scripting should exist in both registries; the shared logic lives in `RobotAdapter`, not in either command class.
+
+> If you add a command, update the tables in `README.md` and the list in `asher/slash-commands/__init__.py`. If it's a robot command, consider adding it to `COMMANDS` in `asher/headless.py` too.
 
 ## Architecture
 
@@ -153,6 +158,14 @@ LoginScreen (ModalScreen) — available in auth.py but not the primary auth path
 
 pylitterbot auto-detects robot type. Commands that differ per model are handled by `RobotAdapter` subclasses in `robot_adapters.py` — `make_adapter(robot)` returns the right one based on `type(robot).__name__`. Status-bar reads use `getattr(..., default)` for graceful degradation on older models. See the `pylitterbot-ref` skill for the confirmed API surface.
 
+## Colour
+
+Every colour comes from `asher/theme.py` (Catppuccin Mocha). Reference the **semantic roles** (`theme.MUTED`, `theme.DANGER`, …), not the raw swatches (`theme.OVERLAY0`) and never a hex literal — a re-flavour then only repoints the roles.
+
+- **Rich styles:** `style=theme.ACCENT`, or `style=f"bold {theme.ACCENT}"`. Prefer building `Text` objects with explicit styles over `Text.from_markup` with inline colours.
+- **`ui/style.tcss`:** use the `$asher-*` variables; `AsherApp.get_css_variables()` supplies them.
+- **Inline `CSS`/`DEFAULT_CSS` on a Screen or Widget:** wrap the block in `theme.apply(...)`, which bakes the `$asher-*` values in at class-definition time. A screen mounted on a host app that isn't `AsherApp` (as the Pilot tests do) would otherwise fail to parse.
+
 ## Code comments
 
 Don't add comments above functions or inline unless the WHY is genuinely non-obvious (a hidden constraint, a subtle invariant, a workaround for a specific bug). Well-named identifiers should make the WHAT self-evident. Before reaching for a comment, check whether the explanation can instead be expressed through abstraction or encapsulation — e.g. domain logic buried in a mixin or command handler should move to a self-commenting, domain-named method rather than being explained in a comment. Favor human-readable, domain-driven names and logical flow over prose explanations, while keeping code legible to agents working in this repo.
@@ -178,6 +191,8 @@ Commands that need a confirmed cloud state before showing a result (e.g. sleep/w
 **Add a robot command:** create a class inheriting `Command` in `asher/commands/__init__.py`, implement `async def run(self, app, args)`, and call `_registry.register(MyCommand())`.
 
 **Add a slash command:** create a class inheriting `SlashCommand` (sets `prefix = "/"`), implement `async def run(self, app, args)`, register it, and document in `asher/slash-commands/__init__.py`.
+
+**Add a headless command:** write `async def _my_command(session, args) -> Result` in `asher/headless.py` and add a `HeadlessCommand(...)` entry to `COMMANDS`. The argparse subparser is generated from the registry — nothing to add in `__main__.py`. Build the `Result` with `_rows()` (read commands) or `_outcome()` (actions) so text and JSON stay in step, and raise `CommandError` rather than printing.
 
 **Change poll interval:** `self.set_interval(300, ...)` in `on_mount`.
 

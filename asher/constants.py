@@ -2,16 +2,18 @@
 
 from __future__ import annotations
 
+from . import theme
+
 STATUS_COLORS: dict[str, str] = {
-    "Ready": "#3fb950",
-    "Cycling": "#58a6ff",
-    "Cat Detected": "#d29922",
-    "Drawer Full": "#f85149",
-    "Offline": "#f85149",
-    "Sleeping": "#484f58",
-    "Empty Cycle": "#58a6ff",
-    "Paused": "#d29922",
-    "Clean Cycle Complete": "#3fb950",
+    "Ready": theme.OK,
+    "Cycling": theme.ACCENT,
+    "Cat Detected": theme.WARN,
+    "Drawer Full": theme.DANGER,
+    "Offline": theme.DANGER,
+    "Sleeping": theme.MUTED,
+    "Empty Cycle": theme.ACCENT,
+    "Paused": theme.WARN,
+    "Clean Cycle Complete": theme.OK,
 }
 
 ROBOT_MODELS: dict[str, str] = {
