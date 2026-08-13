@@ -79,6 +79,7 @@ class AsherApp(UIMixin, ConnectionMixin, MonitoringMixin, CommandsMixin, App):  
         self._show_loading_state()
         self.query_one("#cat-panel").display = self._cat_panel_visible
         self._connect_worker()
+        self._announce_update()
         if self._poll_interval > 0:
             self._poll_timer = self.set_interval(self._poll_interval, self._poll_status_interval)
         else:

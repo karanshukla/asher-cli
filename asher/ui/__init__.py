@@ -9,6 +9,7 @@ from importlib.metadata import version as pkg_version
 
 from dotenv import load_dotenv
 from rich.text import Text
+from textual import work
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Container
@@ -232,6 +233,21 @@ class UIMixin:
         self.query_one("#clean-lbl", Static).update(  # type: ignore[attr-defined]
             Text("Last visit —", style=theme.MUTED)
         )
+
+    @work(thread=True)
+    def _announce_update(self) -> None:
+        """Log a one-line notice when a newer release is published.
+
+        A thread worker because it makes a network request, and the dashboard
+        must not wait on PyPI to finish starting. It only ever tells you an
+        upgrade exists; nothing here installs anything (see :mod:`asher.updates`
+        for why that stays manual).
+        """
+        from ..updates import check  # noqa: PLC0415
+
+        update = check()
+        if update is not None:
+            self.call_from_thread(self._log_warn, update.notice)  # type: ignore[attr-defined]
 
     def _show_welcome(self) -> None:
         log = self.query_one("#log", RichLog)  # type: ignore[attr-defined]

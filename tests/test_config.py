@@ -150,14 +150,14 @@ class TestUpdate:
         update(cat_panel_visible=False)
         update(cat_panel_color=None)
         update(active_pet_index=1)
-        data = load()
-        assert data == {
+        # Built from _DEFAULTS rather than spelled out, so adding a setting
+        # doesn't fail a test about update() layering.
+        assert load() == {
+            **_DEFAULTS,
             "poll_interval_seconds": 10,
             "cat_panel_visible": False,
             "cat_panel_color": None,
             "active_pet_index": 1,
-            "notifications": True,
-            "notification_sound": False,
         }
 
     def test_update_writes_through_to_disk(self, cfg_path: Path) -> None:
