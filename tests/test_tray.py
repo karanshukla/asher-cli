@@ -256,6 +256,12 @@ class TestMenu:
         _, items, _ = self._build()
         assert "Open Asher" in items
 
+    def test_carries_no_robot_actions(self) -> None:
+        """A misclick by the clock must not be able to start a physical cycle."""
+        _, items, _ = self._build()
+        assert "Clean now" not in items
+        assert set(items) == {"Open Asher", "Notifications", "Quit"}
+
     def test_opening_is_the_default_action(self) -> None:
         """Left-clicking a tray icon is expected to open the thing it belongs to."""
         pystray, _, _ = self._build()

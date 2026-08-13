@@ -189,19 +189,20 @@ class _TrayState:
 
 
 def _build_menu(pystray: Any, state: _TrayState, runner: Any, log: Callable[[str], None]) -> Any:
-    """Assemble the tray menu — a live status readout plus the two useful verbs."""
+    """Assemble the tray menu — a live status readout, then what's safe to click.
+
+    Deliberately no robot actions. A tray menu is a small target next to the
+    clock, and starting a cycle is a physical thing that could be happening
+    while the cat is still in the box; a misclick there is not recoverable by
+    clicking again. Robot commands live in the dashboard, which "Open Asher"
+    is there to reach.
+    """
 
     def inert(item: Any) -> None:
         """Menu rows that are readouts, not buttons."""
 
     def open_app(icon: Any, item: Any) -> None:
         log(launcher.open_app()[1])
-
-    def clean(icon: Any, item: Any) -> None:
-        if runner.call(lambda session: session.robot.start_cleaning()):
-            log("Clean cycle requested from the tray.")
-        else:
-            log("Not connected — clean cycle not sent.")
 
     def toggle_notifications(icon: Any, item: Any) -> None:
         settings = config.update(notifications=not config.load().get("notifications", True))
@@ -218,7 +219,6 @@ def _build_menu(pystray: Any, state: _TrayState, runner: Any, log: Callable[[str
         # default=True so left-clicking the icon opens the app, which is what a
         # tray icon is expected to do.
         pystray.MenuItem("Open Asher", open_app, default=True),
-        pystray.MenuItem("Clean now", clean),
         pystray.MenuItem(
             "Notifications",
             toggle_notifications,
