@@ -8,9 +8,21 @@ backend, or a headless session must degrade to a no-op rather than raising.
 from __future__ import annotations
 
 import builtins
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 from asher import notifications
+
+
+def _no_real_toasts() -> Any:
+    """Stop a test that defeats plyer from popping a toast on the dev's desktop.
+
+    Whenever ``_fire_plyer`` is made to fail, ``fire`` falls through to the
+    platform's own notifier — which, unmocked, is a live ``notify-send`` /
+    ``osascript`` call.
+    """
+    return patch.object(notifications, "_fire_native", return_value=False)
+
 
 # ── fire ──────────────────────────────────────────────────────────────────────
 
@@ -35,14 +47,17 @@ class TestFire:
                 raise ImportError("no plyer")
             return real_import(name, *args, **kwargs)  # type: ignore[arg-type]
 
-        with patch("builtins.__import__", side_effect=fake_import):
+        with (
+            patch("builtins.__import__", side_effect=fake_import),
+            _no_real_toasts(),
+        ):
             notifications.fire("Title", "Body")  # must not raise
 
     def test_no_op_when_backend_raises(self) -> None:
         fake_notification = MagicMock()
         fake_notification.notify.side_effect = RuntimeError("no desktop daemon")
         fake_mod = MagicMock(notification=fake_notification)
-        with patch.dict("sys.modules", {"plyer": fake_mod}):
+        with patch.dict("sys.modules", {"plyer": fake_mod}), _no_real_toasts():
             notifications.fire("Title", "Body")  # must not raise
 
     def test_timeout_passed_through(self) -> None:
