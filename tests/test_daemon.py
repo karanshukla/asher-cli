@@ -49,20 +49,38 @@ class TestPidFile:
         assert daemon.read_pid() is None
 
 
+@pytest.fixture
+def posix(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Pin the POSIX branch of ``pid_alive`` so its tests run on Windows too."""
+    monkeypatch.setattr(daemon.sys, "platform", "linux")
+
+
 class TestPidAlive:
     def test_this_process_is_alive(self) -> None:
+        """Unpinned on purpose — exercises the real branch for the host platform."""
         assert daemon.pid_alive(os.getpid()) is True
 
     def test_pid_zero_is_never_alive(self) -> None:
         assert daemon.pid_alive(0) is False
 
-    def test_missing_process_is_not_alive(self) -> None:
+    def test_missing_process_is_not_alive(self, posix: None) -> None:
         with patch.object(daemon.os, "kill", side_effect=ProcessLookupError):
             assert daemon.pid_alive(4242) is False
 
-    def test_another_users_process_counts_as_alive(self) -> None:
+    def test_another_users_process_counts_as_alive(self, posix: None) -> None:
         with patch.object(daemon.os, "kill", side_effect=PermissionError):
             assert daemon.pid_alive(4242) is True
+
+    def test_windows_never_signals_to_test_liveness(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """``os.kill(pid, 0)`` terminates the target on Windows — it must not be reached."""
+        monkeypatch.setattr(daemon.sys, "platform", "win32")
+        with (
+            patch.object(daemon, "_windows_pid_alive", return_value=True) as windows_check,
+            patch.object(daemon.os, "kill") as kill,
+        ):
+            assert daemon.pid_alive(4242) is True
+        windows_check.assert_called_once_with(4242)
+        kill.assert_not_called()
 
 
 class TestRunningPid:
@@ -181,9 +199,11 @@ class TestStop:
         ):
             ok, _ = daemon.stop()
         assert ok is True
+        # Windows has no SIGKILL; there the escalation is a second
+        # TerminateProcess, which is what stop() falls back to.
         assert [call.args[1] for call in kill.call_args_list] == [
             daemon.signal.SIGTERM,
-            daemon.signal.SIGKILL,
+            getattr(daemon.signal, "SIGKILL", daemon.signal.SIGTERM),
         ]
 
     def test_already_gone_counts_as_stopped(self, runtime: Path) -> None:
