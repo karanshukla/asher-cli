@@ -28,6 +28,7 @@ dependencies = [
 
 [project.optional-dependencies]
 mcp = ["pylitterbot[mcp]==2025.6.4"]
+tray = ["pystray>=0.19", "pillow>=10.0"]
 
 [project.scripts]
 asher = "asher.__main__:main"
@@ -51,6 +52,7 @@ dev = [
     "textual-dev>=1.0",
     "watchfiles>=0.21",
     "git-cliff>=2.0",
+    "pillow>=10.0",  # so the tray icon renderer is covered in CI
 ]
 
 [tool.poe.tasks]

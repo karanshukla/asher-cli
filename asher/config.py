@@ -5,6 +5,11 @@ poll interval, cat-panel visibility/colour, the active pet, and the desktop-
 notification preferences. Credentials and the preferred-robot serial stay in
 the OS keyring; this file holds only non-secret UI preferences, so a corrupt
 or hand-edited file degrades to defaults rather than crashing the app.
+
+It is also the only channel between the dashboard and a detached watcher
+(:mod:`asher.watcher`), which is why the watcher re-reads it per alert rather
+than caching at startup: toggling ``/notify`` in the TUI, or the tray's own
+Notifications item, has to reach a process that may have been up for days.
 """
 
 from __future__ import annotations
@@ -23,6 +28,8 @@ _DEFAULTS: dict[str, Any] = {
     "active_pet_index": 0,
     "notifications": True,
     "notification_sound": False,
+    "watch_tray": True,
+    "watch_drawer_threshold": 85,
 }
 
 

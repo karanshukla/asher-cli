@@ -26,6 +26,18 @@ if TYPE_CHECKING:
 _CYCLING_STATUSES = frozenset({LitterBoxStatus.CLEAN_CYCLE, LitterBoxStatus.EMPTY_CYCLE})
 
 
+def _background_watcher_is_running() -> bool:
+    """True when ``asher watch`` has a live daemon, which toasts these faults itself.
+
+    Both processes evaluate the same faults against the same cloud state, so
+    without this the user gets every alert twice whenever the dashboard is open
+    alongside the watcher.
+    """
+    from ..daemon import running_pid  # noqa: PLC0415
+
+    return running_pid() is not None
+
+
 class MonitoringMixin:
     # declared for type checkers; assigned in AsherApp.__init__
     _robot: RobotProtocol | None
@@ -280,6 +292,8 @@ class MonitoringMixin:
         and audible alert are suppressed.
         """
         if not getattr(self, "_notifications_enabled", True):
+            return
+        if _background_watcher_is_running():
             return
         from ..notifications import beep, fire  # noqa: PLC0415
 

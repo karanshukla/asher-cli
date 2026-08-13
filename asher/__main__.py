@@ -6,6 +6,9 @@ terminal required — so the robot can be driven from cron, Task Scheduler, or a
 SSH session. ``asher --help`` lists the commands; :mod:`asher.headless` owns
 what each one does.
 
+``asher watch`` is the exception to "do one thing and exit": it manages a
+long-lived notifier process (:mod:`asher.daemon`) rather than driving the robot.
+
 ``--export`` is kept as a flag alongside the ``export`` subcommand so existing
 cron entries keep working unchanged.
 """
@@ -16,6 +19,7 @@ import argparse
 import asyncio
 import sys
 
+from .daemon import ACTIONS as DAEMON_ACTIONS
 from .headless import COMMANDS
 
 
@@ -65,6 +69,35 @@ def _build_parser() -> argparse.ArgumentParser:
     )
 
     subparsers = parser.add_subparsers(dest="command", metavar="<command>")
+
+    # `watch` isn't in the headless registry: that registry is robot actions,
+    # each of which opens a cloud session and exits. This one manages a process.
+    watch = subparsers.add_parser(
+        "watch",
+        help="run the notification watcher in the background",
+        description="Keep desktop notifications running after this terminal closes. "
+        "`start` detaches a watcher process (with a tray icon where one is available), "
+        "`run` does the same in the foreground.",
+    )
+    watch.add_argument(
+        "action",
+        nargs="?",
+        default="start",
+        choices=DAEMON_ACTIONS,
+        help="default: start",
+    )
+    watch.add_argument(
+        "--robot",
+        default=argparse.SUPPRESS,
+        metavar="INDEX|NAME",
+        help="pick the robot to watch by index or partial name (default: preferred/first).",
+    )
+    watch.add_argument(
+        "--no-tray",
+        action="store_true",
+        help="never show a system-tray icon, even where one is available.",
+    )
+
     for command in COMMANDS:
         sub = subparsers.add_parser(
             command.name,
@@ -86,6 +119,11 @@ def _build_parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = _build_parser().parse_args()
+
+    if args.command == "watch":
+        from .daemon import dispatch  # noqa: PLC0415
+
+        sys.exit(dispatch(args.action, robot=args.robot, tray=not args.no_tray))
 
     if args.command is not None:
         from .headless import run  # noqa: PLC0415

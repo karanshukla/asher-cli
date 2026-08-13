@@ -1057,6 +1057,13 @@ class RefreshCommand(SlashCommand):
         app._log_ok(f"Auto-refresh set to every {seconds}s")
 
 
+def _watcher_summary() -> str:
+    from ..daemon import running_pid  # noqa: PLC0415
+
+    pid = running_pid()
+    return f"running (pid {pid})" if pid is not None else "not running"
+
+
 class ConfigCommand(SlashCommand):
     name = "config"
     description = "show current runtime configuration"
@@ -1096,6 +1103,7 @@ class ConfigCommand(SlashCommand):
                 "notif. sound",
                 "on" if getattr(app, "_notification_sound", False) else "off",
             ),
+            ("watcher", _watcher_summary()),
         ]
         log.write("")
         for k, v in rows:
@@ -1147,6 +1155,28 @@ class NotifyCommand(SlashCommand):
             app._log_ok("Test notification fired")
         else:
             app._log_warn("Usage: /notify on|off|sound on|off|test")
+
+
+class WatchCommand(SlashCommand):
+    name = "watch"
+    description = "start|stop|status  background notifier that outlives this terminal"
+
+    async def run(self, app: AsherApp, args: list[str]) -> None:
+        from ..daemon import ACTIONS, start, status, stop  # noqa: PLC0415
+
+        action = args[0].lower() if args else "status"
+        if action not in ACTIONS or action == "run":
+            app._log_warn("Usage: /watch start|stop|status")
+            return
+
+        handlers = {"start": start, "stop": stop, "status": status}
+        # Each of these blocks on process signals and short sleeps, which would
+        # otherwise stall the UI for the length of the daemon's shutdown grace.
+        ok, message = await asyncio.to_thread(handlers[action])
+        for line in message.splitlines():
+            (app._log_ok if ok else app._log_warn)(line)
+        if ok and action == "start":
+            app._log_info("Dashboard toasts are suppressed while the watcher runs.")
 
 
 class RobotCommand(SlashCommand):
@@ -1403,6 +1433,7 @@ _registry.register(CatCommand())
 _registry.register(RefreshCommand())
 _registry.register(ConfigCommand())
 _registry.register(NotifyCommand())
+_registry.register(WatchCommand())
 _registry.register(McpCommand())
 _registry.register(VersionCommand())
 

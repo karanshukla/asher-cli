@@ -21,10 +21,11 @@ A Claude Code-style terminal dashboard for monitoring and controlling Litter Rob
 - Cat panel with mode label + status badges (status chip, lock, night light, sleep, wait time) under the art
 - Scrollable activity-history pager — `history [count|all]` opens a full-screen, paginated view (arrow keys, `Page Up`/`Page Down`, `Home`/`End`); `c` copies the whole history to the clipboard; `q`/`Esc`/`Enter` to close
 - Commands: `clean`, `status`, `info`, `lock`, `unlock`, `sleep`, `wake`, `night-light on|off|auto`, `night-light-brightness`, `panel-brightness <low|medium|high>` (LR4/LR5), `wait-time`, `power on|off`, `rename`, `insight`, `sleep-schedule`, plus LR5 extras (`privacy`, `volume`, `camera-audio`, `drawer-reset`), `history [count|all]`, `export [days|month]`, `help`, `quit`
-- Slash commands for app management: `/login`, `/logout`, `/robots`, `/robot <index|name>`, `/pets`, `/pet <index|name>`, `/cat on|off|colour <hex>`, `/refresh [seconds|off]`, `/config`, `/notify on|off|sound on|off|test`, `/version`, `/mcp on|off|status`, `/exit`
+- Slash commands for app management: `/login`, `/logout`, `/robots`, `/robot <index|name>`, `/pets`, `/pet <index|name>`, `/cat on|off|colour <hex>`, `/refresh [seconds|off]`, `/config`, `/notify on|off|sound on|off|test`, `/watch start|stop|status`, `/version`, `/mcp on|off|status`, `/exit`
 - Slash-command tab completion — type `/` and a Claude Code-style overlay lists matching commands; `↑`/`↓` to move, `Tab` or `Enter` to accept, `Esc` to dismiss
 - Inline ghost-text completion for bare commands — type a prefix (`cle`) and the rest (`an`) appears greyed; `Tab` or `→` to accept → `clean`
 - Headless mode — every robot command also runs without the TUI (`asher status`, `asher clean`, `asher night-light auto`, `asher export 7`), with `--json` output and documented exit codes for cron / Task Scheduler / SSH
+- Background watcher — `asher watch start` detaches a notifier process that keeps toasting faults, a filling drawer, and offline/online changes **after you close the terminal**; optional system-tray icon shows live status with Clean now / Notifications / Quit
 - Catppuccin Mocha throughout — one palette in `asher/theme.py` drives the TUI stylesheet and every Rich style
 - Cat animation panel that reacts to robot state
 - Command history (↑/↓ arrows)
@@ -119,8 +120,9 @@ LITTER_ROBOT_PASSWORD=yourpassword
 | `/cat on\|off` | Show or hide the cat animation panel |
 | `/cat colour <hex>` | Change the cat art colour (e.g. `/cat colour #ff79c6`); `color` also accepted; `/cat reset` to revert |
 | `/refresh [seconds\|off]` | Change the auto-poll interval or disable it (`/refresh 60`, `/refresh off`) |
-| `/config` | Show current runtime settings (robot, refresh rate, cat panel, active pet, notifications) |
+| `/config` | Show current runtime settings (robot, refresh rate, cat panel, active pet, notifications, watcher) |
 | `/notify on\|off\|sound on\|off\|test` | Toggle desktop toast notifications for fault events (cat detected, pinch, motor fault, drawer full); `test` fires a sample toast |
+| `/watch start\|stop\|status` | Start, stop, or check the background watcher that keeps notifications running after you close the dashboard |
 | `/version` | Show version info (asher-cli, Python, pylitterbot, textual) |
 | `/mcp on\|off\|status` | Toggle the Litter-Robot MCP server entry in Claude Desktop |
 | `/exit` | Exit Asher CLI |
@@ -182,9 +184,42 @@ asher.exe export 7 --output C:\Users\me\litter-history.csv
 
 `asher --export [days]` remains as a deprecated alias for `asher export [days]`, so existing cron entries keep working.
 
+### Background notifications (`asher watch`)
+
+The dashboard only notifies while it's on screen — close the terminal and the toasts stop. `asher watch` runs the same fault monitoring as a detached process, so notifications keep arriving with no terminal open at all.
+
+```bash
+asher watch start        # detach a watcher; the terminal is free to close
+asher watch status       # is one running? plus the last few log lines
+asher watch stop         # shut it down
+asher watch run          # same thing in the foreground, for debugging
+```
+
+You can also drive it from inside the dashboard with `/watch start|stop|status` — handy right before you quit. While a watcher is running the dashboard suppresses its own toasts, so you never get an alert twice.
+
+It notifies on:
+
+- **faults appearing and clearing** — cat detected, pinch, motor/position/gas faults, drawer full (same model-scoped detection as the dashboard's fault banner)
+- **the waste drawer crossing 85%** — an early warning before the robot stops on its own (tune with `watch_drawer_threshold`)
+- **the robot going offline or coming back**
+
+Notifications respect your `/notify` settings, and re-read them on every alert — toggling notifications in the dashboard reaches a watcher that's already running. Faults already showing when the watcher starts are announced immediately; connectivity is only reported when it *changes*, so startup never claims a robot "came back" that was never away.
+
+The watcher is built to be left alone: it reconnects with backoff through Wi-Fi drops, laptop sleeps, expired tokens, and a cloud that's still unreachable at login. Only genuinely missing credentials stop it — sign in with `/login` once first. Its log lives at `~/.asher-cli/watch.log` (`~` is your home directory; `%USERPROFILE%` on Windows).
+
+**System-tray icon** (optional):
+
+```bash
+pip install "asher-cli[tray]"
+```
+
+With `pystray` and Pillow installed, `asher watch start` also shows a tray icon coloured by robot health — green healthy, red faulted, grey offline — with the current status in its tooltip and a menu offering **Clean now**, a **Notifications** toggle, and **Quit**. Everything degrades gracefully: no extras installed, no desktop session, or a Linux box with no AppIndicator host all fall back to a headless watcher rather than failing. Pass `--no-tray` (or set `watch_tray: false`) to skip the icon deliberately.
+
+The watcher does not yet start itself at login — run `asher watch start` from your shell profile, a Startup shortcut, or a `launchd`/`systemd --user` unit if you want that.
+
 ## Configuration
 
-Runtime settings persist across restarts in `~/.asher-cli/config.json`, so you don't have to re-apply `/refresh 60`, `/cat colour #ff79c6`, or `/pet 1` every launch. The file is auto-created on first change and holds six non-secret UI preferences:
+Runtime settings persist across restarts in `~/.asher-cli/config.json`, so you don't have to re-apply `/refresh 60`, `/cat colour #ff79c6`, or `/pet 1` every launch. The file is auto-created on first change and holds eight non-secret UI preferences:
 
 | Setting | Slash command | Default |
 |---|---|---|
@@ -194,6 +229,8 @@ Runtime settings persist across restarts in `~/.asher-cli/config.json`, so you d
 | `active_pet_index` | `/pet <index\|name>` | `0` |
 | `notifications` | `/notify on\|off` | `true` |
 | `notification_sound` | `/notify sound on\|off` | `false` |
+| `watch_tray` | *(file only)* | `true` — set `false` to make `asher watch` always run without a tray icon |
+| `watch_drawer_threshold` | *(file only)* | `85` — drawer % that triggers an early background warning |
 
 Credentials and the preferred-robot serial stay in the OS keyring; `.env` vars stay as env vars. You generally don't need to edit the file by hand — just use the slash commands — but it's plain JSON and safe to inspect or delete (deleting it restores defaults).
 
