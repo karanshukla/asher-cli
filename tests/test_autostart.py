@@ -171,9 +171,13 @@ class TestRegistry:
         assert winreg.SetValueEx.call_args.args[1] == "AsherWatch"
 
     def test_quotes_arguments_containing_spaces(self) -> None:
-        with patch.object(autostart.sys, "executable", "/opt/My Tools/python.exe"):
+        # Compared against the Path-normalised form: the backend routes the
+        # interpreter through Path to find pythonw.exe beside it, which rewrites
+        # separators on Windows. What matters here is the quoting, not the slash.
+        executable = str(Path("/opt/My Tools/python.exe"))
+        with patch.object(autostart.sys, "executable", executable):
             command = RegistryAutostart()._command()
-        assert command.startswith('"/opt/My Tools/python.exe"')
+        assert command.startswith(f'"{executable}"')
         assert command.endswith("-m asher watch run")
 
     def test_location_names_the_value(self) -> None:
