@@ -4,12 +4,43 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from asher.connection import (
+    _env_credentials,
     _keyring_available,
     _keyring_delete,
     _keyring_load,
     _keyring_save,
 )
+
+
+class TestEnvCredentials:
+    """The environment is a development convenience, never an install's source."""
+
+    def test_ignored_outside_dev_mode(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("LITTER_ROBOT_USER", "env@example.com")
+        monkeypatch.setenv("LITTER_ROBOT_PASSWORD", "envpw")
+        monkeypatch.delenv("ASHER_CLI_DEV_MODE", raising=False)
+        assert _env_credentials() == ("", "")
+
+    def test_read_in_dev_mode(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("LITTER_ROBOT_USER", "env@example.com")
+        monkeypatch.setenv("LITTER_ROBOT_PASSWORD", "envpw")
+        monkeypatch.setenv("ASHER_CLI_DEV_MODE", "true")
+        assert _env_credentials() == ("env@example.com", "envpw")
+
+    def test_dev_mode_flag_is_case_insensitive(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("LITTER_ROBOT_USER", "env@example.com")
+        monkeypatch.setenv("LITTER_ROBOT_PASSWORD", "envpw")
+        monkeypatch.setenv("ASHER_CLI_DEV_MODE", "TRUE")
+        assert _env_credentials() == ("env@example.com", "envpw")
+
+    def test_dev_mode_with_nothing_set(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("LITTER_ROBOT_USER", raising=False)
+        monkeypatch.delenv("LITTER_ROBOT_PASSWORD", raising=False)
+        monkeypatch.setenv("ASHER_CLI_DEV_MODE", "true")
+        assert _env_credentials() == ("", "")
 
 
 class TestKeyringAvailable:

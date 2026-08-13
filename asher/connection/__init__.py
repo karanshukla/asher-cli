@@ -18,11 +18,24 @@ from textual import work
 from textual.widgets import RichLog
 
 from .. import theme
-from ..helpers import robot_model, ts
+from ..helpers import dev_mode, robot_model, ts
 
 load_dotenv()
 
 _SERVICE = "asher-cli"
+
+
+def _env_credentials() -> tuple[str, str]:
+    """Credentials from ``.env``/the environment — development only.
+
+    Gated on dev mode so that in a real install the OS keyring is the *only*
+    place credentials come from. A ``LITTER_ROBOT_USER`` left over in a shell
+    profile or a checked-out ``.env`` would otherwise silently outrank the
+    keyring and authenticate as somebody else's account.
+    """
+    if not dev_mode():
+        return "", ""
+    return os.getenv("LITTER_ROBOT_USER") or "", os.getenv("LITTER_ROBOT_PASSWORD") or ""
 
 
 class HeadlessAuthError(Exception):
@@ -141,8 +154,7 @@ class ConnectionMixin:
                 self._log_warn("Keyring not available")  # type: ignore[attr-defined]
 
         if not email or not password:
-            env_email = os.getenv("LITTER_ROBOT_USER") or ""
-            env_pass = os.getenv("LITTER_ROBOT_PASSWORD") or ""
+            env_email, env_pass = _env_credentials()
             email = email or env_email
             password = password or env_pass
 
@@ -276,11 +288,11 @@ async def _connect_headless() -> Any:
     """Connect for the headless CLI (``asher --export``) — no TUI, no prompts.
 
     Same credential priority as ``_connect_worker`` — cached OAuth token first,
-    then email/password from the OS keyring → ``.env`` — but with **no interactive
-    login fallback** (there's no command bar to type into). A scheduled task's
-    environment can't be assumed to match the project dir, so ``.env`` discovery
-    relies on the ``load_dotenv()`` already called at import time rather than an
-    upward directory search.
+    then email/password from the OS keyring, then (in dev mode only) ``.env`` —
+    but with **no interactive login fallback** (there's no command bar to type
+    into). A scheduled task's environment can't be assumed to match the project
+    dir, so ``.env`` discovery relies on the ``load_dotenv()`` already called at
+    import time rather than an upward directory search.
 
     Returns a connected ``Account`` on success. Raises :class:`HeadlessAuthError`
     (exit code 1 = no credentials, 2 = connection failure) otherwise — the caller
@@ -305,13 +317,13 @@ async def _connect_headless() -> Any:
     if _keyring_available():
         email, password = _keyring_load()
     if not email or not password:
-        email = email or os.getenv("LITTER_ROBOT_USER") or ""
-        password = password or os.getenv("LITTER_ROBOT_PASSWORD") or ""
+        env_email, env_password = _env_credentials()
+        email = email or env_email
+        password = password or env_password
 
     if not email or not password:
         raise HeadlessAuthError(
-            "No credentials found. Run asher-cli and sign in with /login at least "
-            "once, or set LITTER_ROBOT_USER / LITTER_ROBOT_PASSWORD in .env.",
+            "No credentials found. Run asher-cli and sign in with /login at least once.",
             1,
         )
 

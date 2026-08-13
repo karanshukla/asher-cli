@@ -2,12 +2,37 @@
 
 from __future__ import annotations
 
+import os
 from datetime import datetime, timezone
 
 from rich.text import Text
 
 from . import theme
 from .constants import ROBOT_MODELS
+
+_DEV_MODE_VAR = "ASHER_CLI_DEV_MODE"
+
+
+def dev_mode() -> bool:
+    """Whether this is a working copy rather than a real install.
+
+    Set by ``ASHER_CLI_DEV_MODE`` in the repo's ``.env``. It gates the
+    conveniences that only make sense while developing — the ``dev`` version
+    string, and reading credentials out of the environment — so neither can
+    take effect on a machine that merely installed the package.
+    """
+    return os.getenv(_DEV_MODE_VAR, "false").lower() == "true"
+
+
+def applescript_string(value: str) -> str:
+    """Quote a Python string as an AppleScript literal.
+
+    ``osascript -e`` takes one argument, so text is embedded in source rather
+    than passed as data — which makes escaping the caller's problem: a robot
+    named ``Cat "Bin"`` would otherwise end the literal early.
+    """
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
 
 
 def fmt_ago(dt: datetime | None) -> str:

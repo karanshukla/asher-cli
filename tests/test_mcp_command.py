@@ -37,9 +37,23 @@ class TestMcpCommand:
             await McpCommand().run(app, ["on"])
         app._log_err.assert_called_once()
 
+    async def test_on_ignores_env_credentials_outside_dev_mode(self, app, monkeypatch):
+        """A stray LITTER_ROBOT_USER must never outrank the keyring in an install."""
+        monkeypatch.setenv("LITTER_ROBOT_USER", "env@example.com")
+        monkeypatch.setenv("LITTER_ROBOT_PASSWORD", "envpw")
+        monkeypatch.delenv("ASHER_CLI_DEV_MODE", raising=False)
+        with (
+            patch("asher.connection._keyring_load", return_value=("", "")),
+            patch("asher.connection._keyring_save", return_value=True) as mock_save,
+        ):
+            await McpCommand().run(app, ["on"])
+        mock_save.assert_not_called()
+        app._log_err.assert_called_once()
+
     async def test_on_falls_back_to_env_and_copies_to_keyring(self, app, monkeypatch):
         monkeypatch.setenv("LITTER_ROBOT_USER", "env@example.com")
         monkeypatch.setenv("LITTER_ROBOT_PASSWORD", "envpw")
+        monkeypatch.setenv("ASHER_CLI_DEV_MODE", "true")
         with (
             patch("asher.connection._keyring_load", return_value=("", "")),
             patch("asher.connection._keyring_save", return_value=True) as mock_save,

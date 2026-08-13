@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 from asher import theme
-from asher.helpers import drawer_bar, fmt_ago, ts
+from asher.helpers import dev_mode, drawer_bar, fmt_ago, ts
 
 
 class TestFmtAgo:
@@ -91,3 +91,23 @@ class TestTs:
     def test_span_style_is_gray(self):
         result = ts()
         assert result._spans[0].style == theme.MUTED
+
+
+class TestDevMode:
+    def test_off_by_default(self, monkeypatch):
+        monkeypatch.delenv("ASHER_CLI_DEV_MODE", raising=False)
+        assert dev_mode() is False
+
+    def test_on_when_set_true(self, monkeypatch):
+        monkeypatch.setenv("ASHER_CLI_DEV_MODE", "true")
+        assert dev_mode() is True
+
+    def test_case_insensitive(self, monkeypatch):
+        monkeypatch.setenv("ASHER_CLI_DEV_MODE", "True")
+        assert dev_mode() is True
+
+    def test_any_other_value_is_off(self, monkeypatch):
+        """Only an explicit `true` opts in — `1`/`yes` must not enable it silently."""
+        for value in ("false", "1", "yes", ""):
+            monkeypatch.setenv("ASHER_CLI_DEV_MODE", value)
+            assert dev_mode() is False

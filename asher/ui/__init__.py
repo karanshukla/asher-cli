@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import contextlib
-import os
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as pkg_version
 
@@ -19,7 +18,7 @@ from textual.widgets import Input, RichLog, Static
 from .. import theme
 from ..cats import CATS
 from ..completion import CommandSuggester
-from ..helpers import ts
+from ..helpers import dev_mode, ts
 
 load_dotenv()
 
@@ -55,7 +54,7 @@ class CmdInput(Input):
             self.cursor_position = len(self.value)
 
 
-if os.getenv("ASHER_CLI_DEV_MODE", "false").lower() == "true":
+if dev_mode():
     VERSION = "dev"
 else:
     try:
