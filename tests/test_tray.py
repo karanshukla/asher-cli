@@ -98,6 +98,20 @@ class TestTrayState:
         state.update(_snapshot())
         assert state.detail() == "Ready  ·  drawer 40%"
 
+    def test_heading_names_the_robot_without_repeating_detail(self) -> None:
+        """The two menu rows are stacked, so neither may restate the other."""
+        state = tray._TrayState()
+        state.update(_snapshot())
+        assert state.heading() == "Asher"
+        assert "drawer" not in state.heading()
+        assert state.heading() not in state.detail()
+
+    def test_offline_detail_does_not_echo_stale_readings(self) -> None:
+        state = tray._TrayState()
+        state.update(_snapshot(online=False))
+        assert state.heading() == "Asher"
+        assert state.detail() == "Offline"
+
     def test_icon_colour_tracks_robot_health(self) -> None:
         state = tray._TrayState()
         state.update(_snapshot())
@@ -184,6 +198,102 @@ class TestRun:
 class TestIconImage:
     def test_draws_a_square_rgba_image(self) -> None:
         pytest.importorskip("PIL")
-        image = tray._icon_image(theme.OK)
+        image = tray._icon_image(theme.OK, dark_panel=True)
         assert image.size == (tray._ICON_SIZE, tray._ICON_SIZE)
         assert image.mode == "RGBA"
+
+    @staticmethod
+    def _head_pixel(image: Any) -> tuple[int, ...]:
+        """A point on the cat's forehead, clear of the status badge."""
+        return image.getpixel((32, 24))
+
+    def test_silhouette_inverts_with_the_panel_tone(self) -> None:
+        pytest.importorskip("PIL")
+        from PIL import ImageColor
+
+        on_dark = tray._icon_image(theme.OK, dark_panel=True)
+        on_light = tray._icon_image(theme.OK, dark_panel=False)
+        assert self._head_pixel(on_dark)[:3] == ImageColor.getrgb(theme.GLYPH_ON_DARK)
+        assert self._head_pixel(on_light)[:3] == ImageColor.getrgb(theme.GLYPH_ON_LIGHT)
+
+    def test_status_rides_the_badge_not_the_silhouette(self) -> None:
+        """Health must not tint the whole cat, or it vanishes on a light panel."""
+        pytest.importorskip("PIL")
+        healthy = tray._icon_image(theme.OK, dark_panel=True)
+        faulted = tray._icon_image(theme.DANGER, dark_panel=True)
+        assert self._head_pixel(healthy) == self._head_pixel(faulted)
+
+        badge = (tray._DOT_CENTRE, tray._DOT_CENTRE)
+        assert healthy.getpixel(badge) != faulted.getpixel(badge)
+
+    def test_badge_is_ringed_by_transparency(self) -> None:
+        """The halo is what keeps the badge readable over the silhouette."""
+        pytest.importorskip("PIL")
+        image = tray._icon_image(theme.OK, dark_panel=True)
+        # Straight up from the badge centre: inside the head, between the badge
+        # edge and the halo edge, so only the halo can have cleared it.
+        gap = (tray._DOT_RADIUS + tray._DOT_HALO_RADIUS) // 2
+        assert image.getpixel((tray._DOT_CENTRE, tray._DOT_CENTRE - gap))[3] == 0
+
+
+class TestMenu:
+    @staticmethod
+    def _items(pystray: Any) -> dict[str, Any]:
+        """The menu's labelled rows, by label, from a mocked pystray."""
+        return {
+            call.args[0]: call.args[1]
+            for call in pystray.MenuItem.call_args_list
+            if isinstance(call.args[0], str)
+        }
+
+    def _build(self) -> tuple[Any, dict[str, Any], list[str]]:
+        pystray, logged = MagicMock(), []
+        state, runner = tray._TrayState(), MagicMock()
+        tray._build_menu(pystray, state, runner, logged.append)
+        return pystray, self._items(pystray), logged
+
+    def test_offers_opening_the_app(self) -> None:
+        _, items, _ = self._build()
+        assert "Open Asher" in items
+
+    def test_opening_is_the_default_action(self) -> None:
+        """Left-clicking a tray icon is expected to open the thing it belongs to."""
+        pystray, _, _ = self._build()
+        defaulted = [
+            call.args[0] for call in pystray.MenuItem.call_args_list if call.kwargs.get("default")
+        ]
+        assert defaulted == ["Open Asher"]
+
+    def test_open_reports_the_outcome_to_the_log(self) -> None:
+        _, items, logged = self._build()
+        with patch.object(tray.launcher, "open_app", return_value=(False, "no terminal")):
+            items["Open Asher"](MagicMock(), MagicMock())
+        assert logged == ["no terminal"]
+
+    def test_open_does_not_raise_when_launching_fails(self) -> None:
+        """A menu handler that raises takes the tray down with it."""
+        _, items, _ = self._build()
+        with patch.object(tray.launcher, "open_app", return_value=(False, "nope")):
+            items["Open Asher"](MagicMock(), MagicMock())
+
+
+class TestPanelTone:
+    def test_icon_follows_the_desktop_tone(self) -> None:
+        state = tray._TrayState()
+        with (
+            patch.object(tray.desktoptheme, "panel_is_dark", return_value=False),
+            patch.object(tray, "_icon_image") as icon_image,
+        ):
+            state.image()
+        assert icon_image.call_args.kwargs["dark_panel"] is False
+
+    def test_a_theme_switch_repaints_an_otherwise_unchanged_icon(self) -> None:
+        state = tray._TrayState()
+        icon = MagicMock()
+        state.bind(icon)
+        with patch.object(tray, "_icon_image", return_value="image"):
+            with patch.object(tray.desktoptheme, "panel_is_dark", return_value=True):
+                state.update(_snapshot())
+            with patch.object(tray.desktoptheme, "panel_is_dark", return_value=False):
+                state.update(_snapshot())
+        assert icon.update_menu.call_count == 2

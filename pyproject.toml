@@ -28,7 +28,10 @@ dependencies = [
 
 [project.optional-dependencies]
 mcp = ["pylitterbot[mcp]==2025.6.4"]
-tray = ["pystray>=0.19", "pillow>=10.0"]
+# PyGObject is what puts pystray on its AppIndicator backend. Without it pystray
+# silently falls back to a legacy XEmbed icon, which KDE Plasma and GNOME no
+# longer host at all — the watcher runs, draws an icon, and nothing shows it.
+tray = ["pystray>=0.19", "pillow>=10.0", "pygobject>=3.42; sys_platform == 'linux'"]
 
 [project.scripts]
 asher = "asher.__main__:main"

@@ -21,12 +21,15 @@ import threading
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
-from . import config, theme
+from . import config, desktoptheme, launcher, theme
 
 if TYPE_CHECKING:
     from .watcher import Snapshot
 
 _ICON_SIZE = 64
+_DOT_CENTRE = 47
+_DOT_RADIUS = 10
+_DOT_HALO_RADIUS = 15
 
 
 def is_available() -> bool:
@@ -75,8 +78,8 @@ def run(
     runner = WatcherRunner(on_status=state.update, **watch_kwargs)
     icon = pystray.Icon(
         "asher",
-        icon=_icon_image(theme.MUTED),
-        title="Asher — connecting…",
+        icon=state.image(),
+        title=state.title(),
         menu=_build_menu(pystray, state, runner, log),
     )
     state.bind(icon)
@@ -127,28 +130,37 @@ class _TrayState:
     every backend pystray supports accepts attribute writes from any thread.
     Redundant redraws are dropped because a status poll fires far more often
     than the rendered state actually changes.
+
+    The desktop's light/dark tone is part of the render key, so switching
+    system theme repaints the icon on the next poll rather than leaving a
+    silhouette that has gone invisible against its new background.
     """
 
     def __init__(self) -> None:
         self._icon: Any = None
         self.snapshot: Snapshot | None = None
-        self._rendered: tuple[str, str] | None = None
+        self._rendered: tuple[Any, ...] | None = None
 
     def bind(self, icon: Any) -> None:
         self._icon = icon
 
+    def image(self) -> Any:
+        return _icon_image(self._colour(), dark_panel=desktoptheme.panel_is_dark())
+
     def update(self, snapshot: Snapshot) -> None:
         self.snapshot = snapshot
-        rendered = (self.title(), self._colour())
+        colour, dark_panel = self._colour(), desktoptheme.panel_is_dark()
+        rendered = (self.title(), self.heading(), self.detail(), colour, dark_panel)
         if rendered == self._rendered or self._icon is None:
             return
         self._rendered = rendered
         with contextlib.suppress(Exception):
-            self._icon.icon = _icon_image(rendered[1])
-            self._icon.title = rendered[0]
+            self._icon.icon = _icon_image(colour, dark_panel=dark_panel)
+            self._icon.title = self.title()
             self._icon.update_menu()
 
     def title(self) -> str:
+        """The hover tooltip — the whole story on one line, shown on its own."""
         snapshot = self.snapshot
         if snapshot is None:
             return "Asher — connecting…"
@@ -156,10 +168,17 @@ class _TrayState:
             return f"Asher — {snapshot.name} (offline)"
         return f"Asher — {snapshot.name}: {snapshot.status}, drawer {snapshot.drawer}"
 
+    def heading(self) -> str:
+        """The menu's first row: which robot, and nothing ``detail`` already says."""
+        snapshot = self.snapshot
+        return "Asher" if snapshot is None else snapshot.name
+
     def detail(self) -> str:
         snapshot = self.snapshot
         if snapshot is None:
             return "Connecting…"
+        if not snapshot.online:
+            return "Offline"
         return f"{snapshot.status}  ·  drawer {snapshot.drawer}"
 
     def _colour(self) -> str:
@@ -174,6 +193,9 @@ def _build_menu(pystray: Any, state: _TrayState, runner: Any, log: Callable[[str
 
     def inert(item: Any) -> None:
         """Menu rows that are readouts, not buttons."""
+
+    def open_app(icon: Any, item: Any) -> None:
+        log(launcher.open_app()[1])
 
     def clean(icon: Any, item: Any) -> None:
         if runner.call(lambda session: session.robot.start_cleaning()):
@@ -190,9 +212,12 @@ def _build_menu(pystray: Any, state: _TrayState, runner: Any, log: Callable[[str
         icon.stop()
 
     return pystray.Menu(
-        pystray.MenuItem(lambda item: state.title().removeprefix("Asher — "), inert, enabled=False),
+        pystray.MenuItem(lambda item: state.heading(), inert, enabled=False),
         pystray.MenuItem(lambda item: state.detail(), inert, enabled=False),
         pystray.Menu.SEPARATOR,
+        # default=True so left-clicking the icon opens the app, which is what a
+        # tray icon is expected to do.
+        pystray.MenuItem("Open Asher", open_app, default=True),
         pystray.MenuItem("Clean now", clean),
         pystray.MenuItem(
             "Notifications",
@@ -204,17 +229,36 @@ def _build_menu(pystray: Any, state: _TrayState, runner: Any, log: Callable[[str
     )
 
 
-def _icon_image(colour: str) -> Any:
-    """Draw the tray glyph — a cat head in ``colour``, no asset files needed.
+def _icon_image(status_colour: str, *, dark_panel: bool) -> Any:
+    """Draw the tray glyph — a cat head toned for the panel, badged with status.
 
-    Kept to one flat silhouette because a tray icon is rendered at 16-22px on
-    most desktops, where anything finer turns to mush.
+    The head is a silhouette in whichever tone contrasts with the desktop panel,
+    the way native tray icons behave; colour carries only the status badge, so
+    the glyph stays legible on a light panel where a green-on-white cat would
+    not. Kept to flat shapes because a tray icon renders at 16-22px on most
+    desktops, where anything finer turns to mush.
     """
     from PIL import Image, ImageDraw  # noqa: PLC0415
 
+    silhouette = theme.GLYPH_ON_DARK if dark_panel else theme.GLYPH_ON_LIGHT
     image = Image.new("RGBA", (_ICON_SIZE, _ICON_SIZE), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
-    draw.polygon([(12, 26), (16, 4), (32, 18)], fill=colour)
-    draw.polygon([(52, 26), (48, 4), (32, 18)], fill=colour)
-    draw.ellipse((8, 16, 56, 58), fill=colour)
+    draw.polygon([(12, 26), (16, 4), (32, 18)], fill=silhouette)
+    draw.polygon([(52, 26), (48, 4), (32, 18)], fill=silhouette)
+    draw.ellipse((8, 16, 56, 58), fill=silhouette)
+    # ImageDraw writes pixels rather than compositing, so filling the halo with
+    # a transparent colour cuts a hole in the head — which is what keeps the
+    # badge readable where it overlaps the silhouette.
+    draw.ellipse(_centred_box(_DOT_HALO_RADIUS), fill=(0, 0, 0, 0))
+    draw.ellipse(_centred_box(_DOT_RADIUS), fill=status_colour)
     return image
+
+
+def _centred_box(radius: int) -> tuple[int, int, int, int]:
+    """A square bounding box of ``radius`` around the status badge's centre."""
+    return (
+        _DOT_CENTRE - radius,
+        _DOT_CENTRE - radius,
+        _DOT_CENTRE + radius,
+        _DOT_CENTRE + radius,
+    )

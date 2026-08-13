@@ -91,6 +91,12 @@ SELECTION_BG = BLUE
 SELECTION_FG = BASE
 """Foreground on ``SELECTION_BG`` — inverted for contrast."""
 
+GLYPH_ON_DARK = TEXT
+"""Icon silhouette drawn against a dark desktop panel."""
+
+GLYPH_ON_LIGHT = CRUST
+"""Icon silhouette drawn against a light desktop panel."""
+
 # ── Animation pulses ─────────────────────────────────────────────────────────
 # Each cat mode shimmers between adjacent Catppuccin hues rather than
 # lightening a single one, which keeps every frame an in-palette colour.
