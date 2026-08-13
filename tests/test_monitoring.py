@@ -261,6 +261,13 @@ class TestNotifyFault:
     """The _refresh_faults transition loop calls _notify_fault on newly-appeared
     faults, gated by the /notify settings."""
 
+    @pytest.fixture(autouse=True)
+    def _no_watcher_running(self):
+        """The TUI suppresses its own toasts while a watcher is running, so
+        these would otherwise fail on any machine that has one started."""
+        with patch("asher.daemon.running_pid", return_value=None):
+            yield
+
     def _mixin(self, prev: set[str] | None = None, notifications: bool = True, sound: bool = False):
         m = MagicMock()
         m._prev_faults = prev if prev is not None else set()
