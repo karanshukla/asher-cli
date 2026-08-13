@@ -6,8 +6,11 @@ terminal required — so the robot can be driven from cron, Task Scheduler, or a
 SSH session. ``asher --help`` lists the commands; :mod:`asher.headless` owns
 what each one does.
 
-``asher watch`` is the exception to "do one thing and exit": it manages a
-long-lived notifier process (:mod:`asher.daemon`) rather than driving the robot.
+``asher watch`` and ``asher update`` are the two subcommands declared here
+rather than in :mod:`asher.headless`: that registry is robot actions, each of
+which opens a cloud session and exits. ``watch`` manages a long-lived process,
+and ``update`` talks to PyPI rather than to a robot, so neither should be made
+to authenticate.
 
 ``--export`` is kept as a flag alongside the ``export`` subcommand so existing
 cron entries keep working unchanged.
@@ -77,7 +80,8 @@ def _build_parser() -> argparse.ArgumentParser:
         help="run the notification watcher in the background",
         description="Keep desktop notifications running after this terminal closes. "
         "`start` detaches a watcher process (with a tray icon where one is available), "
-        "`run` does the same in the foreground.",
+        "`run` does the same in the foreground, and `enable` additionally registers it "
+        "to start at login (launchd / systemd --user / the Windows registry).",
     )
     watch.add_argument(
         "action",
@@ -96,6 +100,20 @@ def _build_parser() -> argparse.ArgumentParser:
         "--no-tray",
         action="store_true",
         help="never show a system-tray icon, even where one is available.",
+    )
+
+    # Also outside the headless registry: it opens no cloud session, so it must
+    # not be made to authenticate just to read a version number.
+    update = subparsers.add_parser(
+        "update",
+        help="check whether a newer release is published",
+        description="Check PyPI for a newer asher-cli release and print the command to "
+        "install it. Never installs anything itself.",
+    )
+    update.add_argument(
+        "--json",
+        action="store_true",
+        help="print the result as JSON instead of text.",
     )
 
     for command in COMMANDS:
@@ -124,6 +142,13 @@ def main() -> None:
         from .daemon import dispatch  # noqa: PLC0415
 
         sys.exit(dispatch(args.action, robot=args.robot, tray=not args.no_tray))
+
+    if args.command == "update":
+        from .updates import report  # noqa: PLC0415
+
+        up_to_date, message = report(as_json=args.json)
+        print(message)
+        sys.exit(0 if up_to_date else 10)
 
     if args.command is not None:
         from .headless import run  # noqa: PLC0415

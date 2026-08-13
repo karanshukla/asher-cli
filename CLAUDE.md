@@ -31,6 +31,8 @@ asher/
   watcher.py        background notification loop with no TUI — pure WatchState (robot snapshots → Alert list) + supervising watch() that reconnects with backoff, plus WatcherRunner (asyncio on a worker thread, for the tray)
   daemon.py         detached watcher process control — pid file/log in ~/.asher-cli, start/stop/status/run, cross-platform detach + liveness (os.kill would *terminate* on Windows)
   tray.py           optional pystray/Pillow system-tray icon over WatcherRunner; every path degrades to a headless watcher
+  autostart.py      login items — AutostartBackend ABC + launchd/systemd-user/registry subclasses + backend() factory; all per-user, no admin rights, disable() removes exactly what enable() wrote
+  updates.py        PyPI release check — read-only over HTTPS, once a day, reports only. Never installs (see its docstring for why that stays manual)
   cats.py           CATS dict (ASCII art)
   login_flow.py     LoginFlow state machine — inline email/password prompt in command bar
   robot_protocol.py RobotProtocol structural Protocol for pylitterbot robot objects
@@ -68,6 +70,8 @@ tests/
   test_watcher.py         WatchState alert transitions + snapshot/deliver (pure) + watch() against a patched open_session + WatcherRunner threading
   test_daemon.py          pid-file bookkeeping, start/stop/status/dispatch with Popen and os.kill mocked
   test_tray.py            availability probing, menu/title text, icon rendering, and the headless fallbacks
+  test_autostart.py       all three login-item backends driven directly (so each is covered on every runner) with launchctl/systemctl/winreg mocked
+  test_updates.py         version comparison, the once-a-day cache, HTTPS-only fetching, and a guard that the module spawns no process
   test_mcp_bridge.py      mcp_bridge launcher credential/subprocess handling
   test_mcp_command.py     /mcp slash command dispatch
   test_faults.py          check_faults() — safety statuses, attribute faults, graceful degradation
@@ -111,7 +115,7 @@ Do not add robot-control commands as slash commands, and do not add app-manageme
 **Special cases** (accepted both with and without `/`):
 `exit`, `quit`, `q` — exit the app
 
-**Headless commands** (`asher <command>`) are a parallel registry in `asher/headless.py`: same robot actions, no Textual, plain-string + JSON output. `asher watch` is deliberately *not* in that registry — it manages a long-lived process rather than doing one thing and exiting, so its subparser is declared directly in `__main__.py` and handled by `daemon.dispatch()`. Slash commands have no headless equivalent — they configure the TUI, which isn't running. A robot command worth scripting should exist in both registries; the shared logic lives in `RobotAdapter`, not in either command class.
+**Headless commands** (`asher <command>`) are a parallel registry in `asher/headless.py`: same robot actions, no Textual, plain-string + JSON output. `asher watch` and `asher update` are deliberately *not* in that registry — `watch` manages a long-lived process rather than doing one thing and exiting, and `update` talks to PyPI rather than a robot, so neither should be forced through `open_session()` and made to authenticate. Both declare their subparser directly in `__main__.py`. Slash commands have no headless equivalent — they configure the TUI, which isn't running. A robot command worth scripting should exist in both registries; the shared logic lives in `RobotAdapter`, not in either command class.
 
 > If you add a command, update the tables in `README.md` and the list in `asher/slash-commands/__init__.py`. If it's a robot command, consider adding it to `COMMANDS` in `asher/headless.py` too.
 
@@ -152,6 +156,8 @@ LoginScreen (ModalScreen) — available in auth.py but not the primary auth path
 | `_poll_status_interval()` | `@work` — poll fallback every 300s (5 min); WebSocket is primary |
 | `watcher.watch()` | supervise a cloud session and notify on every change worth interrupting for — the TUI's `_notify_fault` without a TUI |
 | `daemon.start/stop/status()` | detached watcher process control; `running_pid()` also gates the TUI's own toasts so alerts never double up |
+| `daemon.run_foreground()` | the watcher process itself — claims the pid file (`_pid_file_held`) so a login-started watcher is still visible to `status`/`stop`, and refuses to be a second one |
+| `autostart.enable/disable()` | register/remove the platform login item; `describe()` feeds the `watch status` line |
 | `_tick_cat()` | advances multi-frame cat animation every 0.4s |
 | `_dispatch_command(command, args)` | `@work` — calls `command.run(app, args)` from the registry |
 | `on_input_submitted()` | routes input to login flow or `_dispatch_command` via `CommandRegistry`; Enter on a partial `/cmd` completes it instead of submitting |

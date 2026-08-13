@@ -1159,17 +1159,26 @@ class NotifyCommand(SlashCommand):
 
 class WatchCommand(SlashCommand):
     name = "watch"
-    description = "start|stop|status  background notifier that outlives this terminal"
+    description = (
+        "start|stop|status|enable|disable  background notifier that outlives this terminal"
+    )
 
     async def run(self, app: AsherApp, args: list[str]) -> None:
-        from ..daemon import ACTIONS, start, status, stop  # noqa: PLC0415
+        from ..autostart import disable as disable_autostart  # noqa: PLC0415
+        from ..daemon import ACTIONS, enable_autostart, start, status, stop  # noqa: PLC0415
 
         action = args[0].lower() if args else "status"
         if action not in ACTIONS or action == "run":
-            app._log_warn("Usage: /watch start|stop|status")
+            app._log_warn("Usage: /watch start|stop|status|enable|disable")
             return
 
-        handlers = {"start": start, "stop": stop, "status": status}
+        handlers = {
+            "start": start,
+            "stop": stop,
+            "status": status,
+            "enable": enable_autostart,
+            "disable": disable_autostart,
+        }
         # Each of these blocks on process signals and short sleeps, which would
         # otherwise stall the UI for the length of the daemon's shutdown grace.
         ok, message = await asyncio.to_thread(handlers[action])
@@ -1347,6 +1356,15 @@ class VersionCommand(SlashCommand):
         app._log_info(f"Python {sys.version.split()[0]}")
         app._log_info(f"pylitterbot {_v('pylitterbot')}")
         app._log_info(f"textual {_v('textual')}")
+
+        from ..updates import check, releases_url  # noqa: PLC0415
+
+        update = await asyncio.to_thread(check, force=True)
+        if update is None:
+            app._log_ok("You're on the latest release.")
+        else:
+            app._log_warn(update.notice)
+            app._log_info(f"Changelog: {releases_url()}")
 
 
 def _open_folder(path: Path) -> None:

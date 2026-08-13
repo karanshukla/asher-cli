@@ -30,6 +30,9 @@ _DEFAULTS: dict[str, Any] = {
     "notification_sound": False,
     "watch_tray": True,
     "watch_drawer_threshold": 85,
+    "update_check": True,
+    "last_update_check": None,
+    "latest_known_version": None,
 }
 
 

@@ -20,10 +20,11 @@ import signal
 import subprocess  # nosec B404 # one call site, fixed argv on this interpreter, no shell
 import sys
 import time
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
-from . import config
+from . import autostart, config
 from .export import EXIT_COMMAND_REJECTED, EXIT_OK
 
 _RUNTIME_DIR = Path.home() / ".asher-cli"
@@ -31,12 +32,12 @@ _PID_PATH = _RUNTIME_DIR / "watch.pid"
 _LOG_PATH = _RUNTIME_DIR / "watch.log"
 
 _LOG_SIZE_LIMIT_BYTES = 1_000_000
-_STARTUP_GRACE_SECONDS = 0.6
+_STARTUP_GRACE_SECONDS = 5.0
 _TERM_GRACE_SECONDS = 5.0
 _KILL_GRACE_SECONDS = 3.0
 _DEFAULT_POLL_SECONDS = 300
 
-ACTIONS = ("start", "stop", "status", "run")
+ACTIONS = ("start", "stop", "status", "run", "enable", "disable")
 
 
 def pid_path() -> Path:
@@ -169,13 +170,9 @@ def start(*, robot: str | None = None, tray: bool = True) -> tuple[bool, str]:
     except OSError as exc:
         return False, f"Could not start watcher: {exc}"
 
-    # A watcher that dies on the way up (bad install, unimportable dependency)
-    # would otherwise leave a pid file pointing at nothing and report success.
-    time.sleep(_STARTUP_GRACE_SECONDS)
-    if process.poll() is not None:
+    if not _wait_until_registered(process):
         return False, f"Watcher exited immediately (code {process.returncode}). See {log}"
 
-    write_pid(process.pid)
     return True, "\n".join(
         [
             f"Watcher started (pid {process.pid}) — notifications continue after this terminal closes.",
@@ -183,6 +180,43 @@ def start(*, robot: str | None = None, tray: bool = True) -> tuple[bool, str]:
             "  stop: asher watch stop",
         ]
     )
+
+
+def enable_autostart(*, robot: str | None = None, tray: bool = True) -> tuple[bool, str]:
+    """Register the login item and start watching now.
+
+    `systemctl enable --now` semantics: nobody asking for notifications at login
+    wants to wait until the next one to get any.
+    """
+    ok, message = autostart.enable()
+    if not ok:
+        return ok, message
+    if running_pid() is not None:
+        return True, message
+    _, start_message = start(robot=robot, tray=tray)
+    return True, f"{message}\n{start_message}"
+
+
+def _wait_until_registered(process: subprocess.Popen[bytes]) -> bool:
+    """Wait for the child to claim the pid file, or report that it died trying.
+
+    A watcher that falls over on the way up (bad install, unimportable
+    dependency) would otherwise be reported as started. Waiting for the pid file
+    rather than sleeping a fixed interval also means ``asher watch status`` run
+    immediately after ``start`` sees a registered watcher.
+    """
+    deadline = time.monotonic() + _STARTUP_GRACE_SECONDS
+    while time.monotonic() < deadline:
+        if process.poll() is not None:
+            return False
+        if read_pid() == process.pid:
+            return True
+        time.sleep(0.05)
+    if process.poll() is not None:
+        return False
+    # Alive but slow to register — record it so `stop` can still find it.
+    write_pid(process.pid)
+    return True
 
 
 def _detach_kwargs() -> dict[str, Any]:
@@ -235,9 +269,18 @@ def status() -> tuple[bool, str]:
     """Report whether a watcher is running, with the tail of its log."""
     pid = running_pid()
     if pid is None:
-        return False, "Watcher: not running  (start it with `asher watch start`)"
+        return False, "\n".join(
+            [
+                "Watcher: not running  (start it with `asher watch start`)",
+                f"  autostart: {autostart.describe()}",
+            ]
+        )
 
-    lines = [f"Watcher: running (pid {pid})", f"  log: {log_path()}"]
+    lines = [
+        f"Watcher: running (pid {pid})",
+        f"  autostart: {autostart.describe()}",
+        f"  log: {log_path()}",
+    ]
     lines += [f"  | {entry}" for entry in _log_tail(3)]
     return True, "\n".join(lines)
 
@@ -263,9 +306,35 @@ def _truncate_oversized_log(log: Path) -> None:
 def run_foreground(*, robot: str | None = None, tray: bool = True) -> int:
     """Run the watcher in this process — what the detached child executes.
 
-    Also the way to debug a watcher that isn't behaving: the same code path,
-    with the log on your terminal instead of in a file.
+    Also what launchd/systemd/the registry run at login, and the way to debug a
+    watcher that isn't behaving: the same code path, with the log on your
+    terminal instead of in a file.
     """
+    existing = running_pid()
+    if existing is not None:
+        _log_line(f"A watcher is already running (pid {existing}) — not starting a second.")
+        return EXIT_COMMAND_REJECTED
+    with _pid_file_held():
+        return _watch_here(robot=robot, tray=tray)
+
+
+@contextlib.contextmanager
+def _pid_file_held() -> Iterator[None]:
+    """Own the pid file for this process's lifetime.
+
+    The watcher writes its own pid rather than relying on whoever spawned it,
+    because at login nobody did: launchd and systemd start it directly, and a
+    watcher `stop` and `status` can't see is a watcher you can't turn off.
+    """
+    write_pid(os.getpid())
+    try:
+        yield
+    finally:
+        if read_pid() == os.getpid():
+            clear_pid()
+
+
+def _watch_here(*, robot: str | None, tray: bool) -> int:
     import asyncio  # noqa: PLC0415
 
     settings = config.load()
@@ -331,6 +400,8 @@ def dispatch(action: str, *, robot: str | None = None, tray: bool = True) -> int
         "start": lambda: start(robot=robot, tray=tray),
         "stop": stop,
         "status": status,
+        "enable": lambda: enable_autostart(robot=robot, tray=tray),
+        "disable": autostart.disable,
     }
     handler = handlers.get(action)
     if handler is None:
