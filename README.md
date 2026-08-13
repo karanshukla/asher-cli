@@ -72,12 +72,15 @@ On first run, type `/login` at the command prompt. Your credentials are saved to
 
 To sign out: `/logout`
 
-`.env` fallback (for CI or existing users):
+The keyring is the only place an installed copy reads credentials from. When working from a clone you can supply them in `.env` instead, which requires opting into dev mode explicitly:
 
 ```env
+ASHER_CLI_DEV_MODE=true
 LITTER_ROBOT_USER=your@email.com
 LITTER_ROBOT_PASSWORD=yourpassword
 ```
+
+Without `ASHER_CLI_DEV_MODE=true` those two variables are ignored — so a `LITTER_ROBOT_USER` left in a shell profile can't quietly outrank the account you signed into.
 
 ## Commands
 
@@ -234,7 +237,15 @@ The watcher is built to be left alone: it reconnects with backoff through Wi-Fi 
 pip install "asher-cli[tray]"
 ```
 
-With `pystray` and Pillow installed, `asher watch start` also shows a tray icon coloured by robot health — green healthy, red faulted, grey offline — with the current status in its tooltip and a menu offering **Clean now**, a **Notifications** toggle, and **Quit**. Everything degrades gracefully: no extras installed, no desktop session, or a Linux box with no AppIndicator host all fall back to a headless watcher rather than failing. Pass `--no-tray` (or set `watch_tray: false`) to skip the icon deliberately.
+With the extra installed, `asher watch start` also shows a tray icon: a cat silhouette drawn in whichever tone contrasts with your desktop panel (light on dark, dark on light, following the system light/dark setting on KDE, GNOME, macOS, and Windows), badged with a dot for robot health — green healthy, red faulted, grey offline. The tooltip carries the full status line, and the menu offers **Open Asher**, **Clean now**, a **Notifications** toggle, and **Quit**. **Open Asher** starts the dashboard in a new terminal window — a new console on Windows, Terminal.app on macOS, and the desktop's own emulator on Linux — and is also what left-clicking the icon does. Everything degrades gracefully: no extras installed, no desktop session, or a Linux box with no AppIndicator host all fall back to a headless watcher rather than failing. Pass `--no-tray` (or set `watch_tray: false`) to skip the icon deliberately.
+
+On Linux the extra also pulls in **PyGObject**, which is what puts `pystray` on its AppIndicator backend. Without it `pystray` quietly falls back to a legacy XEmbed icon that KDE Plasma and GNOME no longer host — the watcher runs and draws an icon, but nothing shows it. PyGObject builds from source, so it needs your distro's GObject-introspection and Cairo development packages (`gobject-introspection-devel` + `cairo-gobject-devel` on Fedora, `libgirepository1.0-dev` + `libcairo2-dev` on Debian/Ubuntu).
+
+Working from a clone rather than an install, ask `uv` for the extra explicitly — a plain `uv run` re-syncs the environment and prunes anything the lockfile's default set doesn't mention, tray packages included:
+
+```bash
+uv run --extra tray asher watch start
+```
 
 **Start at login:**
 
@@ -358,10 +369,12 @@ cp .env.example .env
 ```
 
 ```env
+ASHER_CLI_DEV_MODE=true    # shows version as "dev", and opts the two variables below in
 LITTER_ROBOT_USER=your@email.com
 LITTER_ROBOT_PASSWORD=yourpassword
-ASHER_CLI_DEV_MODE=true    # sets version to "dev" instead of the installed package version
 ```
+
+`ASHER_CLI_DEV_MODE` is what makes the credentials below readable at all — outside dev mode the app takes credentials only from the OS keyring.
 
 ### 3. Run with hot reload
 
