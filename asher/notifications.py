@@ -20,6 +20,8 @@ import shutil
 import subprocess  # nosec B404 # each call site below is a fixed argv, no shell
 import sys
 
+from .helpers import applescript_string
+
 _APP_NAME = "Asher CLI"
 _TIMEOUT_SECONDS = 8
 _BACKEND_TIMEOUT_SECONDS = 5
@@ -80,8 +82,8 @@ def _native_argv(title: str, message: str) -> list[str] | None:
         if osascript is None:
             return None
         script = (
-            f"display notification {_applescript_string(message)} "
-            f"with title {_applescript_string(title)}"
+            f"display notification {applescript_string(message)} "
+            f"with title {applescript_string(title)}"
         )
         return [osascript, "-e", script]
     if sys.platform.startswith("linux"):
@@ -99,17 +101,6 @@ def _native_argv(title: str, message: str) -> list[str] | None:
             message,
         ]
     return None
-
-
-def _applescript_string(value: str) -> str:
-    """Quote a Python string as an AppleScript literal.
-
-    ``-e`` takes one argument so the text is embedded in source rather than
-    passed as data, which makes escaping the caller's problem: a robot named
-    ``Cat "Bin"`` would otherwise end the literal early.
-    """
-    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
-    return f'"{escaped}"'
 
 
 def beep(critical: bool = False) -> None:
