@@ -8,6 +8,12 @@ on:
 permissions:
   contents: read
 
+# `uv run` re-syncs to the default groups on every invocation, which would drag
+# the `tray` group (and so a PyGObject/pycairo source build) back in after the
+# explicit sync below deliberately left it out. Sync once, then never re-sync.
+env:
+  UV_NO_SYNC: "1"
+
 jobs:
   lint:
     runs-on: ubuntu-latest

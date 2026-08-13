@@ -8,6 +8,11 @@ on:
 permissions:
   contents: read
 
+# See ci.yml: `uv run` would otherwise re-sync the `tray` group back in and try
+# to build PyGObject from source.
+env:
+  UV_NO_SYNC: "1"
+
 jobs:
   coverage:
     runs-on: ubuntu-latest
