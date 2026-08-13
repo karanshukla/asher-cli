@@ -4,12 +4,89 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from asher.connection import (
+    _env_credentials,
     _keyring_available,
     _keyring_delete,
     _keyring_load,
     _keyring_save,
+    credentials_available,
 )
+
+
+class TestEnvCredentials:
+    """The environment is a development convenience, never an install's source."""
+
+    def test_ignored_outside_dev_mode(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("LITTER_ROBOT_USER", "env@example.com")
+        monkeypatch.setenv("LITTER_ROBOT_PASSWORD", "envpw")
+        monkeypatch.delenv("ASHER_CLI_DEV_MODE", raising=False)
+        assert _env_credentials() == ("", "")
+
+    def test_read_in_dev_mode(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("LITTER_ROBOT_USER", "env@example.com")
+        monkeypatch.setenv("LITTER_ROBOT_PASSWORD", "envpw")
+        monkeypatch.setenv("ASHER_CLI_DEV_MODE", "true")
+        assert _env_credentials() == ("env@example.com", "envpw")
+
+    def test_dev_mode_flag_is_case_insensitive(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("LITTER_ROBOT_USER", "env@example.com")
+        monkeypatch.setenv("LITTER_ROBOT_PASSWORD", "envpw")
+        monkeypatch.setenv("ASHER_CLI_DEV_MODE", "TRUE")
+        assert _env_credentials() == ("env@example.com", "envpw")
+
+    def test_dev_mode_with_nothing_set(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("LITTER_ROBOT_USER", raising=False)
+        monkeypatch.delenv("LITTER_ROBOT_PASSWORD", raising=False)
+        monkeypatch.setenv("ASHER_CLI_DEV_MODE", "true")
+        assert _env_credentials() == ("", "")
+
+
+class TestCredentialsAvailable:
+    """Gate for `asher watch start`, which must not report a pid for a doomed process."""
+
+    def test_a_cached_token_is_enough(self) -> None:
+        with patch("asher.connection._keyring_load_token", return_value="tok"):
+            assert credentials_available() is True
+
+    def test_keyring_email_and_password(self) -> None:
+        with (
+            patch("asher.connection._keyring_load_token", return_value=None),
+            patch("asher.connection._keyring_available", return_value=True),
+            patch("asher.connection._keyring_load", return_value=("a@b.com", "pw")),
+        ):
+            assert credentials_available() is True
+
+    def test_false_when_nothing_is_stored(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("ASHER_CLI_DEV_MODE", raising=False)
+        with (
+            patch("asher.connection._keyring_load_token", return_value=None),
+            patch("asher.connection._keyring_available", return_value=True),
+            patch("asher.connection._keyring_load", return_value=("", "")),
+        ):
+            assert credentials_available() is False
+
+    def test_half_a_credential_is_not_enough(self) -> None:
+        with (
+            patch("asher.connection._keyring_load_token", return_value=None),
+            patch("asher.connection._keyring_available", return_value=True),
+            patch("asher.connection._keyring_load", return_value=("a@b.com", "")),
+        ):
+            assert credentials_available() is False
+
+    def test_falls_back_to_the_environment_in_dev_mode(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("ASHER_CLI_DEV_MODE", "true")
+        monkeypatch.setenv("LITTER_ROBOT_USER", "env@example.com")
+        monkeypatch.setenv("LITTER_ROBOT_PASSWORD", "envpw")
+        with (
+            patch("asher.connection._keyring_load_token", return_value=None),
+            patch("asher.connection._keyring_available", return_value=False),
+        ):
+            assert credentials_available() is True
 
 
 class TestKeyringAvailable:

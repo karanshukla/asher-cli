@@ -31,7 +31,10 @@ dependencies = [
 # `from mcp.server.fastmcp import FastMCP`, and mcp 2.0 deleted that module.
 # Cap it here until pylitterbot ships a 2.x-compatible release.
 mcp = ["pylitterbot[mcp]==2025.6.4", "mcp<2"]
-tray = ["pystray>=0.19", "pillow>=10.0"]
+# PyGObject is what puts pystray on its AppIndicator backend. Without it pystray
+# silently falls back to a legacy XEmbed icon, which KDE Plasma and GNOME no
+# longer host at all — the watcher runs, draws an icon, and nothing shows it.
+tray = ["pystray>=0.19", "pillow>=10.0", "pygobject>=3.42; sys_platform == 'linux'"]
 
 [project.scripts]
 asher = "asher.__main__:main"
@@ -57,6 +60,21 @@ dev = [
     "git-cliff>=2.0",
     "pillow>=10.0",  # so the tray icon renderer is covered in CI
 ]
+# Mirrors the `tray` extra, because a plain `uv run` re-syncs the environment to
+# the default groups and prunes everything else — which silently removed pystray
+# and left the watcher drawing an icon no desktop was hosting. Groups are synced
+# by default (see [tool.uv] below), extras are not, so the working copy keeps a
+# usable tray without every command needing `--extra tray`.
+# CI opts out with `uv sync --no-default-groups --group dev`: PyGObject builds
+# from source and the runners have no GObject-introspection headers.
+tray = [
+    "pystray>=0.19",
+    "pillow>=10.0",
+    "pygobject>=3.42; sys_platform == 'linux'",
+]
+
+[tool.uv]
+default-groups = ["dev", "tray"]
 
 [tool.poe.tasks]
 lint   = "ruff check ."

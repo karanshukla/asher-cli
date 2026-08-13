@@ -25,7 +25,7 @@ A Claude Code-style terminal dashboard for monitoring and controlling Litter Rob
 - Slash-command tab completion — type `/` and a Claude Code-style overlay lists matching commands; `↑`/`↓` to move, `Tab` or `Enter` to accept, `Esc` to dismiss
 - Inline ghost-text completion for bare commands — type a prefix (`cle`) and the rest (`an`) appears greyed; `Tab` or `→` to accept → `clean`
 - Headless mode — every robot command also runs without the TUI (`asher status`, `asher clean`, `asher night-light auto`, `asher export 7`), with `--json` output and documented exit codes for cron / Task Scheduler / SSH
-- Background watcher — `asher watch start` detaches a notifier process that keeps toasting faults, a filling drawer, and offline/online changes **after you close the terminal**; `asher watch enable` starts it at login (launchd / systemd / registry); optional system-tray icon shows live status with Clean now / Notifications / Quit
+- Background watcher — `asher watch start` detaches a notifier process that keeps toasting faults, a filling drawer, and offline/online changes **after you close the terminal**; `asher watch enable` starts it at login (launchd / systemd / registry); optional system-tray icon shows live status with Open Asher / Notifications / Quit
 - Update notices — checks PyPI once a day and tells you when a newer release exists, with the right upgrade command for how you installed it. It never installs anything itself
 - Catppuccin Mocha throughout — one palette in `asher/theme.py` drives the TUI stylesheet and every Rich style
 - Cat animation panel that reacts to robot state
@@ -72,12 +72,7 @@ On first run, type `/login` at the command prompt. Your credentials are saved to
 
 To sign out: `/logout`
 
-`.env` fallback (for CI or existing users):
-
-```env
-LITTER_ROBOT_USER=your@email.com
-LITTER_ROBOT_PASSWORD=yourpassword
-```
+The keyring is the only place an installed copy reads credentials from. Working from a clone, you can use `.env` instead by opting into dev mode (see [Development](#development)).
 
 ## Commands
 
@@ -234,7 +229,9 @@ The watcher is built to be left alone: it reconnects with backoff through Wi-Fi 
 pip install "asher-cli[tray]"
 ```
 
-With `pystray` and Pillow installed, `asher watch start` also shows a tray icon coloured by robot health — green healthy, red faulted, grey offline — with the current status in its tooltip and a menu offering **Clean now**, a **Notifications** toggle, and **Quit**. Everything degrades gracefully: no extras installed, no desktop session, or a Linux box with no AppIndicator host all fall back to a headless watcher rather than failing. Pass `--no-tray` (or set `watch_tray: false`) to skip the icon deliberately.
+`asher watch start` then shows a tray icon: a cat silhouette toned to your desktop panel, badged green healthy / red faulted / grey offline, with the full status in its tooltip. The menu offers **Open Asher** (also the left-click action, opens the dashboard in a new terminal), a **Notifications** toggle, and **Quit**. It carries no robot actions on purpose: a misclick next to the clock shouldn't be able to start a cycle. No extras, no desktop session, or no AppIndicator host all fall back to a headless watcher rather than failing. Pass `--no-tray` (or set `watch_tray: false`) to skip the icon.
+
+On Linux the extra pulls in PyGObject, which builds from source and needs your distro's GObject-introspection and Cairo dev packages (`gobject-introspection-devel` + `cairo-gobject-devel` on Fedora, `libgirepository1.0-dev` + `libcairo2-dev` on Debian/Ubuntu).
 
 **Start at login:**
 
@@ -358,10 +355,12 @@ cp .env.example .env
 ```
 
 ```env
+ASHER_CLI_DEV_MODE=true    # shows version as "dev", and opts the two variables below in
 LITTER_ROBOT_USER=your@email.com
 LITTER_ROBOT_PASSWORD=yourpassword
-ASHER_CLI_DEV_MODE=true    # sets version to "dev" instead of the installed package version
 ```
+
+`ASHER_CLI_DEV_MODE` is what makes the credentials below readable at all — outside dev mode the app takes credentials only from the OS keyring.
 
 ### 3. Run with hot reload
 

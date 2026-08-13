@@ -20,10 +20,16 @@ from asher.export import EXIT_COMMAND_REJECTED, EXIT_OK
 
 @pytest.fixture
 def runtime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Redirect the pid/log files so tests never touch the real home dir."""
+    """Redirect the pid/log files so tests never touch the real home dir.
+
+    Credentials are forced present so ``start``'s pre-flight doesn't make these
+    tests depend on whatever is in the runner's keyring; the pre-flight has its
+    own tests below.
+    """
     monkeypatch.setattr(daemon, "_PID_PATH", tmp_path / "watch.pid")
     monkeypatch.setattr(daemon, "_LOG_PATH", tmp_path / "watch.log")
     monkeypatch.setattr(daemon, "_STARTUP_GRACE_SECONDS", 0)
+    monkeypatch.setattr("asher.connection.credentials_available", lambda: True)
     return tmp_path
 
 
@@ -164,6 +170,39 @@ class TestStart:
         assert ok is False
         assert "already running" in message
         popen.assert_not_called()
+
+    def test_refuses_without_credentials(
+        self, runtime: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The watcher claims the pid file before authenticating, so it would
+        register, report a pid, and stop a moment later with the reason buried
+        in the log."""
+        monkeypatch.setattr("asher.connection.credentials_available", lambda: False)
+        with patch.object(daemon.subprocess, "Popen") as popen:
+            ok, message = daemon.start()
+        assert ok is False
+        assert "/login" in message
+        popen.assert_not_called()
+        assert daemon.read_pid() is None
+
+    def test_credential_check_costs_no_network(
+        self, runtime: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Starting offline must still work: the watcher retries until the cloud answers."""
+        monkeypatch.undo()
+        monkeypatch.setattr(daemon, "_PID_PATH", runtime / "watch.pid")
+        monkeypatch.setattr(daemon, "_LOG_PATH", runtime / "watch.log")
+        monkeypatch.setattr(daemon, "_STARTUP_GRACE_SECONDS", 0)
+        monkeypatch.setattr("asher.connection._keyring_load_token", lambda: None)
+        monkeypatch.setattr("asher.connection._keyring_available", lambda: True)
+        monkeypatch.setattr("asher.connection._keyring_load", lambda: ("a@b.com", "pw"))
+        with (
+            patch.object(daemon.subprocess, "Popen", return_value=_spawned()),
+            patch("pylitterbot.Account") as account,
+        ):
+            ok, _ = daemon.start()
+        assert ok is True
+        account.assert_not_called()
 
     def test_reports_a_child_that_dies_on_the_way_up(self, runtime: Path) -> None:
         with patch.object(daemon.subprocess, "Popen", return_value=_spawned(exited=1)):

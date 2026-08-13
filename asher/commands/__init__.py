@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import os
 import shutil
 import subprocess
 import sys
@@ -1290,13 +1289,11 @@ class McpCommand(SlashCommand):
             return
 
         if sub == "status":
-            from ..connection import _keyring_load  # noqa: PLC0415
+            from ..connection import _env_credentials, _keyring_load  # noqa: PLC0415
 
             email, password = _keyring_load()
             has_keyring_creds = bool(email and password)
-            has_env_creds = bool(
-                os.getenv("LITTER_ROBOT_USER") and os.getenv("LITTER_ROBOT_PASSWORD")
-            )
+            has_env_creds = all(_env_credentials())
             if has_keyring_creds:
                 app._log_info("Credentials: present in keyring")
             elif has_env_creds:
@@ -1310,21 +1307,21 @@ class McpCommand(SlashCommand):
             return
 
         if sub == "on":
-            from ..connection import _keyring_load, _keyring_save  # noqa: PLC0415
+            from ..connection import (  # noqa: PLC0415
+                _env_credentials,
+                _keyring_load,
+                _keyring_save,
+            )
 
             email, password = _keyring_load()
             if not email or not password:
-                env_email = os.getenv("LITTER_ROBOT_USER") or ""
-                env_password = os.getenv("LITTER_ROBOT_PASSWORD") or ""
+                env_email, env_password = _env_credentials()
                 if env_email and env_password and _keyring_save(env_email, env_password):
                     app._log_info("Copied .env credentials into the OS keyring for MCP use.")
                     email, password = env_email, env_password
 
             if not email or not password:
-                app._log_err(
-                    "No credentials in keyring or .env - use /login first, "
-                    "or set LITTER_ROBOT_USER/LITTER_ROBOT_PASSWORD."
-                )
+                app._log_err("No credentials in the keyring - use /login first.")
                 return
             if not await _ensure_mcp_extra(app):
                 return

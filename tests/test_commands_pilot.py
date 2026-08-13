@@ -190,6 +190,9 @@ async def test_slash_login_command_starts_login_flow():
     """Test that '/login' command starts login flow."""
     with (
         patch("asher.connection._keyring_available", return_value=False),
+        # The cached-token path runs before the keyring check, so without this
+        # the app signs in for real on any machine whose keyring holds a token.
+        patch("asher.connection._keyring_load_token", return_value=None),
         patch("os.getenv", return_value=""),
     ):
         app = AsherApp()

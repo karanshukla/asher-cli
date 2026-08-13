@@ -83,7 +83,9 @@ def render_completion(matches: Sequence[Command], selected_idx: int) -> Text:
         line = Text()
         if i == selected_idx:
             line.append(name, style=f"bold {theme.SELECTION_FG} on {theme.SELECTION_BG}")
-            line.append(f"  {cmd.description}", style=f"{theme.FOREGROUND} on {theme.SELECTION_BG}")
+            line.append(
+                f"  {cmd.description}", style=f"{theme.SELECTION_FG} on {theme.SELECTION_BG}"
+            )
         else:
             line.append(name, style=theme.ACCENT)
             line.append(f"  {cmd.description}", style=theme.MUTED)

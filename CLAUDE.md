@@ -29,8 +29,10 @@ asher/
   config.py         runtime settings persistence — load()/save()/update() over ~/.asher-cli/config.json; holds poll interval, cat-panel visibility/colour, active pet index, notification settings (non-secret UI prefs only; credentials stay in keyring)
   notifications.py  desktop toast + audible alert façade — plyer first, then the platform's own tool (osascript/notify-send); fire/beep are always-safe no-ops on failure/headless
   watcher.py        background notification loop with no TUI — pure WatchState (robot snapshots → Alert list) + supervising watch() that reconnects with backoff, plus WatcherRunner (asyncio on a worker thread, for the tray)
-  daemon.py         detached watcher process control — pid file/log in ~/.asher-cli, start/stop/status/run, cross-platform detach + liveness (os.kill would *terminate* on Windows)
-  tray.py           optional pystray/Pillow system-tray icon over WatcherRunner; every path degrades to a headless watcher
+  daemon.py         detached watcher process control — `start` pre-flights `connection.credentials_available()` (presence only, no network, so starting offline still works) because the watcher claims the pid file *before* authenticating and would otherwise report a pid for a process that stops a moment later — pid file/log in ~/.asher-cli, start/stop/status/run, cross-platform detach + liveness (os.kill would *terminate* on Windows)
+  tray.py           optional pystray/Pillow system-tray icon over WatcherRunner; every path degrades to a headless watcher. Icon is a panel-toned silhouette + status dot — colour rides the badge, never the whole glyph
+  launcher.py       open_app() — start the TUI in a new terminal from the tray (a detached tray has none): new console on Windows, Terminal.app via AppleScript on macOS, first installed emulator on Linux (desktop's own preferred)
+  desktoptheme.py   panel_is_dark() — is the tray/menu-bar background dark? kdeglobals luma / gsettings / AppleInterfaceStyle / the Personalize registry keys, behind a TTL cache; every probe degrades to a fallback, never raises
   autostart.py      login items — AutostartBackend ABC + launchd/systemd-user/registry subclasses + backend() factory; all per-user, no admin rights, disable() removes exactly what enable() wrote
   updates.py        PyPI release check — read-only over HTTPS, once a day, reports only. Never installs (see its docstring for why that stays manual)
   cats.py           CATS dict (ASCII art)
@@ -69,7 +71,9 @@ tests/
   test_notifications.py   plyer toast + beep façade — always-safe no-op paths
   test_watcher.py         WatchState alert transitions + snapshot/deliver (pure) + watch() against a patched open_session + WatcherRunner threading
   test_daemon.py          pid-file bookkeeping, start/stop/status/dispatch with Popen and os.kill mocked
-  test_tray.py            availability probing, menu/title text, icon rendering, and the headless fallbacks
+  test_tray.py            availability probing, menu/title text, icon rendering (tone inversion + status badge), and the headless fallbacks
+  test_launcher.py        every platform's open path driven directly (Popen always mocked), terminal preference/fallback order
+  test_desktoptheme.py    all four panel-tone probes driven directly (so each is covered on every runner) with the readers/registry mocked, plus the TTL cache
   test_autostart.py       all three login-item backends driven directly (so each is covered on every runner) with launchctl/systemctl/winreg mocked
   test_updates.py         version comparison, the once-a-day cache, HTTPS-only fetching, and a guard that the module spawns no process
   test_mcp_bridge.py      mcp_bridge launcher credential/subprocess handling
@@ -89,15 +93,26 @@ tests/
 
 Priority order on startup:
 
-1. **OS keyring** — set automatically after first interactive login
-2. **`.env` file** — fallback for existing users / CI
+1. **OS keyring** — cached OAuth token, then email/password; set automatically after first interactive login
+2. **`.env` file** — **development only**, gated on `ASHER_CLI_DEV_MODE=true`
 3. **Inline login flow** — shown when no credentials found anywhere (email → password prompt in command bar)
 
-`.env` variable names (for fallback):
+In a real install the keyring is the **only** source of credentials. `.env` is a
+working-copy convenience: without dev mode a stray `LITTER_ROBOT_USER` in a shell
+profile or a checked-out `.env` would silently outrank the keyring and
+authenticate as the wrong account.
+
+`.env` variable names (dev mode only):
 ```
+ASHER_CLI_DEV_MODE=true
 LITTER_ROBOT_USER=...
 LITTER_ROBOT_PASSWORD=...
 ```
+
+Every environment read goes through `_env_credentials()` in
+`asher/connection/__init__.py` — the one place the gate is applied. Don't call
+`os.getenv("LITTER_ROBOT_*")` anywhere else. `helpers.dev_mode()` is the shared
+predicate (it also selects the `dev` version string).
 
 Keyring service name: `asher-cli`, keys `email` and `password`.
 Helper functions in `asher/connection/__init__.py`: `_keyring_load()`, `_keyring_save()`, `_keyring_delete()`.
@@ -213,6 +228,14 @@ Commands that need a confirmed cloud state before showing a result (e.g. sleep/w
 **Add a new cat state:** add entry to `CATS` dict in `asher/cats.py` (str for static, list[str] for animated), then call `_set_cat("name", "label")`.
 
 **File naming convention:** no underscores in filenames (except Python-required `__init__.py` and `__main__.py`).
+
+## Tray packaging
+
+The `tray` extra is what a published install uses (`pip install "asher-cli[tray]"`). It is **mirrored** as a `tray` dependency-group listed in `[tool.uv] default-groups`, because `uv run` re-syncs the environment to the default *groups* on every invocation and prunes everything else — extras included. Without the group, any plain `uv run` silently removed `pystray` and left the watcher drawing an icon no desktop was hosting. Keep the two lists in step when changing either.
+
+CI opts out with `uv sync --no-default-groups --group dev` (`ci.yml`, `coverage.yml`): PyGObject builds from source and the runners have no GObject-introspection headers. `[tool.uv] default-extras` is not an option — uv 0.11 doesn't support that key.
+
+PyGObject is what selects pystray's `_appindicator` backend. Without it pystray falls back to a legacy XEmbed icon that KDE Plasma and GNOME no longer host: the watcher runs, draws an icon, and nothing shows it, with no error anywhere. Check with `pystray.Icon.__module__`.
 
 ## Dev workflow
 

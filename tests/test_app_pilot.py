@@ -69,6 +69,9 @@ async def test_app_shows_login_prompt_without_credentials():
     """Test that app shows login prompt when no credentials exist."""
     with (
         patch("asher.connection._keyring_available", return_value=False),
+        # The cached-token path runs before the keyring check, so without this
+        # the app signs in for real on any machine whose keyring holds a token.
+        patch("asher.connection._keyring_load_token", return_value=None),
         patch("os.getenv", return_value=""),
     ):
         app = AsherApp()
