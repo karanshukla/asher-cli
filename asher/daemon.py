@@ -143,9 +143,23 @@ def _pid_is_watcher(pid: int) -> bool:
 
 def start(*, robot: str | None = None, tray: bool = True) -> tuple[bool, str]:
     """Spawn a detached watcher process. Returns ``(started, message)``."""
+    from .connection import credentials_available  # noqa: PLC0415
+
     existing = running_pid()
     if existing is not None:
         return False, f"Watcher already running (pid {existing}) — `asher watch stop` to stop it."
+
+    # The watcher claims the pid file before it authenticates, so it registers
+    # successfully and *then* stops — which reported a pid for a process that
+    # was already gone, tray and all. Refusing here keeps the failure in the
+    # terminal the user is looking at.
+    if not credentials_available():
+        return False, "\n".join(
+            [
+                "No credentials found — the watcher would start and immediately stop.",
+                "  fix: run `asher` and sign in with /login, then try again.",
+            ]
+        )
 
     log = log_path()
     log.parent.mkdir(parents=True, exist_ok=True)

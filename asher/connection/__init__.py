@@ -38,6 +38,26 @@ def _env_credentials() -> tuple[str, str]:
     return os.getenv("LITTER_ROBOT_USER") or "", os.getenv("LITTER_ROBOT_PASSWORD") or ""
 
 
+def credentials_available() -> bool:
+    """Whether a background watcher could authenticate without prompting.
+
+    A presence check, deliberately not a login: it costs no network round-trip,
+    so starting the watcher still works offline, which is the whole point of its
+    reconnect loop. It exists so ``asher watch start`` can refuse up front
+    instead of reporting a pid for a process that stops a moment later.
+    """
+    if _keyring_load_token():
+        return True
+    email, password = ("", "")
+    if _keyring_available():
+        email, password = _keyring_load()
+    if not email or not password:
+        env_email, env_password = _env_credentials()
+        email = email or env_email
+        password = password or env_password
+    return bool(email and password)
+
+
 class HeadlessAuthError(Exception):
     """Raised when the headless path can't obtain credentials or connect.
 
