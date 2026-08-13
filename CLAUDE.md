@@ -29,7 +29,7 @@ asher/
   config.py         runtime settings persistence — load()/save()/update() over ~/.asher-cli/config.json; holds poll interval, cat-panel visibility/colour, active pet index, notification settings (non-secret UI prefs only; credentials stay in keyring)
   notifications.py  desktop toast + audible alert façade — plyer first, then the platform's own tool (osascript/notify-send); fire/beep are always-safe no-ops on failure/headless
   watcher.py        background notification loop with no TUI — pure WatchState (robot snapshots → Alert list) + supervising watch() that reconnects with backoff, plus WatcherRunner (asyncio on a worker thread, for the tray)
-  daemon.py         detached watcher process control — pid file/log in ~/.asher-cli, start/stop/status/run, cross-platform detach + liveness (os.kill would *terminate* on Windows)
+  daemon.py         detached watcher process control — `start` pre-flights `connection.credentials_available()` (presence only, no network, so starting offline still works) because the watcher claims the pid file *before* authenticating and would otherwise report a pid for a process that stops a moment later — pid file/log in ~/.asher-cli, start/stop/status/run, cross-platform detach + liveness (os.kill would *terminate* on Windows)
   tray.py           optional pystray/Pillow system-tray icon over WatcherRunner; every path degrades to a headless watcher. Icon is a panel-toned silhouette + status dot — colour rides the badge, never the whole glyph
   launcher.py       open_app() — start the TUI in a new terminal from the tray (a detached tray has none): new console on Windows, Terminal.app via AppleScript on macOS, first installed emulator on Linux (desktop's own preferred)
   desktoptheme.py   panel_is_dark() — is the tray/menu-bar background dark? kdeglobals luma / gsettings / AppleInterfaceStyle / the Personalize registry keys, behind a TTL cache; every probe degrades to a fallback, never raises
@@ -228,6 +228,14 @@ Commands that need a confirmed cloud state before showing a result (e.g. sleep/w
 **Add a new cat state:** add entry to `CATS` dict in `asher/cats.py` (str for static, list[str] for animated), then call `_set_cat("name", "label")`.
 
 **File naming convention:** no underscores in filenames (except Python-required `__init__.py` and `__main__.py`).
+
+## Tray packaging
+
+The `tray` extra is what a published install uses (`pip install "asher-cli[tray]"`). It is **mirrored** as a `tray` dependency-group listed in `[tool.uv] default-groups`, because `uv run` re-syncs the environment to the default *groups* on every invocation and prunes everything else — extras included. Without the group, any plain `uv run` silently removed `pystray` and left the watcher drawing an icon no desktop was hosting. Keep the two lists in step when changing either.
+
+CI opts out with `uv sync --no-default-groups --group dev` (`ci.yml`, `coverage.yml`): PyGObject builds from source and the runners have no GObject-introspection headers. `[tool.uv] default-extras` is not an option — uv 0.11 doesn't support that key.
+
+PyGObject is what selects pystray's `_appindicator` backend. Without it pystray falls back to a legacy XEmbed icon that KDE Plasma and GNOME no longer host: the watcher runs, draws an icon, and nothing shows it, with no error anywhere. Check with `pystray.Icon.__module__`.
 
 ## Dev workflow
 
