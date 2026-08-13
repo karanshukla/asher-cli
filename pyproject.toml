@@ -27,7 +27,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-mcp = ["pylitterbot[mcp]==2025.6.4"]
+# pylitterbot asks for mcp[cli]>=1.0.0 with no upper bound, but its server does
+# `from mcp.server.fastmcp import FastMCP`, and mcp 2.0 deleted that module.
+# Cap it here until pylitterbot ships a 2.x-compatible release.
+mcp = ["pylitterbot[mcp]==2025.6.4", "mcp<2"]
 # PyGObject is what puts pystray on its AppIndicator backend. Without it pystray
 # silently falls back to a legacy XEmbed icon, which KDE Plasma and GNOME no
 # longer host at all — the watcher runs, draws an icon, and nothing shows it.
@@ -87,6 +90,10 @@ packages = ["asher"]
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+# Ruff 0.16 added "*.md" to the default include list, which pulls the Python
+# snippets in docs/ and .claude/skills/ into `ruff format`. Those are
+# illustrative, not compiled, so keep the formatter scoped to real source.
+extend-exclude = ["*.md"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
