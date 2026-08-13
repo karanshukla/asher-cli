@@ -60,6 +60,21 @@ dev = [
     "git-cliff>=2.0",
     "pillow>=10.0",  # so the tray icon renderer is covered in CI
 ]
+# Mirrors the `tray` extra, because a plain `uv run` re-syncs the environment to
+# the default groups and prunes everything else — which silently removed pystray
+# and left the watcher drawing an icon no desktop was hosting. Groups are synced
+# by default (see [tool.uv] below), extras are not, so the working copy keeps a
+# usable tray without every command needing `--extra tray`.
+# CI opts out with `uv sync --no-default-groups --group dev`: PyGObject builds
+# from source and the runners have no GObject-introspection headers.
+tray = [
+    "pystray>=0.19",
+    "pillow>=10.0",
+    "pygobject>=3.42; sys_platform == 'linux'",
+]
+
+[tool.uv]
+default-groups = ["dev", "tray"]
 
 [tool.poe.tasks]
 lint   = "ruff check ."

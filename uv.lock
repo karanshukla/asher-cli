@@ -256,6 +256,11 @@ dev = [
     { name = "textual-dev" },
     { name = "watchfiles" },
 ]
+tray = [
+    { name = "pillow" },
+    { name = "pygobject", marker = "sys_platform == 'linux'" },
+    { name = "pystray" },
+]
 
 [package.metadata]
 requires-dist = [
@@ -287,6 +292,11 @@ dev = [
     { name = "ruff", specifier = ">=0.4" },
     { name = "textual-dev", specifier = ">=1.0" },
     { name = "watchfiles", specifier = ">=0.21" },
+]
+tray = [
+    { name = "pillow", specifier = ">=10.0" },
+    { name = "pygobject", marker = "sys_platform == 'linux'", specifier = ">=3.42" },
+    { name = "pystray", specifier = ">=0.19" },
 ]
 
 [[package]]
