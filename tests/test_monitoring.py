@@ -344,6 +344,68 @@ class TestNotifyFault:
         mock_beep.assert_not_called()
 
 
+class TestUpdateCatPanel:
+    def _mixin(self):
+        m = MagicMock()
+        cat_status = MagicMock()
+        m.query_one = MagicMock(return_value=cat_status)
+        return m, cat_status
+
+    def _rendered(self, cat_status) -> str:
+        return cat_status.update.call_args.args[0].plain
+
+    def test_clean_cycle_shows_short_readable_label(self):
+        """CLEAN_CYCLE's full .text ("Clean Cycle In Progress") overflows the
+        26-column cat panel, so it renders the shortened form instead."""
+        m, cat_status = self._mixin()
+        robot = MagicMock()
+        robot.is_online = True
+        robot.status = LitterBoxStatus.CLEAN_CYCLE
+
+        MonitoringMixin._update_cat_panel(m, robot)
+
+        rendered = self._rendered(cat_status)
+        assert "Cycling" in rendered
+        assert "CCP" not in rendered
+        assert "Clean Cycle In Progress" not in rendered
+
+    def test_cat_panel_status_labels_fit_the_panel_width(self):
+        """Every LitterBoxStatus must render within #cat-status's 26 columns
+        (asher/ui/style.tcss) after CAT_PANEL_STATUS_LABELS shortening, or the
+        line wraps onto a second row."""
+        from asher.constants import CAT_PANEL_STATUS_LABELS
+        from asher.helpers import status_text
+
+        for member in LitterBoxStatus:
+            label = CAT_PANEL_STATUS_LABELS.get(status_text(member), status_text(member))
+            line = f"status   {label}"
+            assert len(line) <= 26, f"{member.name} renders {line!r} ({len(line)} cols)"
+
+    def test_ready_shows_readable_label(self):
+        m, cat_status = self._mixin()
+        robot = MagicMock()
+        robot.is_online = True
+        robot.status = LitterBoxStatus.READY
+
+        MonitoringMixin._update_cat_panel(m, robot)
+
+        rendered = self._rendered(cat_status)
+        assert "Ready" in rendered
+        assert "RDY" not in rendered
+
+    def test_drawer_full_shows_readable_label(self):
+        m, cat_status = self._mixin()
+        robot = MagicMock()
+        robot.is_online = True
+        robot.status = LitterBoxStatus.DRAWER_FULL
+
+        MonitoringMixin._update_cat_panel(m, robot)
+
+        rendered = self._rendered(cat_status)
+        assert "Drawer Full" in rendered
+        assert "DFS" not in rendered
+
+
 class TestCyclingChip:
     def test_chip_without_start(self):
         m = MagicMock()

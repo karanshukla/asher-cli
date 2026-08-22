@@ -69,3 +69,20 @@ def ts() -> Text:
 
 def robot_model(robot: object) -> str:
     return ROBOT_MODELS.get(type(robot).__name__, type(robot).__name__)
+
+
+def status_text(status: object) -> str:
+    """Render a robot status as human-readable text.
+
+    ``LitterBoxStatus`` is a plain ``Enum`` (not ``StrEnum``), so ``str()`` yields
+    the verbose ``"LitterBoxStatus.READY"`` — or, via ``.value``, the raw
+    3-letter cloud code (``"RDY"``). The readable form ("Ready") lives in its
+    ``text`` property. Falls back to ``str()`` for plain strings, and to an em
+    dash when status is missing.
+    """
+    if status is None:
+        return "—"
+    text = getattr(status, "text", None)
+    if isinstance(text, str):
+        return text
+    return str(status)

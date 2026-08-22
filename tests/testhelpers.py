@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 from asher import theme
-from asher.helpers import dev_mode, drawer_bar, fmt_ago, ts
+from asher.helpers import dev_mode, drawer_bar, fmt_ago, status_text, ts
 
 
 class TestFmtAgo:
@@ -111,3 +111,21 @@ class TestDevMode:
         for value in ("false", "1", "yes", ""):
             monkeypatch.setenv("ASHER_CLI_DEV_MODE", value)
             assert dev_mode() is False
+
+
+class TestStatusText:
+    def test_none_returns_em_dash(self):
+        assert status_text(None) == "—"
+
+    def test_uses_text_property_not_value(self):
+        from pylitterbot.enums import LitterBoxStatus
+
+        assert status_text(LitterBoxStatus.CLEAN_CYCLE) == "Clean Cycle In Progress"
+        assert status_text(LitterBoxStatus.READY) == "Ready"
+        assert status_text(LitterBoxStatus.DRAWER_FULL) == "Drawer Full"
+
+    def test_plain_string_passthrough(self):
+        assert status_text("Ready") == "Ready"
+
+    def test_object_without_text_falls_back_to_str(self):
+        assert status_text(42) == "42"

@@ -13,9 +13,9 @@ from textual.css.query import NoMatches
 from textual.widgets import Static
 
 from .. import theme
-from ..constants import STATUS_COLORS
+from ..constants import CAT_PANEL_STATUS_LABELS, STATUS_COLORS
 from ..faults import SEVERITY_ERROR, Fault, check_faults
-from ..helpers import drawer_bar, fmt_ago, robot_model
+from ..helpers import drawer_bar, fmt_ago, robot_model, status_text
 
 if TYPE_CHECKING:
     from textual.timer import Timer
@@ -226,11 +226,12 @@ class MonitoringMixin:
         cycle_count = getattr(r, "cycle_count", None)
         wait = getattr(r, "clean_cycle_wait_time_minutes", None)
 
-        status_str = status.value if status is not None and hasattr(status, "value") else "—"
+        status_str = status_text(status)
         status_color = STATUS_COLORS.get(status_str, theme.OK if online else theme.DANGER)
+        status_label = CAT_PANEL_STATUS_LABELS.get(status_str, status_str)
 
         t = Text()
-        t.append(f"status   {status_str}\n", style=status_color)
+        t.append(f"status   {status_label}\n", style=status_color)
 
         if power_type == "AC":
             t.append("power    mains\n", style=theme.OK)
