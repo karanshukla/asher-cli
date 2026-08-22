@@ -6,13 +6,15 @@ from . import theme
 
 STATUS_COLORS: dict[str, str] = {
     "Ready": theme.OK,
-    "Cycling": theme.ACCENT,
-    "Cat Detected": theme.WARN,
-    "Drawer Full": theme.DANGER,
-    "Offline": theme.DANGER,
-    "Sleeping": theme.MUTED,
+    "Clean Cycle In Progress": theme.ACCENT,
     "Empty Cycle": theme.ACCENT,
-    "Paused": theme.WARN,
+    "Cat Detected": theme.WARN,
+    "Clean Cycle Paused": theme.WARN,
+    "Drawer Almost Full - 2 Cycles Left": theme.WARN,
+    "Drawer Almost Full - 1 Cycle Left": theme.WARN,
+    "Drawer Full": theme.DANGER,
+    "Off": theme.DANGER,
+    "Offline": theme.DANGER,
     "Clean Cycle Complete": theme.OK,
 }
 

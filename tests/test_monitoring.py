@@ -344,6 +344,53 @@ class TestNotifyFault:
         mock_beep.assert_not_called()
 
 
+class TestUpdateCatPanel:
+    def _mixin(self):
+        m = MagicMock()
+        cat_status = MagicMock()
+        m.query_one = MagicMock(return_value=cat_status)
+        return m, cat_status
+
+    def _rendered(self, cat_status) -> str:
+        return cat_status.update.call_args.args[0].plain
+
+    def test_clean_cycle_shows_readable_label(self):
+        m, cat_status = self._mixin()
+        robot = MagicMock()
+        robot.is_online = True
+        robot.status = LitterBoxStatus.CLEAN_CYCLE
+
+        MonitoringMixin._update_cat_panel(m, robot)
+
+        rendered = self._rendered(cat_status)
+        assert "Clean Cycle In Progress" in rendered
+        assert "CCP" not in rendered
+
+    def test_ready_shows_readable_label(self):
+        m, cat_status = self._mixin()
+        robot = MagicMock()
+        robot.is_online = True
+        robot.status = LitterBoxStatus.READY
+
+        MonitoringMixin._update_cat_panel(m, robot)
+
+        rendered = self._rendered(cat_status)
+        assert "Ready" in rendered
+        assert "RDY" not in rendered
+
+    def test_drawer_full_shows_readable_label(self):
+        m, cat_status = self._mixin()
+        robot = MagicMock()
+        robot.is_online = True
+        robot.status = LitterBoxStatus.DRAWER_FULL
+
+        MonitoringMixin._update_cat_panel(m, robot)
+
+        rendered = self._rendered(cat_status)
+        assert "Drawer Full" in rendered
+        assert "DFS" not in rendered
+
+
 class TestCyclingChip:
     def test_chip_without_start(self):
         m = MagicMock()

@@ -15,7 +15,7 @@ from textual.widgets import Static
 from .. import theme
 from ..constants import STATUS_COLORS
 from ..faults import SEVERITY_ERROR, Fault, check_faults
-from ..helpers import drawer_bar, fmt_ago, robot_model
+from ..helpers import drawer_bar, fmt_ago, robot_model, status_text
 
 if TYPE_CHECKING:
     from textual.timer import Timer
@@ -226,7 +226,7 @@ class MonitoringMixin:
         cycle_count = getattr(r, "cycle_count", None)
         wait = getattr(r, "clean_cycle_wait_time_minutes", None)
 
-        status_str = status.value if status is not None and hasattr(status, "value") else "—"
+        status_str = status_text(status)
         status_color = STATUS_COLORS.get(status_str, theme.OK if online else theme.DANGER)
 
         t = Text()
