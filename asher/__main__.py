@@ -132,7 +132,24 @@ def _build_parser() -> argparse.ArgumentParser:
                 metavar="PATH",
                 help="write to this path instead of ~/Downloads.",
             )
+        if command.name == "history":
+            sub.add_argument(
+                "--type",
+                metavar="KIND",
+                help="only events of this kind (LR5 only), e.g. cat, clean, litter.",
+            )
     return parser
+
+
+def _handler_args(parsed: argparse.Namespace) -> list[str]:
+    """Rebuild the word list a headless handler parses.
+
+    The handlers take raw words so the TUI and the CLI read the same grammar;
+    argparse only declares the flags it needs in order to document them in
+    ``--help``, and they are folded back in here.
+    """
+    kind = getattr(parsed, "type", None)
+    return [*parsed.args, "--type", kind] if kind else list(parsed.args)
 
 
 def main() -> None:
@@ -157,7 +174,7 @@ def main() -> None:
             asyncio.run(
                 run(
                     args.command,
-                    args.args,
+                    _handler_args(args),
                     robot=args.robot,
                     output=args.output,
                     as_json=getattr(args, "json", False),

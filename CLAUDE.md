@@ -23,8 +23,8 @@ asher/
   __init__.py
   app.py            AsherApp class (thin orchestrator — composes mixins)
   auth.py           LoginScreen modal (ModalScreen[tuple[str,str]]) — available, not primary flow
-  helpers.py        fmt_ago(), drawer_bar(), ts(), robot_model()  (pure, testable)
-  constants.py      STATUS_COLORS, ROBOT_MODELS
+  helpers.py        fmt_ago(), fmt_until(), drawer_bar(), ts(), robot_model(), status_text() + argument parsing shared by the TUI and headless surfaces: hex_colour(), parse_clock(), parse_day(), split_type_flag(), activity_type()  (pure, testable)
+  constants.py      STATUS_COLORS, CAT_PANEL_STATUS_LABELS, ACTIVITY_TYPES, ROBOT_MODELS
   theme.py          Catppuccin Mocha palette + semantic roles (BACKGROUND, MUTED, DANGER, …) + CSS_VARIABLES/apply() — the only place a hex literal belongs
   config.py         runtime settings persistence — load()/save()/update() over ~/.asher-cli/config.json; holds poll interval, cat-panel visibility/colour, active pet index, notification settings (non-secret UI prefs only; credentials stay in keyring)
   notifications.py  desktop toast + audible alert façade — plyer first, then the platform's own tool (osascript/notify-send); fire/beep are always-safe no-ops on failure/headless

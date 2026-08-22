@@ -2,10 +2,22 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, time, timedelta, timezone
 
 from asher import theme
-from asher.helpers import dev_mode, drawer_bar, fmt_ago, status_text, ts
+from asher.helpers import (
+    activity_type,
+    dev_mode,
+    drawer_bar,
+    fmt_ago,
+    fmt_until,
+    hex_colour,
+    parse_clock,
+    parse_day,
+    split_type_flag,
+    status_text,
+    ts,
+)
 
 
 class TestFmtAgo:
@@ -129,3 +141,105 @@ class TestStatusText:
 
     def test_object_without_text_falls_back_to_str(self):
         assert status_text(42) == "42"
+
+
+class TestFmtUntil:
+    def test_none_returns_em_dash(self):
+        assert fmt_until(None) == "—"
+
+    def test_future_date_counts_down(self):
+        dt = datetime.now(timezone.utc) + timedelta(days=23, hours=1)
+        assert fmt_until(dt) == f"{dt.date().isoformat()} (in 23d)"
+
+    def test_today_says_today(self):
+        dt = datetime.now(timezone.utc) + timedelta(hours=2)
+        assert "(today)" in fmt_until(dt)
+
+    def test_past_date_is_overdue(self):
+        dt = datetime.now(timezone.utc) - timedelta(days=3, hours=1)
+        assert "(overdue by 3d)" in fmt_until(dt)
+
+    def test_just_past_still_reads_as_today(self):
+        dt = datetime.now(timezone.utc) - timedelta(hours=2)
+        assert "(today)" in fmt_until(dt)
+
+    def test_naive_datetime_is_read_as_utc(self):
+        dt = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=5, hours=1)
+        assert "(in 5d)" in fmt_until(dt)
+
+
+class TestHexColour:
+    def test_normalises_to_upper_six_digits(self):
+        assert hex_colour("#ff9e64") == "#FF9E64"
+
+    def test_accepts_a_missing_hash(self):
+        assert hex_colour("ff9e64") == "#FF9E64"
+
+    def test_expands_the_three_digit_shorthand(self):
+        assert hex_colour("#f0a") == "#FF00AA"
+
+    def test_tolerates_surrounding_whitespace(self):
+        assert hex_colour("  #FF9E64 ") == "#FF9E64"
+
+    def test_rejects_non_hex_characters(self):
+        assert hex_colour("#zzzzzz") is None
+
+    def test_rejects_a_wrong_length(self):
+        assert hex_colour("#ff9e6") is None
+        assert hex_colour("") is None
+
+
+class TestParseClock:
+    def test_parses_a_24_hour_time(self):
+        assert parse_clock("22:00") == time(22, 0)
+        assert parse_clock("7:05") == time(7, 5)
+
+    def test_rejects_a_missing_separator(self):
+        assert parse_clock("2200") is None
+
+    def test_rejects_out_of_range_values(self):
+        assert parse_clock("24:00") is None
+        assert parse_clock("22:60") is None
+
+    def test_rejects_words(self):
+        assert parse_clock("bedtime") is None
+
+
+class TestParseDay:
+    def test_parses_short_and_long_names(self):
+        assert parse_day("mon") == 0
+        assert parse_day("Monday") == 0
+        assert parse_day("SUN") == 6
+
+    def test_unknown_day_is_none(self):
+        assert parse_day("caturday") is None
+
+
+class TestSplitTypeFlag:
+    def test_no_flag_leaves_args_alone(self):
+        assert split_type_flag(["50"]) == (["50"], None)
+
+    def test_separate_value(self):
+        assert split_type_flag(["50", "--type", "cat"]) == (["50"], "cat")
+
+    def test_equals_form(self):
+        assert split_type_flag(["--type=cat", "50"]) == (["50"], "cat")
+
+    def test_flag_without_a_value_is_empty_not_missing(self):
+        assert split_type_flag(["--type"]) == ([], "")
+
+
+class TestActivityType:
+    def test_friendly_names_map_to_cloud_types(self):
+        assert activity_type("cat") == "PET_VISIT"
+        assert activity_type("clean") == "CYCLE_COMPLETED"
+
+    def test_lookup_is_case_insensitive(self):
+        assert activity_type("Cat") == "PET_VISIT"
+
+    def test_unknown_word_passes_through_uppercased(self):
+        assert activity_type("weird_new_event") == "WEIRD_NEW_EVENT"
+
+    def test_missing_or_blank_is_none(self):
+        assert activity_type(None) is None
+        assert activity_type("  ") is None

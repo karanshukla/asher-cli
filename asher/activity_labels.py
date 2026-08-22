@@ -35,6 +35,13 @@ ACTION_LABELS: dict[str, tuple[str, str]] = {
     "motor fault": ("Motor fault", theme.DANGER),
     "pinch detect": ("Pinch detected", theme.DANGER),
     "timing fault": ("Timing fault", theme.WARN),
+    # The LR5 activity endpoint reports SCREAMING_SNAKE type codes rather than
+    # the sentence-style text the LR3/LR4 history returns.
+    "pet_visit": ("Cat visit", theme.WARN),
+    "cat_detect": ("Cat detected", theme.WARN),
+    "cycle_completed": ("Clean cycle complete", theme.OK),
+    "cycle_interrupted": ("Cycle interrupted", theme.WARN),
+    "litter_low": ("Litter low", theme.WARN),
 }
 
 # Fallback colour for unknown event types — muted grey rather than crashing.

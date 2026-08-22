@@ -325,3 +325,113 @@ async def test_panel_brightness_high_lr5(lr5_app):
         await pilot.pause()
 
     lr5_app._robot.set_panel_brightness.assert_called_once_with(BrightnessLevel.HIGH)
+
+
+# ── night-light color (§4) ────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_night_light_colour_on_lr5(lr5_app):
+    lr5_app._robot.set_night_light_settings = AsyncMock(return_value=True)
+    async with lr5_app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#cmd-input")
+        await _type(pilot, "night-light color ff9e64")
+        await pilot.pause()
+        await pilot.pause()
+
+        log = _log_text(lr5_app)
+
+    lr5_app._robot.set_night_light_settings.assert_called_once_with(color="#FF9E64")
+    assert "#FF9E64" in log
+
+
+@pytest.mark.asyncio
+async def test_night_light_colour_rejects_a_non_colour(lr5_app):
+    lr5_app._robot.set_night_light_settings = AsyncMock(return_value=True)
+    async with lr5_app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#cmd-input")
+        await _type(pilot, "night-light color burgundy")
+        await pilot.pause()
+
+        log = _log_text(lr5_app)
+
+    lr5_app._robot.set_night_light_settings.assert_not_called()
+    assert "Usage" in log
+
+
+@pytest.mark.asyncio
+async def test_night_light_colour_not_supported_on_lr4(lr4_app):
+    lr4_app._robot.set_night_light_settings = AsyncMock(return_value=True)
+    async with lr4_app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#cmd-input")
+        await _type(pilot, "night-light color #FF9E64")
+        await pilot.pause()
+        await pilot.pause()
+
+        log = _log_text(lr4_app)
+
+    lr4_app._robot.set_night_light_settings.assert_not_called()
+    assert "LR5" in log
+
+
+@pytest.mark.asyncio
+async def test_night_light_mode_still_works_alongside_colour(lr5_app):
+    lr5_app._robot.set_night_light_mode = AsyncMock(return_value=True)
+    async with lr5_app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#cmd-input")
+        await _type(pilot, "night-light auto")
+        await pilot.pause()
+        await pilot.pause()
+
+    lr5_app._robot.set_night_light_mode.assert_called_once()
+
+
+# ── history --type (§11) ──────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_history_type_filter_uses_the_lr5_endpoint(lr5_app):
+    lr5_app._robot.get_activities = AsyncMock(
+        return_value=[{"timestamp": "2026-08-20T10:00:00Z", "type": "PET_VISIT"}]
+    )
+    async with lr5_app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#cmd-input")
+        await _type(pilot, "history 10 --type cat")
+        await pilot.pause()
+        await pilot.pause()
+
+    lr5_app._robot.get_activities.assert_called_once_with(limit=10, activity_type="PET_VISIT")
+    lr5_app._robot.get_activity_history.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_unfiltered_history_still_uses_the_shared_call(lr5_app):
+    async with lr5_app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#cmd-input")
+        await _type(pilot, "history 10")
+        await pilot.pause()
+        await pilot.pause()
+
+    lr5_app._robot.get_activity_history.assert_called_once_with(limit=10)
+
+
+@pytest.mark.asyncio
+async def test_history_type_filter_refused_on_lr4(lr4_app):
+    lr4_app._robot.get_activities = AsyncMock(return_value=[])
+    async with lr4_app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#cmd-input")
+        await _type(pilot, "history --type cat")
+        await pilot.pause()
+        await pilot.pause()
+
+        log = _log_text(lr4_app)
+
+    lr4_app._robot.get_activities.assert_not_called()
+    assert "LR5" in log

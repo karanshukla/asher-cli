@@ -39,6 +39,20 @@ CAT_PANEL_STATUS_LABELS: dict[str, str] = {
     "Pinch Detect At Startup": "Pinch (Startup)",
 }
 
+# Friendly `history --type` argument → the LR5 activity type the cloud filters
+# on. Anything not listed is passed through uppercased, so a type this table
+# doesn't know yet is still reachable without a release.
+ACTIVITY_TYPES: dict[str, str] = {
+    "cat": "PET_VISIT",
+    "visit": "PET_VISIT",
+    "detect": "CAT_DETECT",
+    "clean": "CYCLE_COMPLETED",
+    "cycle": "CYCLE_COMPLETED",
+    "interrupted": "CYCLE_INTERRUPTED",
+    "litter": "LITTER_LOW",
+    "offline": "OFFLINE",
+}
+
 ROBOT_MODELS: dict[str, str] = {
     "LitterRobot3": "LR3",
     "LitterRobot4": "LR4",

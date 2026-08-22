@@ -532,3 +532,142 @@ async def test_sleep_schedule_alias_works(connected_app):
         log = _log_text(connected_app)
 
     assert "22:00" in log
+
+
+# ── sleep-schedule set / disable (§8) ─────────────────────────────────────────
+
+
+def _lr5_app(app):
+    """Re-front the same fake robot with an LR5 adapter, which can write schedules."""
+    from asher.robot_adapters import LR5Adapter
+
+    app._robot.set_sleep_mode = AsyncMock(return_value=True)
+    app._adapter = LR5Adapter(app._robot)
+    return app
+
+
+@pytest.mark.asyncio
+async def test_sleep_schedule_set_sends_the_window(connected_app):
+    app = _lr5_app(connected_app)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#cmd-input")
+        await _type(pilot, "sleep-schedule set mon 22:00 07:00")
+        await pilot.pause()
+        await pilot.pause()
+
+        log = _log_text(app)
+
+    app._robot.set_sleep_mode.assert_called_once_with(True, 1320, wake_time=420, day_of_week=1)
+    assert "Mon" in log
+
+
+@pytest.mark.asyncio
+async def test_sleep_schedule_set_all_days(connected_app):
+    app = _lr5_app(connected_app)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#cmd-input")
+        await _type(pilot, "sleep-schedule set all 22:30 06:15")
+        await pilot.pause()
+        await pilot.pause()
+
+    assert app._robot.set_sleep_mode.call_args.kwargs["day_of_week"] is None
+
+
+@pytest.mark.asyncio
+async def test_sleep_schedule_set_rejects_a_bad_time(connected_app):
+    app = _lr5_app(connected_app)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#cmd-input")
+        await _type(pilot, "sleep-schedule set all 2200 07:00")
+        await pilot.pause()
+
+        log = _log_text(app)
+
+    app._robot.set_sleep_mode.assert_not_called()
+    assert "HH:MM" in log
+
+
+@pytest.mark.asyncio
+async def test_sleep_schedule_set_needs_all_three_arguments(connected_app):
+    app = _lr5_app(connected_app)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#cmd-input")
+        await _type(pilot, "sleep-schedule set mon")
+        await pilot.pause()
+
+        log = _log_text(app)
+
+    app._robot.set_sleep_mode.assert_not_called()
+    assert "Usage" in log
+
+
+@pytest.mark.asyncio
+async def test_sleep_schedule_disable(connected_app):
+    app = _lr5_app(connected_app)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#cmd-input")
+        await _type(pilot, "sleep-schedule disable")
+        await pilot.pause()
+        await pilot.pause()
+
+        log = _log_text(app)
+
+    app._robot.set_sleep_mode.assert_called_once_with(False)
+    assert "disabled" in log
+
+
+@pytest.mark.asyncio
+async def test_sleep_schedule_write_on_lr4_points_at_the_app(connected_app):
+    from asher.robot_adapters import LR4Adapter
+
+    connected_app._robot.set_sleep_mode = AsyncMock(return_value=True)
+    connected_app._adapter = LR4Adapter(connected_app._robot)
+    async with connected_app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#cmd-input")
+        await _type(pilot, "sleep-schedule set all 22:00 07:00")
+        await pilot.pause()
+        await pilot.pause()
+
+        log = _log_text(connected_app)
+
+    connected_app._robot.set_sleep_mode.assert_not_called()
+    assert "Whisker app" in log
+
+
+@pytest.mark.asyncio
+async def test_sleep_schedule_unknown_subcommand_shows_the_grammar(connected_app):
+    app = _lr5_app(connected_app)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#cmd-input")
+        await _type(pilot, "sleep-schedule reticulate")
+        await pilot.pause()
+
+        log = _log_text(app)
+
+    app._robot.set_sleep_mode.assert_not_called()
+    assert "Usage" in log
+
+
+@pytest.mark.asyncio
+async def test_bare_sleep_schedule_still_reads(connected_app):
+    """The viewer keeps working now that the command also writes."""
+    app = _lr5_app(connected_app)
+    app._robot.sleep_schedule = _make_schedule(enabled_days=[0])
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#cmd-input")
+        await _type(pilot, "sleep-schedule")
+        await pilot.pause()
+        await pilot.pause()
+
+        log = _log_text(app)
+
+    app._robot.set_sleep_mode.assert_not_called()
+    assert "22:00" in log
