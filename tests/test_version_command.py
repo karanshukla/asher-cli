@@ -9,6 +9,18 @@ import pytest
 from asher.app import AsherApp
 
 
+@pytest.fixture(autouse=True)
+def no_update_check():
+    """Keep /version off the network.
+
+    ``VersionCommand`` finishes with an update check in a worker thread; left
+    live it reaches PyPI, and a slow response outlives ``run_test()`` so the
+    worker writes to a torn-down screen.
+    """
+    with patch("asher.updates.check", return_value=None):
+        yield
+
+
 @pytest.fixture
 def app_no_connect():
     """An AsherApp with the background _connect_worker stubbed out."""
