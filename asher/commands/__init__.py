@@ -7,7 +7,7 @@ import contextlib
 import shutil
 import subprocess
 import sys
-from datetime import time
+from datetime import datetime, time
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as pkg_version
 from pathlib import Path
@@ -26,8 +26,21 @@ from textual.widgets import Input, RichLog, Static
 
 from .. import theme
 from ..completion import enter_completes, render_completion, slash_matches
+from ..constants import ACTIVITY_TYPES
 from ..export import ExportError, build_history_csv, resolve_dest
-from ..helpers import fmt_ago, robot_model, status_text, ts
+from ..helpers import (
+    DAY_NAMES,
+    activity_type,
+    fmt_ago,
+    fmt_until,
+    hex_colour,
+    parse_clock,
+    parse_day,
+    robot_model,
+    split_type_flag,
+    status_text,
+    ts,
+)
 from ..history_view import HistoryScreen
 from ..login_flow import LoginFlow, LoginState
 from .base import Command, CommandRegistry, SlashCommand
@@ -235,6 +248,9 @@ class InfoCommand(Command):
             ("Online", _yn(getattr(r, "is_online", False))),
             ("Last seen", fmt_ago(last_seen)),
         ]
+        filter_due = getattr(r, "next_filter_replacement_date", None)
+        if isinstance(filter_due, datetime):
+            rows.insert(-2, ("Filter due", fmt_until(filter_due)))
         log = app.query_one("#log", RichLog)
         for k, v in rows:
             t = Text()
@@ -332,19 +348,22 @@ class WakeCommand(Command):
 class NightLightCommand(Command):
     name = "night-light"
     aliases = ("nightlight", "nl")
-    description = "set night light mode"
+    description = "on|off|auto|color <hex>  set night light mode"
     requires_robot = True
 
     @property
     def display_name(self) -> str:
-        return "night-light on|off|auto"
+        return "night-light"
 
     async def run(self, app: AsherApp, args: list[str]) -> None:
         if app._adapter is None:
             return
         arg = args[0].lower() if args else ""
+        if arg in ("color", "colour"):
+            await self._set_colour(app, args[1:])
+            return
         if arg not in ("on", "off", "auto"):
-            app._log_warn("Usage: night-light on|off|auto")
+            app._log_warn("Usage: night-light on|off|auto|color <hex>")
             return
         ok, msg = await app._adapter.set_night_light(arg)
         if ok:
@@ -356,6 +375,19 @@ class NightLightCommand(Command):
             else:
                 nl = Text("☀", style=theme.WARN)
             app.query_one("#nightlight-lbl", Static).update(nl)
+        else:
+            app._log_warn(msg)
+
+    async def _set_colour(self, app: AsherApp, args: list[str]) -> None:
+        if app._adapter is None:
+            return
+        colour = hex_colour(args[0]) if args else None
+        if colour is None:
+            app._log_warn("Usage: night-light color <hex>  e.g. night-light color #FF9E64")
+            return
+        ok, msg = await app._adapter.set_night_light_color(colour)
+        if ok:
+            app._log_ok(msg)
         else:
             app._log_warn(msg)
 
@@ -424,13 +456,14 @@ class PanelBrightnessCommand(Command):
 class HistoryCommand(Command):
     name = "history"
     aliases = ("hist",)
-    description = "[count|all]  show recent activity in a scrollable pager"
+    description = "[count|all] [--type <kind>]  recent activity in a scrollable pager"
     requires_robot = True
 
     async def run(self, app: AsherApp, args: list[str]) -> None:
-        if app._robot is None:
+        if app._robot is None or app._adapter is None:
             return
-        raw = args[0].lower() if args else ""
+        counts, wanted_type = split_type_flag(args)
+        raw = counts[0].lower() if counts else ""
         if raw in ("all", "max"):
             limit = 500
         elif raw:
@@ -441,10 +474,15 @@ class HistoryCommand(Command):
                 return
         else:
             limit = 50
-        try:
-            acts = await app._robot.get_activity_history(limit=limit)
-        except Exception as exc:
-            app._log_err(f"Failed to get history: {exc}")
+
+        wanted = activity_type(wanted_type)
+        if wanted_type is not None and wanted is None:
+            app._log_warn(f"Usage: history [count|all] --type <{'|'.join(ACTIVITY_TYPES)}>")
+            return
+
+        acts, problem = await app._adapter.get_history(limit, wanted)
+        if acts is None:
+            app._log_err(problem)
             return
         robot_name = getattr(app._robot, "name", "robot")
         app.push_screen(HistoryScreen(acts, app._pets, robot_name))
@@ -600,9 +638,6 @@ class InsightCommand(Command):
             log.write(t)
 
 
-_DAY_NAMES = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
-
-
 def _fmt_sleep_time(t: object) -> str:
     if t is None:
         return "—"
@@ -629,10 +664,16 @@ def _parse_sleep_day(day: Any) -> tuple[int, bool, object, object] | None:
         return None
 
 
+_EVERY_DAY = ("all", "every", "daily", "everyday")
+_SCHEDULE_USAGE = (
+    "Usage: sleep-schedule · sleep-schedule set <day|all> <HH:MM> <HH:MM> · sleep-schedule disable"
+)
+
+
 class SleepScheduleCommand(Command):
     name = "sleep-schedule"
     aliases = ("sleepschedule",)
-    description = "show the per-day sleep schedule (read-only)"
+    description = "[set <day|all> <HH:MM> <HH:MM>|disable]  per-day sleep windows"
     requires_robot = True
 
     @property
@@ -640,6 +681,52 @@ class SleepScheduleCommand(Command):
         return "sleep-schedule"
 
     async def run(self, app: AsherApp, args: list[str]) -> None:
+        action = args[0].lower() if args else ""
+        if action == "set":
+            await self._set_window(app, args[1:])
+            return
+        if action in ("disable", "off"):
+            await self._disable(app)
+            return
+        if action:
+            app._log_warn(_SCHEDULE_USAGE)
+            return
+        await self._show(app)
+
+    async def _set_window(self, app: AsherApp, args: list[str]) -> None:
+        if app._adapter is None:
+            return
+        if len(args) < 3:
+            app._log_warn("Usage: sleep-schedule set <day|all> <HH:MM> <HH:MM>")
+            return
+        day_arg = args[0].lower()
+        weekday = None if day_arg in _EVERY_DAY else parse_day(day_arg)
+        if weekday is None and day_arg not in _EVERY_DAY:
+            app._log_warn(f"Unknown day '{args[0]}' — use {'/'.join(DAY_NAMES)} or 'all'")
+            return
+        sleep, wake = parse_clock(args[1]), parse_clock(args[2])
+        if sleep is None or wake is None:
+            app._log_warn("Times must be 24-hour HH:MM — e.g. sleep-schedule set all 22:00 07:00")
+            return
+
+        ok, msg = await app._adapter.set_sleep_window(weekday, sleep, wake)
+        if not ok:
+            app._log_warn(msg)
+            return
+        app._log_ok(msg)
+        await app._refresh_status()
+
+    async def _disable(self, app: AsherApp) -> None:
+        if app._adapter is None:
+            return
+        ok, msg = await app._adapter.disable_sleep_schedule()
+        if not ok:
+            app._log_warn(msg)
+            return
+        app._log_ok(msg)
+        await app._refresh_status()
+
+    async def _show(self, app: AsherApp) -> None:
         if app._robot is None:
             return
         try:
@@ -688,7 +775,7 @@ class SleepScheduleCommand(Command):
                 continue
             idx, day_enabled, sleep_t, wake_t = parsed
 
-            name = _DAY_NAMES[idx]
+            name = DAY_NAMES[idx]
             t = Text()
             t.append(f"  {name} ", style=theme.MUTED)
             if day_enabled:

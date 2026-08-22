@@ -524,6 +524,175 @@ class TestParser:
         assert args.export == "7"
         assert args.output == "/tmp/x.csv"
 
+    def test_history_takes_a_type_flag(self):
+        args = self._parse(["history", "20", "--type", "cat"])
+        assert args.args == ["20"]
+        assert args.type == "cat"
+
+    def test_the_type_flag_is_folded_back_into_the_handler_arguments(self):
+        from asher.__main__ import _handler_args
+
+        assert _handler_args(self._parse(["history", "20", "--type", "cat"])) == [
+            "20",
+            "--type",
+            "cat",
+        ]
+
+    def test_handler_arguments_are_untouched_without_the_flag(self):
+        from asher.__main__ import _handler_args
+
+        assert _handler_args(self._parse(["history", "20"])) == ["20"]
+
+    def test_sleep_schedule_takes_a_set_form(self):
+        args = self._parse(["sleep-schedule", "set", "mon", "22:00", "07:00"])
+        assert args.args == ["set", "mon", "22:00", "07:00"]
+
     def test_every_registered_command_has_a_subparser(self):
         for command in COMMANDS:
             assert self._parse([command.name]).command == command.name
+
+
+# ── roadmap gaps: filters, colour, schedule writes ───────────────────────────
+
+
+class TestHistoryFiltering:
+    async def test_type_flag_reaches_the_lr5_endpoint(self):
+        robot = _robot(model="LitterRobot5")
+        robot.get_activities = AsyncMock(
+            return_value=[{"timestamp": "2026-08-20T10:00:00Z", "type": "PET_VISIT"}]
+        )
+        result = await COMMANDS_BY_NAME["history"].handler(_session(robot), ["10", "--type", "cat"])
+        robot.get_activities.assert_awaited_once_with(limit=10, activity_type="PET_VISIT")
+        assert result.data["events"][0]["event"] == "Cat visit"
+
+    async def test_equals_form_is_accepted(self):
+        robot = _robot(model="LitterRobot5")
+        robot.get_activities = AsyncMock(return_value=[])
+        await COMMANDS_BY_NAME["history"].handler(_session(robot), ["--type=clean"])
+        assert robot.get_activities.await_args.kwargs["activity_type"] == "CYCLE_COMPLETED"
+
+    async def test_filtering_is_refused_on_an_lr4(self):
+        with pytest.raises(CommandError) as excinfo:
+            await COMMANDS_BY_NAME["history"].handler(_session(), ["--type", "cat"])
+        assert "LR5" in str(excinfo.value)
+        assert excinfo.value.code == EXIT_COMMAND_REJECTED
+
+    async def test_type_without_a_value_is_a_usage_error(self):
+        with pytest.raises(CommandError) as excinfo:
+            await COMMANDS_BY_NAME["history"].handler(_session(), ["--type"])
+        assert "Usage" in str(excinfo.value)
+
+    async def test_count_still_parses_alongside_the_flag(self):
+        robot = _robot(model="LitterRobot5")
+        robot.get_activities = AsyncMock(return_value=[])
+        await COMMANDS_BY_NAME["history"].handler(_session(robot), ["all", "--type", "cat"])
+        assert robot.get_activities.await_args.kwargs["limit"] == 500
+
+
+class TestNightLightColour:
+    async def test_colour_is_normalised_before_it_is_sent(self):
+        robot = _robot(model="LitterRobot5")
+        robot.set_night_light_settings = AsyncMock(return_value=True)
+        result = await COMMANDS_BY_NAME["night-light"].handler(_session(robot), ["color", "ff9e64"])
+        assert result.data["ok"] is True
+        robot.set_night_light_settings.assert_awaited_once_with(color="#FF9E64")
+
+    async def test_british_spelling_works_too(self):
+        robot = _robot(model="LitterRobot5")
+        robot.set_night_light_settings = AsyncMock(return_value=True)
+        await COMMANDS_BY_NAME["night-light"].handler(_session(robot), ["colour", "#f0a"])
+        robot.set_night_light_settings.assert_awaited_once_with(color="#FF00AA")
+
+    async def test_a_bad_colour_never_reaches_the_cloud(self):
+        robot = _robot(model="LitterRobot5")
+        robot.set_night_light_settings = AsyncMock(return_value=True)
+        with pytest.raises(CommandError):
+            await COMMANDS_BY_NAME["night-light"].handler(_session(robot), ["color", "burgundy"])
+        robot.set_night_light_settings.assert_not_called()
+
+    async def test_colour_on_an_lr4_reports_the_model_limit(self):
+        with pytest.raises(CommandError) as excinfo:
+            await COMMANDS_BY_NAME["night-light"].handler(_session(), ["color", "#FF9E64"])
+        assert "LR5" in str(excinfo.value)
+
+    async def test_the_mode_form_still_works(self):
+        session = _session()
+        session.robot.set_night_light_mode = AsyncMock(return_value=True)
+        result = await COMMANDS_BY_NAME["night-light"].handler(session, ["auto"])
+        assert result.data["ok"] is True
+
+
+class TestSleepScheduleWrites:
+    async def test_set_sends_the_window_for_one_day(self):
+        robot = _robot(model="LitterRobot5")
+        robot.set_sleep_mode = AsyncMock(return_value=True)
+        result = await COMMANDS_BY_NAME["sleep-schedule"].handler(
+            _session(robot), ["set", "tue", "22:00", "07:00"]
+        )
+        assert result.data["ok"] is True
+        robot.set_sleep_mode.assert_awaited_once_with(True, 1320, wake_time=420, day_of_week=2)
+
+    async def test_set_all_days(self):
+        robot = _robot(model="LitterRobot5")
+        robot.set_sleep_mode = AsyncMock(return_value=True)
+        await COMMANDS_BY_NAME["sleep-schedule"].handler(
+            _session(robot), ["set", "all", "22:00", "07:00"]
+        )
+        assert robot.set_sleep_mode.await_args.kwargs["day_of_week"] is None
+
+    async def test_missing_arguments_are_a_usage_error(self):
+        with pytest.raises(CommandError) as excinfo:
+            await COMMANDS_BY_NAME["sleep-schedule"].handler(_session(), ["set", "mon"])
+        assert "Usage" in str(excinfo.value)
+
+    async def test_an_unreadable_time_is_rejected_locally(self):
+        robot = _robot(model="LitterRobot5")
+        robot.set_sleep_mode = AsyncMock(return_value=True)
+        with pytest.raises(CommandError) as excinfo:
+            await COMMANDS_BY_NAME["sleep-schedule"].handler(
+                _session(robot), ["set", "all", "bedtime", "07:00"]
+            )
+        assert "HH:MM" in str(excinfo.value)
+        robot.set_sleep_mode.assert_not_called()
+
+    async def test_an_unknown_day_is_rejected_locally(self):
+        robot = _robot(model="LitterRobot5")
+        robot.set_sleep_mode = AsyncMock(return_value=True)
+        with pytest.raises(CommandError) as excinfo:
+            await COMMANDS_BY_NAME["sleep-schedule"].handler(
+                _session(robot), ["set", "caturday", "22:00", "07:00"]
+            )
+        assert "Unknown day" in str(excinfo.value)
+        robot.set_sleep_mode.assert_not_called()
+
+    async def test_disable_turns_every_day_off(self):
+        robot = _robot(model="LitterRobot5")
+        robot.set_sleep_mode = AsyncMock(return_value=True)
+        result = await COMMANDS_BY_NAME["sleep-schedule"].handler(_session(robot), ["disable"])
+        assert "disabled" in result.lines[0]
+        robot.set_sleep_mode.assert_awaited_once_with(False)
+
+    async def test_an_unknown_subcommand_explains_the_grammar(self):
+        with pytest.raises(CommandError) as excinfo:
+            await COMMANDS_BY_NAME["sleep-schedule"].handler(_session(), ["reticulate"])
+        assert "Usage" in str(excinfo.value)
+
+    async def test_writing_a_schedule_on_an_lr4_points_at_the_app(self):
+        with pytest.raises(CommandError) as excinfo:
+            await COMMANDS_BY_NAME["sleep-schedule"].handler(
+                _session(), ["set", "all", "22:00", "07:00"]
+            )
+        assert "Whisker app" in str(excinfo.value)
+
+
+class TestFilterReminder:
+    async def test_info_shows_the_next_filter_date_when_the_model_has_one(self):
+        due = datetime.now(timezone.utc) + timedelta(days=23, hours=1)
+        robot = _robot(model="LitterRobot5", next_filter_replacement_date=due)
+        result = await COMMANDS_BY_NAME["info"].handler(_session(robot), [])
+        assert result.data["filter_due"] == f"{due.date().isoformat()} (in 23d)"
+
+    async def test_info_omits_the_row_on_a_model_without_one(self):
+        robot = _robot(next_filter_replacement_date=None)
+        result = await COMMANDS_BY_NAME["info"].handler(_session(robot), [])
+        assert "filter_due" not in result.data

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import time
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -23,6 +24,8 @@ def robot():
     r.set_volume = AsyncMock(return_value=True)
     r.set_camera_audio = AsyncMock(return_value=True)
     r.reset_waste_drawer = AsyncMock(return_value=True)
+    r.set_night_light_settings = AsyncMock(return_value=True)
+    r.get_activity_history = AsyncMock(return_value=[])
     return r
 
 
@@ -667,3 +670,192 @@ async def test_lr5_drawer_reset_exception(robot):
     ok, msg = await LR5Adapter(robot).reset_waste_drawer()
     assert not ok
     assert "nope" in msg
+
+
+# ── night light colour (LR5 only) ─────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_lr5_night_light_colour(robot):
+    ok, msg = await LR5Adapter(robot).set_night_light_color("#FF9E64")
+    assert ok
+    assert "#FF9E64" in msg
+    robot.set_night_light_settings.assert_awaited_once_with(color="#FF9E64")
+
+
+@pytest.mark.asyncio
+async def test_lr5_night_light_colour_rejected(robot):
+    robot.set_night_light_settings.return_value = False
+    ok, _ = await LR5Adapter(robot).set_night_light_color("#FF9E64")
+    assert not ok
+
+
+@pytest.mark.asyncio
+async def test_lr5_night_light_colour_exception(robot):
+    robot.set_night_light_settings.side_effect = Exception("bad colour")
+    ok, msg = await LR5Adapter(robot).set_night_light_color("#FF9E64")
+    assert not ok
+    assert "bad colour" in msg
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("adapter_cls", [LR3Adapter, LR4Adapter])
+async def test_night_light_colour_is_lr5_only(robot, adapter_cls):
+    ok, msg = await adapter_cls(robot).set_night_light_color("#FF9E64")
+    assert not ok
+    assert "LR5" in msg
+    robot.set_night_light_settings.assert_not_called()
+
+
+# ── sleep schedule: set a window ──────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_lr5_sets_one_day_using_the_day_of_week_numbering(robot):
+    ok, msg = await LR5Adapter(robot).set_sleep_window(0, time(22, 0), time(7, 30))
+    assert ok
+    assert "Mon" in msg
+    # Monday is 0 as a Python weekday but 1 in pylitterbot's DayOfWeek, which is
+    # the numbering the stored schedule entries use.
+    robot.set_sleep_mode.assert_awaited_once_with(True, 1320, wake_time=450, day_of_week=1)
+
+
+@pytest.mark.asyncio
+async def test_lr5_sets_every_day_when_no_weekday_given(robot):
+    ok, msg = await LR5Adapter(robot).set_sleep_window(None, time(22, 0), time(7, 0))
+    assert ok
+    assert "every day" in msg
+    assert robot.set_sleep_mode.await_args.kwargs["day_of_week"] is None
+
+
+@pytest.mark.asyncio
+async def test_lr5_sunday_maps_to_day_of_week_zero(robot):
+    await LR5Adapter(robot).set_sleep_window(6, time(23, 0), time(6, 0))
+    assert robot.set_sleep_mode.await_args.kwargs["day_of_week"] == 0
+
+
+@pytest.mark.asyncio
+async def test_lr5_sleep_window_rejected(robot):
+    robot.set_sleep_mode.return_value = False
+    ok, _ = await LR5Adapter(robot).set_sleep_window(None, time(22, 0), time(7, 0))
+    assert not ok
+
+
+@pytest.mark.asyncio
+async def test_lr5_sleep_window_exception(robot):
+    robot.set_sleep_mode.side_effect = Exception("patch failed")
+    ok, msg = await LR5Adapter(robot).set_sleep_window(None, time(22, 0), time(7, 0))
+    assert not ok
+    assert "patch failed" in msg
+
+
+@pytest.mark.asyncio
+async def test_lr3_sleep_window_sets_the_start_time_only(robot):
+    ok, msg = await LR3Adapter(robot).set_sleep_window(None, time(22, 0), time(7, 0))
+    assert ok
+    assert "22:00" in msg
+    # The wake time is not the LR3's to set, and the message has to say so.
+    assert "ignored" in msg
+    robot.set_sleep_mode.assert_awaited_once_with(True, time(22, 0))
+
+
+@pytest.mark.asyncio
+async def test_lr3_refuses_a_single_day(robot):
+    ok, msg = await LR3Adapter(robot).set_sleep_window(2, time(22, 0), time(7, 0))
+    assert not ok
+    assert "every day" in msg
+    robot.set_sleep_mode.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_lr4_sleep_window_points_at_the_app(robot):
+    ok, msg = await LR4Adapter(robot).set_sleep_window(None, time(22, 0), time(7, 0))
+    assert not ok
+    assert "Whisker app" in msg
+    robot.set_sleep_mode.assert_not_called()
+
+
+# ── sleep schedule: disable ───────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("adapter_cls", [LR3Adapter, LR5Adapter])
+async def test_disable_schedule_turns_sleep_off(robot, adapter_cls):
+    ok, msg = await adapter_cls(robot).disable_sleep_schedule()
+    assert ok
+    assert "disabled" in msg
+    robot.set_sleep_mode.assert_awaited_once_with(False)
+
+
+@pytest.mark.asyncio
+async def test_disable_schedule_on_lr4_explains_instead(robot):
+    ok, msg = await LR4Adapter(robot).disable_sleep_schedule()
+    assert not ok
+    assert "Whisker app" in msg
+
+
+@pytest.mark.asyncio
+async def test_disable_schedule_surfaces_a_rejection(robot):
+    robot.set_sleep_mode.return_value = False
+    ok, msg = await LR5Adapter(robot).disable_sleep_schedule()
+    assert not ok
+    assert "rejected" in msg
+
+
+# ── activity history ──────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("adapter_cls", [LR3Adapter, LR4Adapter, LR5Adapter])
+async def test_unfiltered_history_uses_the_shared_call(robot, adapter_cls):
+    events, problem = await adapter_cls(robot).get_history(25)
+    assert problem == ""
+    assert events == []
+    robot.get_activity_history.assert_awaited_once_with(limit=25)
+
+
+@pytest.mark.asyncio
+async def test_history_failure_is_reported_not_raised(robot):
+    robot.get_activity_history.side_effect = RuntimeError("api down")
+    events, problem = await LR4Adapter(robot).get_history(25)
+    assert events is None
+    assert "api down" in problem
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("adapter_cls", [LR3Adapter, LR4Adapter])
+async def test_filtering_history_is_lr5_only(robot, adapter_cls):
+    events, problem = await adapter_cls(robot).get_history(25, "PET_VISIT")
+    assert events is None
+    assert "LR5" in problem
+    robot.get_activity_history.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_lr5_filtered_history_returns_activities(robot):
+    robot.get_activities = AsyncMock(
+        return_value=[
+            {"timestamp": "2026-08-20T10:00:00Z", "type": "PET_VISIT"},
+            {"timestamp": None, "type": "PET_VISIT"},  # unparseable: dropped
+        ]
+    )
+    events, problem = await LR5Adapter(robot).get_history(10, "PET_VISIT")
+    assert problem == ""
+    assert [event.action for event in events] == ["PET_VISIT"]
+    assert events[0].timestamp.year == 2026
+    robot.get_activities.assert_awaited_once_with(limit=10, activity_type="PET_VISIT")
+    robot.get_activity_history.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_lr5_filtered_history_failure_is_reported(robot):
+    robot.get_activities = AsyncMock(side_effect=RuntimeError("api down"))
+    events, problem = await LR5Adapter(robot).get_history(10, "PET_VISIT")
+    assert events is None
+    assert "api down" in problem
+
+
+def test_only_the_lr5_advertises_history_filtering():
+    assert LR5Adapter.supports_history_filter is True
+    assert LR3Adapter.supports_history_filter is False
+    assert LR4Adapter.supports_history_filter is False

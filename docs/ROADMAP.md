@@ -18,7 +18,7 @@ Current state, missing functionality, and suggested additions — grounded in wh
 | Status bar top row — name + model, contextual online label (Cycling/Paused/Cat inside/Cycle done/Drawer full/Offline), night light mode + brightness, panel lock indicator | ✅ |
 | Status bar second row — drawer %, litter %, cat weight (with pet name), last visit | ✅ |
 | Pet name from Whisker account profile | ✅ |
-| Commands: clean, status, info, lock, unlock, sleep, wake, night-light on/off/auto, night-light-brightness, wait-time, power on/off, rename, insight, privacy on/off, volume, camera-audio on/off, drawer-reset (LR5 extras via adapter; gracefully refused on LR3/LR4), history, export [days\|month], help, clear, quit | ✅ |
+| Commands: clean, status, info, lock, unlock, sleep, wake, night-light on/off/auto/color, night-light-brightness, wait-time, power on/off, rename, insight, sleep-schedule (view/set/disable), privacy on/off, volume, camera-audio on/off, drawer-reset (LR5 extras via adapter; gracefully refused on LR3/LR4), history [--type], export [days\|month], help, clear, quit | ✅ |
 | Slash commands: `/login`, `/logout`, `/exit`, `/help`, `/robots`, `/robot <index\|name>`, `/pets`, `/pet <index\|name>`, `/cat on\|off\|colour <hex>`, `/refresh [seconds\|off]`, `/config`, `/mcp on\|off\|status` | ✅ |
 | MCP bridge — keyring-backed `pylitterbot[mcp]` launcher, auto-installs the extra, writes/removes the Claude Desktop config entry (incl. Windows MSIX path) | ✅ |
 | Inline login flow (email → password in command bar, no restart) | ✅ |
@@ -255,6 +255,8 @@ safe and informative rather than a crash.
 | ~~`volume <0-100>`~~ ✅ | `set_volume(int)` | `sound_volume` |
 | ~~`camera-audio on/off`~~ ✅ | `set_camera_audio(bool)` | `camera_audio_enabled` |
 | ~~`drawer-reset`~~ ✅ | `reset_waste_drawer()` | `is_drawer_removed` |
+| ~~`night-light color <hex>`~~ ✅ | `set_night_light_settings(color=...)` | `night_light_color` |
+| ~~`filter reminder`~~ ✅ | _(read-only)_ | `next_filter_replacement_date` |
 
 `volume` accepts `0-100` (the actual pylitterbot range, not the `0-10` listed
 in earlier drafts of this table). Bare `volume` prints the current value
@@ -263,21 +265,15 @@ exceptions, and the LR3/LR4 "not supported" fallthrough for each command; pilot
 tests in `tests/test_lr5_commands.py` exercise the command-bar dispatch end to
 end against both an LR5 and an LR4 adapter.
 
-### Not yet wired
+`night-light color <hex>` takes the same `#RRGGBB` (or 3-digit shorthand) a
+user would type anywhere else; `helpers.hex_colour()` normalises and rejects it
+locally, so a typo never becomes a cloud round trip. `filter reminder` is the
+read-only `next_filter_replacement_date`, rendered by `helpers.fmt_until()` as
+a `Filter due` row in `info` — present only on models that report one.
 
-| Command | API | LR5 property |
-|---|---|---|
-| `night-light color <hex>` | `set_night_light_settings(color=...)` | `night_light_color` |
-| `filter reminder` | _(read-only)_ | `next_filter_replacement_date` |
-
-`night-light color` is a natural follow-on — `LR5Adapter.set_night_light`
-already calls `set_night_light_mode`; `set_night_light_settings(color=...)` is
-the richer overload that also takes `mode`/`brightness`/`color`. `filter
-reminder` is a read-only property that could slot into `info` output.
-
-The LR5 also has `get_activities(limit, offset, activity_type)` (plural) which
-is richer than `get_activity_history` and supports pagination and filtering by
-type (e.g. only weight events).
+`get_activities(limit, offset, activity_type)` (plural, LR5-only) is what backs
+`history --type` (§11). Its `offset` parameter is still unused — pagination
+beyond a single `limit` remains open.
 
 ---
 
@@ -385,13 +381,34 @@ is wrapped defensively and degrades to a `_log_err`. Works on LR3/LR4/LR5 — th
 property exists on all three.
 
 ```
-sleep-schedule            show current schedule ✅
-sleep-schedule set        interactive wizard (or flags) — not yet
-sleep-schedule Mon 22:00 07:00   set Monday sleep window — not yet
-sleep-schedule disable    clear all days — not yet
+sleep-schedule                        show current schedule ✅
+sleep-schedule set Mon 22:00 07:00    set Monday's sleep window ✅
+sleep-schedule set all 22:00 07:00    set every day ✅
+sleep-schedule disable                turn every day off ✅
 ```
 
-### Contextual sleep/wake toggle
+### ~~`sleep-schedule set` / `disable`~~ ✅
+
+Writing a schedule is `RobotAdapter.set_sleep_window(weekday, sleep, wake)` /
+`disable_sleep_schedule()`, so each model answers for itself:
+
+- **LR5** — `set_sleep_mode(True, <minutes>, wake_time=<minutes>, day_of_week=…)`
+  per day, or every day when no day is named. `day_of_week` is passed in
+  pylitterbot's `DayOfWeek` numbering (Sun=0), *not* the Mon=0 its docstring
+  claims: the value is matched against the `dayOfWeek` field of the schedule the
+  cloud returned, and those follow the enum.
+- **LR3** — one window for every day and a firmware-fixed 8-hour sleep, so only
+  the start time is sent and the message says the wake time was ignored; naming
+  a single day is refused rather than silently applied to all seven.
+- **LR4** — no schedule setter exists in the API at all; both paths return the
+  shared `LR4_SCHEDULE_NOTE` pointing at the Whisker app.
+
+`disable` rides on the same `set_sleep(False)` each model already implements
+rather than repeating the dispatch. Days and times are parsed by
+`helpers.parse_day()` / `helpers.parse_clock()` before any call is made, so a
+typo is a local message.
+
+### ~~Contextual sleep/wake toggle~~ ✅
 
 LR4 does not implement `set_sleep_mode` — calling it raises `NotImplementedError`.
 LR3 and LR5 both support it but with different signatures:
@@ -399,10 +416,9 @@ LR3 and LR5 both support it but with different signatures:
 - **LR3**: `set_sleep_mode(value: bool, sleep_time: time | None)`
 - **LR5**: `set_sleep_mode(value: bool, sleep_time: int | time | None, *, wake_time, day_of_week)`
 
-The `sleep` / `wake` commands should detect the robot model and dispatch accordingly:
-- LR3 → `set_sleep_mode(True/False)` (uses current time as sleep start)
-- LR5 → `set_sleep_mode(True/False)` (enables/disables all schedule days)
-- LR4 → explain schedule-based sleep and point to `sleep-schedule` command
+`sleep` / `wake` route through `RobotAdapter.set_sleep()`, which dispatches per
+model: LR3 and LR5 toggle sleep mode, and the LR4 explains its schedule-based
+sleep and points at `sleep-schedule`.
 
 ---
 
@@ -664,9 +680,15 @@ events and relative time (like the status bar's "7d ago") would be cleaner.
 `get_activity_history(limit=25)` is hardcoded. Could support `history 50` or
 `history --all` to page through more results.
 
-### `history --type cat` filter (LR5)
-`robot.get_activities(activity_type="cat_detection")` on LR5 lets you filter to
-only cat visits, only cleans, etc.
+### ~~`history --type cat` filter (LR5)~~ ✅
+`history [count|all] --type <kind>` filters on the LR5 via
+`get_activities(limit, activity_type=…)`. Friendly words map to cloud types in
+`constants.ACTIVITY_TYPES` (`cat` → `PET_VISIT`, `clean` → `CYCLE_COMPLETED`, …)
+and anything unlisted is passed through uppercased, so a type the app doesn't
+know yet is still reachable. The returned dicts are reduced to `Activity`
+objects the shared `format_activity()` already renders. LR3/LR4 have no such
+parameter, so `RobotAdapter.supports_history_filter` is False there and the
+command says so instead of silently returning everything.
 
 ---
 
@@ -1649,7 +1671,7 @@ Ranked by user-visible impact vs. implementation effort:
 5. ~~**Tab-completion for slash commands** (§23)~~ ✅ — Claude Code-style overlay dropdown on `/` keypress; single-source registry drives both dispatch and completion
 6. ~~**`/version` slash command** (§24)~~ ✅ — prints asher-cli / Python / pylitterbot / textual versions to the log via `importlib.metadata`, with a `"?"` fallback when not installed; model badge in the status bar was already done
 7. ~~**`wait-time`, `power`, `rename`, `insight` commands** (§3)~~ ✅ — all four wired up; plus the `status`/`info` split (`status` trimmed to at-a-glance, `info` is the full property dump with power/cycles/litter/brightness/Wi-Fi). `panel-brightness <low|medium|high>` now wired too (the earlier claim it wasn't exposed was stale — it exists on LR4/LR5); `reset`/`reset-settings`/`firmware`-update deliberately omitted as destructive
-8. ~~**Sleep schedule viewer** (§8)~~ ✅ — `sleep-schedule` (alias `sleepschedule`) renders the per-day sleep/wake window read-only, sorted Mon→Sun, with an active-window `● now` marker; config wizard/set/disable still TODO
+8. ~~**Sleep schedule** (§8)~~ ✅ — `sleep-schedule` (alias `sleepschedule`) renders the per-day sleep/wake window, sorted Mon→Sun, with an active-window `● now` marker; `sleep-schedule set <day|all> <HH:MM> <HH:MM>` and `sleep-schedule disable` write it back through the adapter (LR5 per-day, LR3 start-time only, LR4 read-only)
 9. ~~**Headless CLI export** (§25)~~ ✅ — `asher --export 7` writes activity history to CSV without launching the TUI, for cron/Task Scheduler/SSH; `--output` and `--robot` flags, documented exit codes; CSV core shared with the TUI `export` command via `build_history_csv()`
 10. ~~**Full headless command surface** (issue #60)~~ ✅ — every robot command is now an `asher <command>` subcommand backed by the `COMMANDS` registry in `asher/headless.py`, with `--robot`/`--json` and exit code 5 for a rejected command; `--export` stays as a deprecated alias. Slash commands stay TUI-only by design
 
@@ -1663,7 +1685,7 @@ Ranked by user-visible impact vs. implementation effort:
 
 ### Device & platform expansion
 
-1. ~~**LR5 extras** (§4)~~ ✅ — privacy, volume, camera-audio, drawer-reset wired up via `LR5Adapter` (gracefully refused on LR3/LR4 through the base adapter). Night-light colour and filter-reminder remain as smaller follow-ons
+1. ~~**LR5 extras** (§4)~~ ✅ — privacy, volume, camera-audio, drawer-reset, `night-light color <hex>`, the `Filter due` row in `info`, and `history --type` all wired up via `LR5Adapter` (gracefully refused on LR3/LR4 through the base adapter)
 2. **Feeder robot support** (§5) — snack, gravity, meal size commands
 3. **Multi-robot tab view** (§11) — `TabbedContent` widget when `len(robots) > 1`
 

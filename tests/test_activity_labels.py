@@ -132,3 +132,24 @@ class TestActionLabelsIntegrity:
             assert isinstance(raw_str, str) and raw_str
             assert label  # non-empty display label
             assert colour.startswith("#") and len(colour) == 7
+
+
+class TestLR5ActivityTypes:
+    """The LR5 activity endpoint returns type codes, not sentence-style text."""
+
+    def test_pet_visit_reads_as_a_cat_visit(self):
+        label, colour = format_activity(_act("PET_VISIT"))
+        assert label == "Cat visit"
+        assert colour == theme.WARN
+
+    def test_cycle_completed_matches_the_lr4_wording(self):
+        label, _ = format_activity(_act("CYCLE_COMPLETED"))
+        assert label == "Clean cycle complete"
+
+    def test_litter_low_is_translated(self):
+        label, _ = format_activity(_act("LITTER_LOW"))
+        assert label == "Litter low"
+
+    def test_a_cat_detect_still_gains_its_weight_suffix(self):
+        label, _ = format_activity(_act("CAT_DETECT", weight=9.1))
+        assert "9.1 lb" in label

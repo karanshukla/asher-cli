@@ -33,6 +33,7 @@ from datetime import datetime, time
 from typing import TYPE_CHECKING, Any
 
 from .activity_labels import activity_raw_text, format_activity
+from .constants import ACTIVITY_TYPES
 from .export import (
     EXIT_COMMAND_REJECTED,
     EXIT_CONNECTION_FAILURE,
@@ -44,7 +45,19 @@ from .export import (
     resolve_dest,
     resolve_robot,
 )
-from .helpers import fmt_ago, robot_model, status_text
+from .helpers import (
+    DAY_NAMES,
+    activity_type,
+    fmt_ago,
+    fmt_until,
+    hex_colour,
+    parse_clock,
+    parse_day,
+    robot_model,
+    split_type_flag,
+    status_text,
+)
+from .robot_adapters import HISTORY_FILTER_NOTE
 
 if TYPE_CHECKING:
     from .robot_adapters import RobotAdapter
@@ -181,6 +194,7 @@ async def _info(session: Session, args: list[str]) -> Result:
     brightness = getattr(robot, "panel_brightness", None)
     cycles = getattr(robot, "cycle_count", None)
     wait = getattr(robot, "clean_cycle_wait_time_minutes", None)
+    filter_due = getattr(robot, "next_filter_replacement_date", None)
     return _rows(
         [
             ("Name", getattr(robot, "name", "—")),
@@ -196,6 +210,7 @@ async def _info(session: Session, args: list[str]) -> Result:
             ("Drawer", _percent(getattr(robot, "waste_drawer_level", None))),
             ("Litter", _percent(getattr(robot, "litter_level", None))),
             ("Cycles", str(cycles) if cycles is not None else "—"),
+            *([("Filter due", fmt_until(filter_due))] if isinstance(filter_due, datetime) else []),
             ("Online", yes_no(getattr(robot, "is_online", False))),
             ("Last seen", fmt_ago(getattr(robot, "last_seen", None))),
         ]
@@ -266,11 +281,17 @@ def _parse_count(args: list[str]) -> int:
 
 
 async def _history(session: Session, args: list[str]) -> Result:
-    count = _parse_count(args)
-    try:
-        acts = await session.robot.get_activity_history(limit=count)
-    except Exception as exc:
-        raise CommandError(f"Failed to fetch history: {exc}", EXIT_CONNECTION_FAILURE) from exc
+    counts, requested = split_type_flag(args)
+    count = _parse_count(counts)
+    kind = activity_type(requested)
+    if requested is not None and kind is None:
+        raise CommandError(f"Usage: history [count|all] --type <{'|'.join(ACTIVITY_TYPES)}>")
+    if kind is not None and not session.adapter.supports_history_filter:
+        raise CommandError(HISTORY_FILTER_NOTE)
+
+    acts, problem = await session.adapter.get_history(count, kind)
+    if acts is None:
+        raise CommandError(problem, EXIT_CONNECTION_FAILURE)
 
     events: list[dict[str, Any]] = []
     lines: list[str] = []
@@ -319,16 +340,24 @@ async def _insight(session: Session, args: list[str]) -> Result:
     return result
 
 
-_DAY_NAMES = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
-
-
 def _sleep_time(value: object) -> str | None:
     if value is None:
         return None
     return value.strftime("%H:%M") if isinstance(value, time) else str(value)
 
 
+_EVERY_DAY = ("all", "every", "daily", "everyday")
+
+
 async def _sleep_schedule(session: Session, args: list[str]) -> Result:
+    action = args[0].lower() if args else ""
+    if action == "set":
+        return await _set_sleep_window(session, args[1:])
+    if action in ("disable", "off"):
+        return _outcome(*await session.adapter.disable_sleep_schedule())
+    if action:
+        raise CommandError("Usage: sleep-schedule [set <day|all> <HH:MM> <HH:MM> | disable]")
+
     schedule = getattr(session.robot, "sleep_schedule", None)
     if schedule is None:
         return Result(
@@ -346,13 +375,13 @@ async def _sleep_schedule(session: Session, args: list[str]) -> Result:
             continue
         days.append(
             {
-                "day": _DAY_NAMES[index],
+                "day": DAY_NAMES[index],
                 "enabled": bool(getattr(day, "is_enabled", False)),
                 "sleep_time": _sleep_time(getattr(day, "sleep_time", None)),
                 "wake_time": _sleep_time(getattr(day, "wake_time", None)),
             }
         )
-    days.sort(key=lambda entry: _DAY_NAMES.index(entry["day"]))
+    days.sort(key=lambda entry: DAY_NAMES.index(entry["day"]))
 
     lines = [] if enabled else ["Sleep schedule is disabled. Configured windows:"]
     for entry in days:
@@ -363,6 +392,19 @@ async def _sleep_schedule(session: Session, args: list[str]) -> Result:
         )
         lines.append(f"  {entry['day']}  {window}")
     return Result(data={"enabled": enabled, "days": days}, lines=lines)
+
+
+async def _set_sleep_window(session: Session, args: list[str]) -> Result:
+    if len(args) < 3:
+        raise CommandError("Usage: sleep-schedule set <day|all> <HH:MM> <HH:MM>")
+    day_arg = args[0].lower()
+    weekday = None if day_arg in _EVERY_DAY else parse_day(day_arg)
+    if weekday is None and day_arg not in _EVERY_DAY:
+        raise CommandError(f"Unknown day '{args[0]}' — use {'/'.join(DAY_NAMES)} or 'all'")
+    sleep, wake = parse_clock(args[1]), parse_clock(args[2])
+    if sleep is None or wake is None:
+        raise CommandError("Times must be 24-hour HH:MM — e.g. sleep-schedule set all 22:00 07:00")
+    return _outcome(*await session.adapter.set_sleep_window(weekday, sleep, wake))
 
 
 # ── actions ──────────────────────────────────────────────────────────────────
@@ -396,8 +438,13 @@ async def _wake(session: Session, args: list[str]) -> Result:
 
 async def _night_light(session: Session, args: list[str]) -> Result:
     mode = args[0].lower() if args else ""
+    if mode in ("color", "colour"):
+        colour = hex_colour(args[1]) if len(args) > 1 else None
+        if colour is None:
+            raise CommandError("Usage: night-light color <hex>")
+        return _outcome(*await session.adapter.set_night_light_color(colour))
     if mode not in ("on", "off", "auto"):
-        raise CommandError("Usage: night-light on|off|auto")
+        raise CommandError("Usage: night-light on|off|auto|color <hex>")
     return _outcome(*await session.adapter.set_night_light(mode))
 
 
@@ -493,15 +540,30 @@ COMMANDS: tuple[HeadlessCommand, ...] = (
     HeadlessCommand("info", "info", "full robot details (model, serial, firmware, …)", _info),
     HeadlessCommand("robots", "robots", "list robots on the account", _robots),
     HeadlessCommand("pets", "pets", "list pets on the account", _pets),
-    HeadlessCommand("history", "history [count|all]", "recent activity (default: 50)", _history),
+    HeadlessCommand(
+        "history",
+        "history [count|all] [--type <kind>]",
+        "recent activity (default: 50; --type filters on LR5)",
+        _history,
+    ),
     HeadlessCommand("insight", "insight [days]", "cycle-usage statistics", _insight),
-    HeadlessCommand("sleep-schedule", "sleep-schedule", "per-day sleep windows", _sleep_schedule),
+    HeadlessCommand(
+        "sleep-schedule",
+        "sleep-schedule [set <day|all> <HH:MM> <HH:MM> | disable]",
+        "show or change the per-day sleep windows",
+        _sleep_schedule,
+    ),
     HeadlessCommand("clean", "clean", "start a clean cycle", _clean),
     HeadlessCommand("lock", "lock", "lock the control panel", _lock),
     HeadlessCommand("unlock", "unlock", "unlock the control panel", _unlock),
     HeadlessCommand("sleep", "sleep", "enable sleep mode", _sleep),
     HeadlessCommand("wake", "wake", "disable sleep mode", _wake),
-    HeadlessCommand("night-light", "night-light on|off|auto", "set night light mode", _night_light),
+    HeadlessCommand(
+        "night-light",
+        "night-light on|off|auto|color <hex>",
+        "set night light mode, or its colour (LR5)",
+        _night_light,
+    ),
     HeadlessCommand(
         "night-light-brightness",
         "night-light-brightness <level>",
