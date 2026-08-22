@@ -44,7 +44,7 @@ from .export import (
     resolve_dest,
     resolve_robot,
 )
-from .helpers import fmt_ago, robot_model
+from .helpers import fmt_ago, robot_model, status_text
 
 if TYPE_CHECKING:
     from .robot_adapters import RobotAdapter
@@ -131,14 +131,6 @@ def _int_arg(args: list[str], usage: str) -> int:
 # ── robot state ──────────────────────────────────────────────────────────────
 
 
-def _status_text(status: object) -> str:
-    """``LitterBoxStatus`` is a plain Enum, so its readable form lives on ``.text``."""
-    if status is None:
-        return "—"
-    text = getattr(status, "text", None)
-    return text if isinstance(text, str) else str(status)
-
-
 _POWER_LABELS = {"AC": "AC (mains)", "DC": "Battery", "NC": "Off/unknown"}
 
 
@@ -164,7 +156,7 @@ async def _status(session: Session, args: list[str]) -> Result:
         [
             ("Name", getattr(robot, "name", "—")),
             ("Online", "yes" if getattr(robot, "is_online", False) else "no"),
-            ("Status", _status_text(getattr(robot, "status", None))),
+            ("Status", status_text(getattr(robot, "status", None))),
             ("Drawer", _percent(getattr(robot, "waste_drawer_level", None))),
             ("Litter", _percent(getattr(robot, "litter_level", None))),
             ("Cat weight", _weight(robot)),

@@ -27,7 +27,7 @@ from textual.widgets import Input, RichLog, Static
 from .. import theme
 from ..completion import enter_completes, render_completion, slash_matches
 from ..export import ExportError, build_history_csv, resolve_dest
-from ..helpers import fmt_ago, robot_model, ts
+from ..helpers import fmt_ago, robot_model, status_text, ts
 from ..history_view import HistoryScreen
 from ..login_flow import LoginFlow, LoginState
 from .base import Command, CommandRegistry, SlashCommand
@@ -41,22 +41,6 @@ def _fmt_wait_time(minutes: object) -> str:
         return f"{int(float(str(minutes)))} min"
     except (TypeError, ValueError):
         return "—"
-
-
-def _status_text(status: object) -> str:
-    """Render a robot status as human-readable text.
-
-    ``LitterBoxStatus`` is a plain ``Enum`` (not ``StrEnum``), so ``str()`` yields
-    the verbose ``"LitterBoxStatus.READY"``; the readable form ("Ready") lives in
-    its ``text`` property. Falls back to ``str()`` for plain strings, and to an
-    em dash when status is missing.
-    """
-    if status is None:
-        return "—"
-    text = getattr(status, "text", None)
-    if isinstance(text, str):
-        return text
-    return str(status)
 
 
 _POWER_LABELS = {"AC": "AC (mains)", "DC": "Battery", "NC": "Off/unknown"}
@@ -188,7 +172,7 @@ class StatusCommand(Command):
         last_seen = getattr(app, "_last_cat_seen", None) or getattr(r, "last_seen", None)
         rows = [
             ("Online", "yes" if getattr(r, "is_online", False) else "no"),
-            ("Status", _status_text(getattr(r, "status", None))),
+            ("Status", status_text(getattr(r, "status", None))),
             ("Drawer", f"{float(getattr(r, 'waste_drawer_level', 0) or 0):.0f}%"),
             ("Last seen", fmt_ago(last_seen)),
             ("Cat weight", weight),
