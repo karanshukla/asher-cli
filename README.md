@@ -10,7 +10,9 @@
 
 A Claude Code-style terminal dashboard for monitoring and controlling Litter Robot via the Whisker cloud API.
 
-<img width="808" height="351" alt="image" src="https://github.com/user-attachments/assets/6599966f-837c-419c-8692-bfda3533e730" />
+<img width="1165" height="885" alt="image" src="https://github.com/user-attachments/assets/03be7ed3-95f6-45cf-93db-cf5bf84d6499" />
+
+<img width="1165" height="885" alt="image" src="https://github.com/user-attachments/assets/5aa60ff1-6e6b-4c71-8376-d96d52d96809" />
 
 ## Features
 
