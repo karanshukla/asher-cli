@@ -3,13 +3,13 @@ revision = 3
 requires-python = ">=3.10"
 resolution-markers = [
     "python_full_version >= '3.15' and sys_platform == 'win32'",
-    "python_full_version == '3.14.*' and sys_platform == 'win32'",
     "python_full_version >= '3.15' and sys_platform != 'win32'",
+    "python_full_version == '3.14.*' and sys_platform == 'win32'",
     "python_full_version == '3.14.*' and sys_platform != 'win32'",
-    "python_full_version >= '3.11' and python_full_version < '3.14' and sys_platform == 'win32'",
-    "python_full_version < '3.11' and sys_platform == 'win32'",
     "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten'",
+    "python_full_version >= '3.11' and python_full_version < '3.14' and sys_platform == 'win32'",
     "(python_full_version >= '3.11' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32') or (python_full_version == '3.11.*' and sys_platform == 'emscripten')",
+    "python_full_version < '3.11' and sys_platform == 'win32'",
     "python_full_version < '3.11' and sys_platform != 'win32'",
 ]
 
@@ -269,8 +269,8 @@ requires-dist = [
     { name = "pillow", marker = "extra == 'tray'", specifier = ">=10.0" },
     { name = "plyer", specifier = ">=2.1.0" },
     { name = "pygobject", marker = "sys_platform == 'linux' and extra == 'tray'", specifier = ">=3.42" },
-    { name = "pylitterbot", specifier = "==2025.6.4" },
-    { name = "pylitterbot", extras = ["mcp"], marker = "extra == 'mcp'", specifier = "==2025.6.4" },
+    { name = "pylitterbot", specifier = "==2025.6.5" },
+    { name = "pylitterbot", extras = ["mcp"], marker = "extra == 'mcp'", specifier = "==2025.6.5" },
     { name = "pystray", marker = "extra == 'tray'", specifier = ">=0.19" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "rich", specifier = ">=13.0.0" },
@@ -2585,7 +2585,7 @@ crypto = [
 
 [[package]]
 name = "pylitterbot"
-version = "2025.6.4"
+version = "2025.6.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -2593,9 +2593,9 @@ dependencies = [
     { name = "pycognito" },
     { name = "pyjwt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/74/19/84f7d5078ef3add6ee8e9b9972020a47d0489f1eb88d6a6a0876d7acdee4/pylitterbot-2025.6.4.tar.gz", hash = "sha256:9ab5cbf81151ff5d073990b443c1dcf73255064a896ba8b9aada62efba83f5b9", size = 68685, upload-time = "2026-08-03T16:17:27.841Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/83/33/7768130bdb281c4523e4af96b212d6364d911adb4dd9e07bded0e4abb133/pylitterbot-2025.6.5.tar.gz", hash = "sha256:6128c00385fbf843c51f379983221a2a8a71003aa9e6e1771d37bf6b337c7a5d", size = 68619, upload-time = "2026-09-04T22:32:40.031Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0d/44/da42aa0bbb16b7e962cec8114327336be5e33fe54b055a6edb708598542b/pylitterbot-2025.6.4-py3-none-any.whl", hash = "sha256:c402a7de7c1e303b1b6fa9d31b2373fa85146108c1536ef3f614ef5023043283", size = 85767, upload-time = "2026-08-03T16:17:28.646Z" },
+    { url = "https://files.pythonhosted.org/packages/88/ba/b87cf7bad59f0ef1cb2484ca1e148f0393a08e17e62f2a4befed813dafc6/pylitterbot-2025.6.5-py3-none-any.whl", hash = "sha256:d9cf5f855b106b17d84dce6dc8c0d89c387a9254eb7418e0ea78ea5bbe89af13", size = 85682, upload-time = "2026-09-04T22:32:38.942Z" },
 ]
 
 [package.optional-dependencies]
@@ -3063,11 +3063,11 @@ version = "2026.6.3"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.15' and sys_platform == 'win32'",
-    "python_full_version == '3.14.*' and sys_platform == 'win32'",
     "python_full_version >= '3.15' and sys_platform != 'win32'",
+    "python_full_version == '3.14.*' and sys_platform == 'win32'",
     "python_full_version == '3.14.*' and sys_platform != 'win32'",
-    "python_full_version >= '3.11' and python_full_version < '3.14' and sys_platform == 'win32'",
     "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten'",
+    "python_full_version >= '3.11' and python_full_version < '3.14' and sys_platform == 'win32'",
     "(python_full_version >= '3.11' and python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32') or (python_full_version == '3.11.*' and sys_platform == 'emscripten')",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/aa/2a/9618a122aeb2a169a28b03889a2995fe297588964333d4a7d67bdf46e147/rpds_py-2026.6.3.tar.gz", hash = "sha256:1cebd1337c242e4ec2293e541f712b2da849b29f48f0c293684b71c0632625d4", size = 64051, upload-time = "2026-06-30T07:17:53.009Z" }

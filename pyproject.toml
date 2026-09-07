@@ -17,7 +17,7 @@ classifiers = [
     "Topic :: Home Automation",
 ]
 dependencies = [
-    "pylitterbot==2025.6.4",
+    "pylitterbot==2025.6.5",
     "textual>=0.47.0",
     "rich>=13.0.0",
     "python-dotenv>=1.0.0",
@@ -30,7 +30,7 @@ dependencies = [
 # pylitterbot asks for mcp[cli]>=1.0.0 with no upper bound, but its server does
 # `from mcp.server.fastmcp import FastMCP`, and mcp 2.0 deleted that module.
 # Cap it here until pylitterbot ships a 2.x-compatible release.
-mcp = ["pylitterbot[mcp]==2025.6.4", "mcp<2"]
+mcp = ["pylitterbot[mcp]==2025.6.5", "mcp<2"]
 # PyGObject is what puts pystray on its AppIndicator backend. Without it pystray
 # silently falls back to a legacy XEmbed icon, which KDE Plasma and GNOME no
 # longer host at all — the watcher runs, draws an icon, and nothing shows it.
