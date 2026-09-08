@@ -41,7 +41,8 @@
         "pin"
       ],
       "automerge": true,
-      "platformAutomerge": true
+      "platformAutomerge": true,
+      "automergeStrategy": "squash"
     }
   ]
 }
