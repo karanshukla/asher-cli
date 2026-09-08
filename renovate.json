@@ -1,22 +1,47 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"],
+  "extends": [
+    "config:recommended"
+  ],
   "packageRules": [
     {
-      "matchManagers": ["pep621"],
+      "matchManagers": [
+        "pep621"
+      ],
       "enabled": false
     },
     {
-      "matchManagers": ["pep621"],
-      "matchPackageNames": ["pylitterbot"],
+      "matchManagers": [
+        "pep621"
+      ],
+      "matchPackageNames": [
+        "pylitterbot"
+      ],
       "enabled": true,
-      "schedule": ["before 9am on Monday"]
+      "schedule": [
+        "before 9am on Monday"
+      ]
     },
     {
-      "matchManagers": ["github-actions"],
+      "matchManagers": [
+        "github-actions"
+      ],
       "pinDigests": true,
       "enabled": true,
-      "schedule": ["before 9am on Monday"]
+      "schedule": [
+        "before 9am on Monday"
+      ]
+    },
+    {
+      "description": "Auto-merge non-major updates once required checks pass; majors still get manual review.",
+      "matchUpdateTypes": [
+        "patch",
+        "minor",
+        "digest",
+        "pin"
+      ],
+      "automerge": true,
+      "platformAutomerge": true
     }
   ]
 }
