@@ -6,24 +6,6 @@
   "packageRules": [
     {
       "matchManagers": [
-        "pep621"
-      ],
-      "enabled": false
-    },
-    {
-      "matchManagers": [
-        "pep621"
-      ],
-      "matchPackageNames": [
-        "pylitterbot"
-      ],
-      "enabled": true,
-      "schedule": [
-        "before 9am on Monday"
-      ]
-    },
-    {
-      "matchManagers": [
         "github-actions"
       ],
       "pinDigests": true,

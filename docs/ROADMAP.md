@@ -1414,11 +1414,10 @@ stretch goal.
 
 The project uses **Renovate** (`renovate.json`), not Dependabot — it handles
 `uv.lock` better and is more configurable. The config extends
-`config:recommended`, runs weekly (Mondays), and — critically for this project —
-**pins `pylitterbot` to require manual review**: the Whisker API is
-reverse-engineered and a minor version bump could change method names or
-response schemas, so it should never be auto-merged. GitHub Actions are pinned
-to commit SHAs and also bumped weekly.
+`config:recommended`, so all Python dependencies get regular update PRs.
+Patch/minor/digest/pin updates auto-merge once required checks pass; majors
+wait for manual review. GitHub Actions are pinned to commit SHAs and bumped
+weekly (Mondays).
 
 ### Branch strategy
 
@@ -1681,7 +1680,7 @@ Ranked by user-visible impact vs. implementation effort:
 2. ~~**CI/CD pipeline**~~ ✅ — lint + test + release workflows in `.github/workflows/`
 3. ~~**Versioning discipline** (§20)~~ ✅ — `bump-my-version` configured with auto-commit + auto-tag (`v{x.y.z}`); `CHANGELOG.md` auto-generated from conventional commits via git-cliff (`cliff.toml` + `poe changelog` task + CI release notes)
 4. **Standalone binary** (§16) — PyInstaller `.exe` + macOS/Linux builds via CI matrix
-5. ~~**Dependabot / Renovate** (§21)~~ ✅ — Renovate (`renovate.json`) live, weekly, `pylitterbot` pinned to manual review
+5. ~~**Dependabot / Renovate** (§21)~~ ✅ — Renovate (`renovate.json`) live, non-major updates auto-merge
 
 ### Device & platform expansion
 
