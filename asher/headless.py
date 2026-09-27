@@ -13,12 +13,12 @@ Design constraints that shape the code here:
 
 * **No Textual.** Commands render plain strings and never touch a widget, so the
   module imports cleanly (and fast) in a scheduled task.
-* **Model differences go through** :class:`~asher.robot_adapters.RobotAdapter`,
+* **Model differences go through** :class:`~asher.robot.adapters.RobotAdapter`,
   exactly as the TUI commands do — LR3/LR4/LR5 quirks stay in one place.
 * **Every command returns a** :class:`Result`, which carries both the
   human-readable lines and a JSON payload. ``--json`` picks the other rendering
   of the same data rather than taking a separate code path.
-* **Exit codes are the contract** (see :mod:`asher.export`): a script checks
+* **Exit codes are the contract** (see :mod:`asher.core.export`): a script checks
   ``$?`` rather than parsing text.
 """
 
@@ -32,9 +32,9 @@ from dataclasses import dataclass, field
 from datetime import datetime, time
 from typing import TYPE_CHECKING, Any
 
-from .activity_labels import activity_raw_text, format_activity
-from .constants import ACTIVITY_TYPES
-from .export import (
+from .core.activity import activity_raw_text, format_activity
+from .core.constants import ACTIVITY_TYPES
+from .core.export import (
     EXIT_COMMAND_REJECTED,
     EXIT_CONNECTION_FAILURE,
     EXIT_NO_ROBOT_MATCH,
@@ -45,7 +45,7 @@ from .export import (
     resolve_dest,
     resolve_robot,
 )
-from .helpers import (
+from .core.helpers import (
     DAY_NAMES,
     activity_type,
     fmt_ago,
@@ -57,11 +57,13 @@ from .helpers import (
     split_type_flag,
     status_text,
 )
-from .robot_adapters import HISTORY_FILTER_NOTE
+from .robot.adapters import HISTORY_FILTER_NOTE
 
 if TYPE_CHECKING:
-    from .robot_adapters import RobotAdapter
-    from .robot_protocol import RobotProtocol
+    import argparse
+
+    from .robot.adapters import RobotAdapter
+    from .robot.protocol import RobotProtocol
 
 _MAX_HISTORY = 500
 _DEFAULT_HISTORY = 50
@@ -596,19 +598,19 @@ COMMANDS_BY_NAME: dict[str, HeadlessCommand] = {cmd.name: cmd for cmd in COMMAND
 async def open_session(robot_selector: str | None, output: str | None = None) -> Session:
     """Authenticate and pick the robot to act on.
 
-    Raises :class:`~asher.connection.HeadlessAuthError` when credentials are
+    Raises :class:`~asher.core.credentials.HeadlessAuthError` when credentials are
     missing or the cloud is unreachable, and :class:`CommandError` when the
     account has no robots or ``robot_selector`` matches none of them.
     """
-    from .connection import _connect_headless, _keyring_load_robot  # noqa: PLC0415
+    from .core import credentials  # noqa: PLC0415
 
-    account = await _connect_headless()
+    account = await credentials.connect_headless()
     robots = list(getattr(account, "robots", []))
     pets = list(getattr(account, "pets", []))
     if not robots:
         raise CommandError("No Litter Robots found on this account.", EXIT_CONNECTION_FAILURE)
 
-    robot = resolve_robot(robots, robot_selector, _keyring_load_robot())
+    robot = resolve_robot(robots, robot_selector, credentials.load_preferred_robot())
     if robot is None:
         available = "\n".join(
             f"  [{index}] {getattr(rb, 'name', '?')}" for index, rb in enumerate(robots)
@@ -618,7 +620,7 @@ async def open_session(robot_selector: str | None, output: str | None = None) ->
             EXIT_NO_ROBOT_MATCH,
         )
 
-    from .robot_adapters import make_adapter  # noqa: PLC0415
+    from .robot.adapters import make_adapter  # noqa: PLC0415
 
     return Session(
         account=account,
@@ -647,7 +649,7 @@ async def run(
     Prints the result to stdout and any failure message to stderr, so callers
     only have to propagate the return value.
     """
-    from .connection import HeadlessAuthError  # noqa: PLC0415
+    from .core import credentials  # noqa: PLC0415
 
     command = COMMANDS_BY_NAME.get(name)
     if command is None:
@@ -658,7 +660,7 @@ async def run(
     try:
         session = await open_session(robot, output)
         result = await command.handler(session, args or [])
-    except HeadlessAuthError as exc:
+    except credentials.HeadlessAuthError as exc:
         print(str(exc), file=sys.stderr)
         return exc.code
     except (CommandError, ExportError) as exc:
@@ -678,3 +680,24 @@ async def _disconnect(session: Session) -> None:
     """Close the cloud session so the process can exit promptly."""
     with contextlib.suppress(Exception):
         await session.account.disconnect()
+
+
+async def run_legacy_export(args: argparse.Namespace) -> int:
+    """Legacy ``asher --export`` entry point — delegates to the headless runner.
+
+    ``asher export 7`` and ``asher --export 7`` must produce byte-identical CSVs,
+    so the flag form is a thin translation onto the ``export`` command rather
+    than a second implementation.
+    """
+    try:
+        parse_days(args.export)
+    except ExportError as exc:
+        print(str(exc), file=sys.stderr)
+        return exc.code
+
+    return await run(
+        "export",
+        [args.export] if args.export else [],
+        robot=args.robot,
+        output=args.output,
+    )

@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from asher.commands import McpCommand
+from asher.tui.commands.slash import McpCommand
 
 
 async def _make_awaitable(value):
@@ -33,7 +33,7 @@ class TestMcpCommand:
     async def test_on_without_credentials_logs_error(self, app, monkeypatch):
         monkeypatch.delenv("LITTER_ROBOT_USER", raising=False)
         monkeypatch.delenv("LITTER_ROBOT_PASSWORD", raising=False)
-        with patch("asher.connection._keyring_load", return_value=("", "")):
+        with patch("asher.core.credentials.load", return_value=("", "")):
             await McpCommand().run(app, ["on"])
         app._log_err.assert_called_once()
 
@@ -43,8 +43,8 @@ class TestMcpCommand:
         monkeypatch.setenv("LITTER_ROBOT_PASSWORD", "envpw")
         monkeypatch.delenv("ASHER_CLI_DEV_MODE", raising=False)
         with (
-            patch("asher.connection._keyring_load", return_value=("", "")),
-            patch("asher.connection._keyring_save", return_value=True) as mock_save,
+            patch("asher.core.credentials.load", return_value=("", "")),
+            patch("asher.core.credentials.save", return_value=True) as mock_save,
         ):
             await McpCommand().run(app, ["on"])
         mock_save.assert_not_called()
@@ -55,10 +55,10 @@ class TestMcpCommand:
         monkeypatch.setenv("LITTER_ROBOT_PASSWORD", "envpw")
         monkeypatch.setenv("ASHER_CLI_DEV_MODE", "true")
         with (
-            patch("asher.connection._keyring_load", return_value=("", "")),
-            patch("asher.connection._keyring_save", return_value=True) as mock_save,
-            patch("asher.mcp_config.mcp_extra_installed", return_value=True),
-            patch("asher.mcp_config.set_mcp_enabled", return_value=[Path("x")]),
+            patch("asher.core.credentials.load", return_value=("", "")),
+            patch("asher.core.credentials.save", return_value=True) as mock_save,
+            patch("asher.mcp.config.mcp_extra_installed", return_value=True),
+            patch("asher.mcp.config.set_mcp_enabled", return_value=[Path("x")]),
         ):
             await McpCommand().run(app, ["on"])
         mock_save.assert_called_once_with("env@example.com", "envpw")
@@ -66,9 +66,9 @@ class TestMcpCommand:
 
     async def test_on_with_credentials_enables_server(self, app):
         with (
-            patch("asher.connection._keyring_load", return_value=("a@b.com", "pw")),
-            patch("asher.mcp_config.mcp_extra_installed", return_value=True),
-            patch("asher.mcp_config.set_mcp_enabled", return_value=[Path("x")]) as mock_set,
+            patch("asher.core.credentials.load", return_value=("a@b.com", "pw")),
+            patch("asher.mcp.config.mcp_extra_installed", return_value=True),
+            patch("asher.mcp.config.set_mcp_enabled", return_value=[Path("x")]) as mock_set,
         ):
             await McpCommand().run(app, ["on"])
         mock_set.assert_called_once_with(True)
@@ -79,10 +79,10 @@ class TestMcpCommand:
         proc.communicate = MagicMock(return_value=_await_result((b"installed\n", None)))
         proc.returncode = 0
         with (
-            patch("asher.connection._keyring_load", return_value=("a@b.com", "pw")),
-            patch("asher.mcp_config.mcp_extra_installed", return_value=False),
+            patch("asher.core.credentials.load", return_value=("a@b.com", "pw")),
+            patch("asher.mcp.config.mcp_extra_installed", return_value=False),
             patch("asyncio.create_subprocess_exec", return_value=proc),
-            patch("asher.mcp_config.set_mcp_enabled", return_value=[Path("x")]) as mock_set,
+            patch("asher.mcp.config.set_mcp_enabled", return_value=[Path("x")]) as mock_set,
         ):
             await McpCommand().run(app, ["on"])
         mock_set.assert_called_once_with(True)
@@ -92,23 +92,23 @@ class TestMcpCommand:
         proc.communicate = MagicMock(return_value=_await_result((b"boom\n", None)))
         proc.returncode = 1
         with (
-            patch("asher.connection._keyring_load", return_value=("a@b.com", "pw")),
-            patch("asher.mcp_config.mcp_extra_installed", return_value=False),
+            patch("asher.core.credentials.load", return_value=("a@b.com", "pw")),
+            patch("asher.mcp.config.mcp_extra_installed", return_value=False),
             patch("asyncio.create_subprocess_exec", return_value=proc),
-            patch("asher.mcp_config.set_mcp_enabled") as mock_set,
+            patch("asher.mcp.config.set_mcp_enabled") as mock_set,
         ):
             await McpCommand().run(app, ["on"])
         mock_set.assert_not_called()
         app._log_err.assert_called()
 
     async def test_off_disables_server(self, app):
-        with patch("asher.mcp_config.set_mcp_enabled", return_value=[Path("x")]) as mock_set:
+        with patch("asher.mcp.config.set_mcp_enabled", return_value=[Path("x")]) as mock_set:
             await McpCommand().run(app, ["off"])
         mock_set.assert_called_once_with(False)
         app._log_ok.assert_called_once()
 
     async def test_off_when_already_disabled_logs_info_not_ok(self, app):
-        with patch("asher.mcp_config.set_mcp_enabled", return_value=[]):
+        with patch("asher.mcp.config.set_mcp_enabled", return_value=[]):
             await McpCommand().run(app, ["off"])
         app._log_ok.assert_not_called()
         app._log_info.assert_called_once()
@@ -118,10 +118,10 @@ class TestMcpCommand:
         monkeypatch.delenv("LITTER_ROBOT_PASSWORD", raising=False)
         with (
             patch(
-                "asher.mcp_config.mcp_status",
+                "asher.mcp.config.mcp_status",
                 return_value=[(Path("/x/claude_desktop_config.json"), True)],
             ),
-            patch("asher.connection._keyring_load", return_value=("a@b.com", "pw")),
+            patch("asher.core.credentials.load", return_value=("a@b.com", "pw")),
         ):
             await McpCommand().run(app, ["status"])
         assert app._log_info.call_count == 2

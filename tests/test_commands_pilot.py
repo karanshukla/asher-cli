@@ -1,4 +1,4 @@
-"""Integration tests for asher.commands using Textual's Pilot."""
+"""Integration tests for asher.tui.commands using Textual's Pilot."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from asher.app import AsherApp
-from asher.robot_adapters import LR3Adapter
+from asher.robot.adapters import LR3Adapter
+from asher.tui.app import AsherApp
 
 
 @pytest.fixture
@@ -167,7 +167,7 @@ async def test_night_light_on_command(connected_app):
 async def test_command_shows_error_when_not_connected():
     """Test that commands show error when no robot is connected."""
     with (
-        patch("asher.connection._keyring_available", return_value=False),
+        patch("asher.core.credentials.keyring_available", return_value=False),
         patch("os.getenv", return_value=""),
     ):
         app = AsherApp()
@@ -189,10 +189,10 @@ async def test_command_shows_error_when_not_connected():
 async def test_slash_login_command_starts_login_flow():
     """Test that '/login' command starts login flow."""
     with (
-        patch("asher.connection._keyring_available", return_value=False),
+        patch("asher.core.credentials.keyring_available", return_value=False),
         # The cached-token path runs before the keyring check, so without this
         # the app signs in for real on any machine whose keyring holds a token.
-        patch("asher.connection._keyring_load_token", return_value=None),
+        patch("asher.core.credentials.load_token", return_value=None),
         patch("os.getenv", return_value=""),
     ):
         app = AsherApp()
@@ -204,7 +204,7 @@ async def test_slash_login_command_starts_login_flow():
             await pilot.press("enter")
             await pilot.pause()
             # Login state should be set
-            from asher.login_flow import LoginState
+            from asher.tui.loginflow import LoginState
 
             assert app._login.state is LoginState.AWAITING_EMAIL
 
@@ -246,7 +246,7 @@ async def test_unknown_command_shows_warning(connected_app):
 async def test_slash_quit_exits_app():
     """Test that '/quit' command exits the app."""
     with (
-        patch("asher.connection._keyring_available", return_value=False),
+        patch("asher.core.credentials.keyring_available", return_value=False),
         patch("os.getenv", return_value=""),
     ):
         app = AsherApp()
@@ -264,9 +264,9 @@ async def test_slash_quit_exits_app():
 async def test_login_does_not_save_credentials_on_auth_failure():
     """Test that failed login does not persist credentials to the keyring."""
     with (
-        patch("asher.connection._keyring_available", return_value=False),
+        patch("asher.core.credentials.keyring_available", return_value=False),
         patch("os.getenv", return_value=""),
-        patch("asher.connection._keyring_save") as mock_keyring_save,
+        patch("asher.core.credentials.save") as mock_keyring_save,
         patch("pylitterbot.Account") as MockAccount,
     ):
         MockAccount.return_value.connect = AsyncMock(side_effect=Exception("Invalid credentials"))

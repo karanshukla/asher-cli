@@ -6,7 +6,7 @@ user-invocable: false
 
 # pylitterbot Confirmed API Surface
 
-Load this skill whenever working on `asher/commands/`, `asher/monitoring/`, `asher/robot_adapters.py`, or anything that touches `robot.*`.
+Load this skill whenever working on `asher/tui/commands/`, `asher/tui/monitoring.py`, `asher/robot/adapters.py`, or anything that touches `robot.*`.
 
 ## Robot attributes (LR4 confirmed)
 
@@ -54,7 +54,7 @@ model_name = type(robot).__name__  # "LitterRobot4", "LitterRobot3", etc.
 | `set_sleep_mode()` | Simple on/off | Per-weekday schedule | TBD |
 | Night light | `set_night_light_brightness(int)` | `set_night_light_mode(NightLightMode)` | TBD |
 
-Use `asher/robot_adapters.py` for all model-specific dispatch — do not branch on `type(robot).__name__` inline in command handlers.
+Use `asher/robot/adapters.py` for all model-specific dispatch — do not branch on `type(robot).__name__` inline in command handlers.
 
 ## Timing / cloud queuing gotcha
 

@@ -1,4 +1,4 @@
-"""Tests for asher.autostart — login items on launchd, systemd, and the registry.
+"""Tests for asher.desktop.autostart — login items on launchd, systemd, and the registry.
 
 Each backend is driven directly rather than through the platform dispatch, so
 all three are covered on every CI runner. External commands (``launchctl``,
@@ -15,8 +15,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from asher import autostart
-from asher.autostart import (
+from asher.desktop import autostart
+from asher.desktop.autostart import (
     AutostartError,
     LaunchdAutostart,
     RegistryAutostart,

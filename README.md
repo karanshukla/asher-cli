@@ -29,7 +29,7 @@ A Claude Code-style terminal dashboard for monitoring and controlling Litter Rob
 - Headless mode — every robot command also runs without the TUI (`asher status`, `asher clean`, `asher night-light auto`, `asher export 7`), with `--json` output and documented exit codes for cron / Task Scheduler / SSH
 - Background watcher — `asher watch start` detaches a notifier process that keeps toasting faults, a filling drawer, and offline/online changes **after you close the terminal**; `asher watch enable` starts it at login (launchd / systemd / registry); optional system-tray icon shows live status with Open Asher / Notifications / Quit
 - Update notices — checks PyPI once a day and tells you when a newer release exists, with the right upgrade command for how you installed it. It never installs anything itself
-- Catppuccin Mocha throughout — one palette in `asher/theme.py` drives the TUI stylesheet and every Rich style
+- Catppuccin Mocha throughout — one palette in `asher/core/theme.py` drives the TUI stylesheet and every Rich style
 - Cat animation panel that reacts to robot state
 - Command history (↑/↓ arrows)
 - Real-time updates via WebSocket; 5-minute poll fallback

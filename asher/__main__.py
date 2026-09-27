@@ -22,7 +22,7 @@ import argparse
 import asyncio
 import sys
 
-from .daemon import ACTIONS as DAEMON_ACTIONS
+from .desktop.daemon import ACTIONS as DAEMON_ACTIONS
 from .headless import COMMANDS
 
 
@@ -156,12 +156,12 @@ def main() -> None:
     args = _build_parser().parse_args()
 
     if args.command == "watch":
-        from .daemon import dispatch  # noqa: PLC0415
+        from .desktop.daemon import dispatch  # noqa: PLC0415
 
         sys.exit(dispatch(args.action, robot=args.robot, tray=not args.no_tray))
 
     if args.command == "update":
-        from .updates import report  # noqa: PLC0415
+        from .core.updates import report  # noqa: PLC0415
 
         up_to_date, message = report(as_json=args.json)
         print(message)
@@ -183,11 +183,11 @@ def main() -> None:
         )
 
     if args.export is not None:
-        from .export import _run_headless_export  # noqa: PLC0415
+        from .headless import run_legacy_export  # noqa: PLC0415
 
-        sys.exit(asyncio.run(_run_headless_export(args)))
+        sys.exit(asyncio.run(run_legacy_export(args)))
 
-    from .app import AsherApp  # noqa: PLC0415
+    from .tui.app import AsherApp  # noqa: PLC0415
 
     AsherApp().run()
 

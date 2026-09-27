@@ -1,4 +1,4 @@
-"""Tests for asher.monitoring module."""
+"""Tests for asher.tui.monitoring module."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import pytest
 from pylitterbot.enums import LitterBoxStatus
 from textual.css.query import NoMatches
 
-from asher.monitoring import MonitoringMixin
+from asher.tui.monitoring import MonitoringMixin
 
 
 class TestMonitoringMixinStructure:
@@ -265,7 +265,7 @@ class TestNotifyFault:
     def _no_watcher_running(self):
         """The TUI suppresses its own toasts while a watcher is running, so
         these would otherwise fail on any machine that has one started."""
-        with patch("asher.daemon.running_pid", return_value=None):
+        with patch("asher.desktop.daemon.running_pid", return_value=None):
             yield
 
     def _mixin(self, prev: set[str] | None = None, notifications: bool = True, sound: bool = False):
@@ -290,7 +290,7 @@ class TestNotifyFault:
         m = self._mixin()
         robot = _healthy_robot()
         robot.globe_motor_fault_status = GlobeMotorFaultStatus.FAULT_OVERTORQUE_AMP
-        with patch("asher.notifications.fire") as mock_fire:
+        with patch("asher.desktop.notifications.fire") as mock_fire:
             MonitoringMixin._refresh_faults(m, robot)
         mock_fire.assert_called_once()
         assert "TestBot" in mock_fire.call_args.args[0]
@@ -302,7 +302,7 @@ class TestNotifyFault:
         robot = _healthy_robot()
         robot.globe_motor_fault_status = GlobeMotorFaultStatus.FAULT_OVERTORQUE_AMP
         m = self._mixin(prev={"GLOBE MOTOR FAULT"})  # already known
-        with patch("asher.notifications.fire") as mock_fire:
+        with patch("asher.desktop.notifications.fire") as mock_fire:
             MonitoringMixin._refresh_faults(m, robot)
         mock_fire.assert_not_called()
 
@@ -312,7 +312,7 @@ class TestNotifyFault:
         m = self._mixin(notifications=False)
         robot = _healthy_robot()
         robot.globe_motor_fault_status = GlobeMotorFaultStatus.FAULT_OVERTORQUE_AMP
-        with patch("asher.notifications.fire") as mock_fire:
+        with patch("asher.desktop.notifications.fire") as mock_fire:
             MonitoringMixin._refresh_faults(m, robot)
         mock_fire.assert_not_called()
 
@@ -323,8 +323,8 @@ class TestNotifyFault:
         robot = _healthy_robot()
         robot.status = LitterBoxStatus.CAT_DETECTED
         with (
-            patch("asher.notifications.fire"),
-            patch("asher.notifications.beep") as mock_beep,
+            patch("asher.desktop.notifications.fire"),
+            patch("asher.desktop.notifications.beep") as mock_beep,
         ):
             MonitoringMixin._refresh_faults(m, robot)
         mock_beep.assert_called_once()
@@ -337,8 +337,8 @@ class TestNotifyFault:
         robot = _healthy_robot()
         robot.globe_motor_fault_status = GlobeMotorFaultStatus.FAULT_OVERTORQUE_AMP
         with (
-            patch("asher.notifications.fire"),
-            patch("asher.notifications.beep") as mock_beep,
+            patch("asher.desktop.notifications.fire"),
+            patch("asher.desktop.notifications.beep") as mock_beep,
         ):
             MonitoringMixin._refresh_faults(m, robot)
         mock_beep.assert_not_called()
@@ -371,10 +371,10 @@ class TestUpdateCatPanel:
 
     def test_cat_panel_status_labels_fit_the_panel_width(self):
         """Every LitterBoxStatus must render within #cat-status's 26 columns
-        (asher/ui/style.tcss) after CAT_PANEL_STATUS_LABELS shortening, or the
+        (asher/tui/style.tcss) after CAT_PANEL_STATUS_LABELS shortening, or the
         line wraps onto a second row."""
-        from asher.constants import CAT_PANEL_STATUS_LABELS
-        from asher.helpers import status_text
+        from asher.core.constants import CAT_PANEL_STATUS_LABELS
+        from asher.core.helpers import status_text
 
         for member in LitterBoxStatus:
             label = CAT_PANEL_STATUS_LABELS.get(status_text(member), status_text(member))

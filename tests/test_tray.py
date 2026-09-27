@@ -1,4 +1,4 @@
-"""Tests for asher.tray — availability probing, menu text, and the fallback.
+"""Tests for asher.desktop.tray — availability probing, menu text, and the fallback.
 
 pystray and Pillow are an optional extra, so the tray is exercised through
 fakes: the point of these tests is that a missing or unusable tray costs the
@@ -14,9 +14,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from asher import theme, tray
-from asher.export import EXIT_OK
-from asher.watcher import Snapshot
+from asher.core import theme
+from asher.core.export import EXIT_OK
+from asher.desktop import tray
+from asher.desktop.watcher import Snapshot
 
 
 def _blocking_import(*blocked: str):
@@ -160,7 +161,7 @@ class TestRun:
     def test_falls_back_to_headless_without_pystray(self) -> None:
         with (
             patch("builtins.__import__", side_effect=_blocking_import("pystray")),
-            patch("asher.watcher.watch", return_value=EXIT_OK) as watch,
+            patch("asher.desktop.watcher.watch", return_value=EXIT_OK) as watch,
         ):
             assert tray.run(robot_selector="Asher", poll_seconds=60) == EXIT_OK
         assert watch.call_args.kwargs["robot_selector"] == "Asher"
@@ -173,7 +174,7 @@ class TestRun:
         with (
             patch.dict("sys.modules", {"pystray": fake_pystray}),
             patch.object(tray, "_icon_image", return_value="image"),
-            patch("asher.watcher.watch", return_value=EXIT_OK) as watch,
+            patch("asher.desktop.watcher.watch", return_value=EXIT_OK) as watch,
         ):
             assert tray.run(log=lambda _: None) == EXIT_OK
         watch.assert_called_once()
@@ -185,7 +186,7 @@ class TestRun:
         with (
             patch.dict("sys.modules", {"pystray": fake_pystray}),
             patch.object(tray, "_icon_image", return_value="image"),
-            patch("asher.watcher.WatcherRunner", return_value=runner),
+            patch("asher.desktop.watcher.WatcherRunner", return_value=runner),
         ):
             assert tray.run(log=lambda _: None) == EXIT_OK
         runner.request_stop.assert_called_once()

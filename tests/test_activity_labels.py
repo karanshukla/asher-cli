@@ -1,4 +1,4 @@
-"""Tests for asher.activity_labels — pure translation layer.
+"""Tests for asher.core.activity — pure translation layer.
 
 No Textual / event-loop dependency. ``Activity`` is a plain dataclass so we
 build real instances rather than mocking, which keeps the assertions honest
@@ -12,8 +12,8 @@ from types import SimpleNamespace
 
 from pylitterbot.enums import LitterBoxStatus
 
-from asher import theme
-from asher.activity_labels import (
+from asher.core import theme
+from asher.core.activity import (
     ACTION_LABELS,
     UNKNOWN_COLOUR,
     activity_raw_text,

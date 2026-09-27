@@ -1,4 +1,4 @@
-"""Tests for asher.desktoptheme — panel-tone detection on all three platforms.
+"""Tests for asher.desktop.desktoptheme — panel-tone detection on all three platforms.
 
 Every backend is driven directly rather than via ``sys.platform`` dispatch, so
 the macOS and Windows probes stay covered on the Linux CI runner. The probes
@@ -16,7 +16,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from asher import desktoptheme
+from asher.desktop import desktoptheme
 
 
 @pytest.fixture(autouse=True)

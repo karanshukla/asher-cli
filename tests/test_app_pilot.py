@@ -1,4 +1,4 @@
-"""Integration tests for asher.app using Textual's Pilot."""
+"""Integration tests for asher.tui.app using Textual's Pilot."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from asher.app import AsherApp
+from asher.tui.app import AsherApp
 
 
 @pytest.fixture
@@ -49,7 +49,7 @@ def mock_account(mock_robot):
 async def test_app_initial_state():
     """Test that AsherApp initializes with correct default state."""
     with (
-        patch("asher.connection._keyring_available", return_value=False),
+        patch("asher.core.credentials.keyring_available", return_value=False),
         patch("os.getenv", return_value=""),
     ):
         app = AsherApp()
@@ -59,7 +59,7 @@ async def test_app_initial_state():
         assert app._is_loading is True
         assert app._cat_mode == "idle"
         assert app._cat_frame == 0
-        from asher.login_flow import LoginState
+        from asher.tui.loginflow import LoginState
 
         assert app._login.state is LoginState.IDLE
 
@@ -68,10 +68,10 @@ async def test_app_initial_state():
 async def test_app_shows_login_prompt_without_credentials():
     """Test that app shows login prompt when no credentials exist."""
     with (
-        patch("asher.connection._keyring_available", return_value=False),
+        patch("asher.core.credentials.keyring_available", return_value=False),
         # The cached-token path runs before the keyring check, so without this
         # the app signs in for real on any machine whose keyring holds a token.
-        patch("asher.connection._keyring_load_token", return_value=None),
+        patch("asher.core.credentials.load_token", return_value=None),
         patch("os.getenv", return_value=""),
     ):
         app = AsherApp()
@@ -96,7 +96,7 @@ async def test_app_bindings_exist():
 async def test_app_composes_ui():
     """Test that app composes all expected UI widgets."""
     with (
-        patch("asher.connection._keyring_available", return_value=False),
+        patch("asher.core.credentials.keyring_available", return_value=False),
         patch("os.getenv", return_value=""),
     ):
         app = AsherApp()
@@ -122,7 +122,7 @@ async def test_app_composes_ui():
 async def test_status_bar_widgets_exist():
     """Test that status bar has all expected labels."""
     with (
-        patch("asher.connection._keyring_available", return_value=False),
+        patch("asher.core.credentials.keyring_available", return_value=False),
         patch("os.getenv", return_value=""),
     ):
         app = AsherApp()
@@ -143,7 +143,7 @@ async def test_status_bar_widgets_exist():
 async def test_quit_command_exits_app():
     """Test that typing 'quit' exits the app."""
     with (
-        patch("asher.connection._keyring_available", return_value=False),
+        patch("asher.core.credentials.keyring_available", return_value=False),
         patch("os.getenv", return_value=""),
     ):
         app = AsherApp()
@@ -161,7 +161,7 @@ async def test_quit_command_exits_app():
 async def test_clear_command_clears_log():
     """Test that 'clear' command clears the log."""
     with (
-        patch("asher.connection._keyring_available", return_value=False),
+        patch("asher.core.credentials.keyring_available", return_value=False),
         patch("os.getenv", return_value=""),
     ):
         app = AsherApp()
@@ -184,7 +184,7 @@ async def test_clear_command_clears_log():
 async def test_help_command_shows_help():
     """Test that 'help' command displays help text."""
     with (
-        patch("asher.connection._keyring_available", return_value=False),
+        patch("asher.core.credentials.keyring_available", return_value=False),
         patch("os.getenv", return_value=""),
     ):
         app = AsherApp()
@@ -205,7 +205,7 @@ async def test_help_command_shows_help():
 async def test_ctrl_l_clears_log():
     """Test that Ctrl+L key binding clears the log."""
     with (
-        patch("asher.connection._keyring_available", return_value=False),
+        patch("asher.core.credentials.keyring_available", return_value=False),
         patch("os.getenv", return_value=""),
     ):
         app = AsherApp()

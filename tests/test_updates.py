@@ -1,4 +1,4 @@
-"""Tests for asher.updates — release checking that never installs anything.
+"""Tests for asher.core.updates — release checking that never installs anything.
 
 The network is always mocked. The load-bearing assertions here are the safety
 ones: HTTPS only, no code path that runs an installer, and a check that stays
@@ -17,8 +17,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from asher import config, updates
-from asher.updates import Update, check, is_newer, latest_version, report, upgrade_command
+from asher.core import config, updates
+from asher.core.updates import Update, check, is_newer, latest_version, report, upgrade_command
 
 
 @pytest.fixture

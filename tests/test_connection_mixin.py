@@ -1,8 +1,8 @@
-"""Tests for asher.connection.ConnectionMixin."""
+"""Tests for asher.tui.connection.ConnectionMixin."""
 
 from __future__ import annotations
 
-from asher.connection import ConnectionMixin
+from asher.tui.connection import ConnectionMixin
 
 
 class TestConnectionMixinStructure:

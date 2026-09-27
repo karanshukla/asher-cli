@@ -1,4 +1,4 @@
-"""Tests for asher.launcher — opening the TUI from the tray.
+"""Tests for asher.desktop.launcher — opening the TUI from the tray.
 
 Each platform path is driven directly rather than through ``sys.platform``
 dispatch, so the macOS and Windows branches stay covered on the Linux CI
@@ -16,7 +16,7 @@ from unittest.mock import patch
 
 import pytest
 
-from asher import launcher
+from asher.desktop import launcher
 
 
 def _which(available: set[str]) -> Any:

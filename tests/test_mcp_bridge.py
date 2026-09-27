@@ -1,4 +1,4 @@
-"""Tests for asher.mcp_bridge module."""
+"""Tests for asher.mcp.bridge module."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from asher.mcp_bridge import main
+from asher.mcp.bridge import main
 
 
 class TestMain:
@@ -22,7 +22,7 @@ class TestMain:
         mock_result = MagicMock(returncode=0)
         with (
             patch("keyring.get_password", side_effect=["test@example.com", "secret123"]),
-            patch("asher.mcp_bridge.subprocess.run", return_value=mock_result) as mock_run,
+            patch("asher.mcp.bridge.subprocess.run", return_value=mock_result) as mock_run,
             pytest.raises(SystemExit) as exc,
         ):
             main()
@@ -36,7 +36,7 @@ class TestMain:
         mock_result = MagicMock(returncode=3)
         with (
             patch("keyring.get_password", side_effect=["a@b.com", "pw"]),
-            patch("asher.mcp_bridge.subprocess.run", return_value=mock_result),
+            patch("asher.mcp.bridge.subprocess.run", return_value=mock_result),
             pytest.raises(SystemExit) as exc,
         ):
             main()

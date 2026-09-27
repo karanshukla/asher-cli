@@ -1,13 +1,13 @@
-"""Tests for asher.ui module."""
+"""Tests for asher.tui.ui module."""
 
 from __future__ import annotations
 
 import re
 from pathlib import Path
 
-from asher.ui import _SPINNER, VERSION, UIMixin
+from asher.tui.ui import _SPINNER, VERSION, UIMixin
 
-_CSS_PATH = Path(__file__).parent.parent / "asher" / "ui" / "style.tcss"
+_CSS_PATH = Path(__file__).parent.parent / "asher" / "tui" / "style.tcss"
 _CSS = _CSS_PATH.read_text()
 
 
@@ -109,14 +109,14 @@ class TestCSS:
 
 class TestAppCSS:
     def test_app_has_css_path(self):
-        from asher.app import AsherApp
+        from asher.tui.app import AsherApp
 
         assert hasattr(AsherApp, "CSS_PATH")
 
     def test_css_path_points_to_existing_file(self):
-        from asher.app import AsherApp
+        from asher.tui.app import AsherApp
 
-        css_path = Path(__file__).parent.parent / "asher" / AsherApp.CSS_PATH
+        css_path = Path(__file__).parent.parent / "asher" / "tui" / AsherApp.CSS_PATH
         assert css_path.exists()
 
 

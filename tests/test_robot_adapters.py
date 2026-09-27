@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from asher.robot_adapters import LR3Adapter, LR4Adapter, LR5Adapter, make_adapter
+from asher.robot.adapters import LR3Adapter, LR4Adapter, LR5Adapter, make_adapter
 
 
 @pytest.fixture
