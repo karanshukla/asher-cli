@@ -7,6 +7,7 @@ from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as pkg_version
 
 from dotenv import load_dotenv
+from rich.table import Table
 from rich.text import Text
 from textual import work
 from textual.app import ComposeResult
@@ -329,25 +330,29 @@ class UIMixin:
         except NoMatches:
             pass
 
+    def _log_stamped(self, body: Text, marker: Text | None = None) -> None:
+        line = Table.grid()
+        line.add_column(no_wrap=True)
+        if marker is not None:
+            line.add_column(no_wrap=True)
+        line.add_column()
+        line.add_row(ts(), *([marker] if marker is not None else []), body)
+        self.query_one("#log", RichLog).write(line)  # type: ignore[attr-defined]
+
+    def _log_marked(self, marker: str, msg: str, style: str) -> None:
+        self._log_stamped(Text(msg, style=style), marker=Text(f"{marker} ", style=style))
+
     def _log_ok(self, msg: str) -> None:
-        t = ts()
-        t.append(f"✓ {msg}", style=theme.OK)
-        self.query_one("#log", RichLog).write(t)  # type: ignore[attr-defined]
+        self._log_marked("✓", msg, theme.OK)
 
     def _log_err(self, msg: str) -> None:
-        t = ts()
-        t.append(f"✖ {msg}", style=theme.DANGER)
-        self.query_one("#log", RichLog).write(t)  # type: ignore[attr-defined]
+        self._log_marked("✖", msg, theme.DANGER)
 
     def _log_warn(self, msg: str) -> None:
-        t = ts()
-        t.append(f"⚠ {msg}", style=theme.WARN)
-        self.query_one("#log", RichLog).write(t)  # type: ignore[attr-defined]
+        self._log_marked("⚠", msg, theme.WARN)
 
     def _log_info(self, msg: str) -> None:
-        t = ts()
-        t.append(f"  {msg}", style=theme.SUBTLE)
-        self.query_one("#log", RichLog).write(t)  # type: ignore[attr-defined]
+        self._log_marked(" ", msg, theme.SUBTLE)
 
     def action_clear_log(self) -> None:
         self.query_one("#log", RichLog).clear()  # type: ignore[attr-defined]

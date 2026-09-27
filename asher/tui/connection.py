@@ -9,11 +9,12 @@ if TYPE_CHECKING:
     from ..robot.adapters import RobotAdapter
     from ..robot.protocol import RobotProtocol
 
+from rich.text import Text
 from textual import work
 from textual.widgets import RichLog
 
 from ..core import credentials, theme
-from ..core.helpers import robot_model, ts
+from ..core.helpers import robot_model
 
 
 class ConnectionMixin:
@@ -162,11 +163,10 @@ class ConnectionMixin:
         await self._update_last_cat_seen()  # type: ignore[attr-defined]
         await self._refresh_status()  # type: ignore[attr-defined]
 
-        t = ts()
-        t.append("✓ Connected to ", style=theme.OK)
+        t = Text("Connected to ", style=theme.OK)
         name = getattr(self._robot, "name", "robot")
         t.append(name, style=f"bold {theme.FOREGROUND_BRIGHT}")
         t.append(f" ({robot_model(self._robot)})", style=theme.MUTED)
-        log.write(t)
+        self._log_stamped(t, marker=Text("✓ ", style=theme.OK))  # type: ignore[attr-defined]
         self._set_cat("happy", "connected!")  # type: ignore[attr-defined]
         return True

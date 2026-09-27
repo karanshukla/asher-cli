@@ -15,7 +15,6 @@ from textual.css.query import NoMatches
 from textual.widgets import Input, RichLog, Static
 
 from ...core import theme
-from ...core.helpers import ts
 from ..completion import enter_completes, render_completion, slash_matches
 from ..loginflow import LoginFlow, LoginState
 from .base import HINT_DEFAULT, Command
@@ -51,20 +50,14 @@ class CommandsMixin:
         if not raw:
             return
 
-        log = self.query_one("#log", RichLog)  # type: ignore[attr-defined]
-
         # Login flow intercepts before history/echo
         if self._login.state is LoginState.AWAITING_EMAIL:
-            t = ts()
-            t.append(f"  {raw}", style=theme.FOREGROUND_BRIGHT)
-            log.write(t)
+            self._log_stamped(Text(raw, style=theme.FOREGROUND_BRIGHT), marker=Text("  "))  # type: ignore[attr-defined]
             self._handle_login_email(raw)
             return
 
         if self._login.state is LoginState.AWAITING_PASSWORD:
-            t = ts()
-            t.append("  ••••••••", style=theme.MUTED)
-            log.write(t)
+            self._log_stamped(Text("••••••••", style=theme.MUTED), marker=Text("  "))  # type: ignore[attr-defined]
             self._handle_login_password(raw)
             return
 
@@ -72,10 +65,9 @@ class CommandsMixin:
         self._cmd_history.insert(0, raw)
         self._hist_idx = -1
 
-        t = ts()
-        t.append("> ", style=f"bold {theme.OK}")
-        t.append(raw, style=theme.FOREGROUND_BRIGHT)
-        log.write(t)
+        self._log_stamped(  # type: ignore[attr-defined]
+            Text(raw, style=theme.FOREGROUND_BRIGHT), marker=Text("> ", style=f"bold {theme.OK}")
+        )
 
         parts = raw.strip().split()
         raw_cmd = parts[0].lower() if parts else ""

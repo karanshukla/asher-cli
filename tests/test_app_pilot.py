@@ -218,3 +218,23 @@ async def test_ctrl_l_clears_log():
             await pilot.press("ctrl+l")
             # Log should be cleared
             assert len(log.lines) == 0
+
+
+@pytest.mark.asyncio
+async def test_wrapped_log_line_hangs_under_its_message():
+    with (
+        patch("asher.core.credentials.keyring_available", return_value=False),
+        patch("os.getenv", return_value=""),
+        patch("asher.core.updates.check", return_value=None),
+    ):
+        app = AsherApp()
+        async with app.run_test(size=(80, 30)) as pilot:
+            await pilot.pause()
+            log = app.query_one("#log")
+            log.clear()
+            app._log_warn("Update available: v1.3.0 → v1.4.0  (pip install -U asher-cli) " * 2)
+            await pilot.pause()
+            first, continuation = (strip.text for strip in log.lines[:2])
+            message_column = first.index("⚠") + 2
+            assert continuation[:message_column].strip() == ""
+            assert continuation[message_column] != " "

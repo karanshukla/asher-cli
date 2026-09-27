@@ -18,7 +18,6 @@ from textual.widgets import RichLog, Static
 from ...core import theme
 from ...core.helpers import (
     robot_model,
-    ts,
 )
 from .base import HINT_SIGNIN, SlashCommand
 
@@ -85,18 +84,16 @@ class RobotsCommand(SlashCommand):
         if not robots:
             app._log_warn("No robots loaded - use /login to connect first.")
             return
-        log = app.query_one("#log", RichLog)
         for idx, robot in enumerate(robots):
             active = robot is app._robot
-            t = ts()
-            t.append("  ● " if active else "    ", style=theme.OK if active else theme.MUTED)
-            t.append(f"[{idx}] ", style=theme.MUTED)
+            marker = Text("  ● " if active else "    ", style=theme.OK if active else theme.MUTED)
+            t = Text(f"[{idx}] ", style=theme.MUTED)
             t.append(
                 getattr(robot, "name", "-"),
                 style=theme.FOREGROUND_BRIGHT if active else theme.FOREGROUND,
             )
             t.append(f"  {robot_model(robot)}", style=theme.MUTED)
-            log.write(t)
+            app._log_stamped(t, marker=marker)
 
 
 class PetsCommand(SlashCommand):
@@ -108,18 +105,16 @@ class PetsCommand(SlashCommand):
         if not pets:
             app._log_warn("No pets found on this account.")
             return
-        log = app.query_one("#log", RichLog)
         active_idx = getattr(app, "_active_pet_idx", 0)
         for idx, pet in enumerate(pets):
             active = idx == active_idx
-            t = ts()
-            t.append("  ● " if active else "    ", style=theme.OK if active else theme.MUTED)
-            t.append(f"[{idx}] ", style=theme.MUTED)
+            marker = Text("  ● " if active else "    ", style=theme.OK if active else theme.MUTED)
+            t = Text(f"[{idx}] ", style=theme.MUTED)
             t.append(
                 getattr(pet, "name", "-"),
                 style=theme.FOREGROUND_BRIGHT if active else theme.FOREGROUND,
             )
-            log.write(t)
+            app._log_stamped(t, marker=marker)
 
 
 class PetCommand(SlashCommand):

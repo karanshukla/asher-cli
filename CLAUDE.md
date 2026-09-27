@@ -40,7 +40,7 @@ asher/
 
   tui/              the Textual dashboard — nothing outside tui/ imports it except __main__
     app.py            AsherApp class (thin orchestrator — composes mixins)
-    ui.py             UIMixin — compose(), log helpers (_log_ok/err/warn/info), cat helpers
+    ui.py             UIMixin — compose(), log helpers (_log_ok/err/warn/info, _log_stamped for hanging-indent lines), cat helpers
     style.tcss        the app stylesheet ($asher-* variables)
     connection.py     ConnectionMixin — _connect_worker, token/password connect, post-connect setup (credentials come from core.credentials)
     monitoring.py     MonitoringMixin — _poll_status_interval, _refresh_status
