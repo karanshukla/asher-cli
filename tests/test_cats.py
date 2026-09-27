@@ -1,8 +1,8 @@
-"""Tests for asher.cats ASCII art definitions."""
+"""Tests for asher.tui.cats ASCII art definitions."""
 
 from __future__ import annotations
 
-from asher.cats import CATS
+from asher.tui.cats import CATS
 
 
 class TestCatsStructure:

@@ -1,7 +1,7 @@
-"""Tests for asher.export — shared CSV core + headless export path.
+"""Tests for asher.core.export — shared CSV core + headless export path.
 
-No Textual ``Pilot`` is needed: ``build_history_csv`` and ``_run_headless_export``
-are plain async functions, testable the same way as ``asher.mcp_bridge``.
+No Textual ``Pilot`` is needed: ``build_history_csv`` and ``headless.run_legacy_export``
+are plain async functions, testable the same way as ``asher.mcp.bridge``.
 Mirrors the style of ``tests/test_mcp_bridge.py``.
 """
 
@@ -14,8 +14,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from asher import export
-from asher.export import (
+from asher import headless
+from asher.core import export
+from asher.core.export import (
     EXIT_CONNECTION_FAILURE,
     EXIT_NO_CREDENTIALS,
     EXIT_NO_ROBOT_MATCH,
@@ -272,7 +273,7 @@ class TestBuildHistoryCsv:
         assert rows[1][3] == ""
 
 
-# ── _run_headless_export ──────────────────────────────────────────────────────
+# ── run_legacy_export ──────────────────────────────────────────────────────
 
 
 def _export_args(
@@ -294,10 +295,10 @@ class TestRunHeadlessExport:
         account = _account(robots=[_robot(serial="LR4C001", name="Idiot Box", acts=[act])])
         dest = tmp_path / "out.csv"
         with (
-            patch("asher.connection._connect_headless", AsyncMock(return_value=account)),
-            patch("asher.connection._keyring_load_robot", return_value=""),
+            patch("asher.core.credentials.connect_headless", AsyncMock(return_value=account)),
+            patch("asher.core.credentials.load_preferred_robot", return_value=""),
         ):
-            code = await export._run_headless_export(_export_args(export="7", output=str(dest)))
+            code = await headless.run_legacy_export(_export_args(export="7", output=str(dest)))
         assert code == EXIT_OK
         assert dest.exists()
         rows = list(csv.reader(dest.read_text().splitlines()))
@@ -307,44 +308,44 @@ class TestRunHeadlessExport:
         assert "1 events" in captured.out
 
     async def test_no_credentials_exits_one(self, capsys):
-        from asher.connection import HeadlessAuthError
+        from asher.core import credentials
 
         with patch(
-            "asher.connection._connect_headless",
-            AsyncMock(side_effect=HeadlessAuthError("no creds", EXIT_NO_CREDENTIALS)),
+            "asher.core.credentials.connect_headless",
+            AsyncMock(side_effect=credentials.HeadlessAuthError("no creds", EXIT_NO_CREDENTIALS)),
         ):
-            code = await export._run_headless_export(_export_args())
+            code = await headless.run_legacy_export(_export_args())
         assert code == EXIT_NO_CREDENTIALS
         assert "no creds" in capsys.readouterr().err
 
     async def test_connection_failure_exits_two(self, capsys):
-        from asher.connection import HeadlessAuthError
+        from asher.core import credentials
 
         with patch(
-            "asher.connection._connect_headless",
-            AsyncMock(side_effect=HeadlessAuthError("down", EXIT_CONNECTION_FAILURE)),
+            "asher.core.credentials.connect_headless",
+            AsyncMock(side_effect=credentials.HeadlessAuthError("down", EXIT_CONNECTION_FAILURE)),
         ):
-            code = await export._run_headless_export(_export_args())
+            code = await headless.run_legacy_export(_export_args())
         assert code == EXIT_CONNECTION_FAILURE
         assert "down" in capsys.readouterr().err
 
     async def test_no_robots_on_account_exits_two(self, capsys):
         account = _account(robots=[])
         with (
-            patch("asher.connection._connect_headless", AsyncMock(return_value=account)),
-            patch("asher.connection._keyring_load_robot", return_value=""),
+            patch("asher.core.credentials.connect_headless", AsyncMock(return_value=account)),
+            patch("asher.core.credentials.load_preferred_robot", return_value=""),
         ):
-            code = await export._run_headless_export(_export_args())
+            code = await headless.run_legacy_export(_export_args())
         assert code == EXIT_CONNECTION_FAILURE
         assert "No Litter Robots" in capsys.readouterr().err
 
     async def test_robot_selector_no_match_exits_four(self, capsys):
         account = _account(robots=[_robot(serial="S0", name="Asher")])
         with (
-            patch("asher.connection._connect_headless", AsyncMock(return_value=account)),
-            patch("asher.connection._keyring_load_robot", return_value=""),
+            patch("asher.core.credentials.connect_headless", AsyncMock(return_value=account)),
+            patch("asher.core.credentials.load_preferred_robot", return_value=""),
         ):
-            code = await export._run_headless_export(_export_args(robot="zzz"))
+            code = await headless.run_legacy_export(_export_args(robot="zzz"))
         assert code == EXIT_NO_ROBOT_MATCH
         err = capsys.readouterr().err
         assert "zzz" in err
@@ -356,15 +357,15 @@ class TestRunHeadlessExport:
         account = _account(robots=[robot])
         dest = tmp_path / "out.csv"
         with (
-            patch("asher.connection._connect_headless", AsyncMock(return_value=account)),
-            patch("asher.connection._keyring_load_robot", return_value=""),
+            patch("asher.core.credentials.connect_headless", AsyncMock(return_value=account)),
+            patch("asher.core.credentials.load_preferred_robot", return_value=""),
         ):
-            code = await export._run_headless_export(_export_args(output=str(dest)))
+            code = await headless.run_legacy_export(_export_args(output=str(dest)))
         assert code == EXIT_CONNECTION_FAILURE
         assert "api down" in capsys.readouterr().err
 
     async def test_invalid_period_prints_message(self, capsys):
-        code = await export._run_headless_export(_export_args(export="garbage"))
+        code = await headless.run_legacy_export(_export_args(export="garbage"))
         assert code == EXIT_OK
         assert "garbage" in capsys.readouterr().err
 
@@ -373,10 +374,10 @@ class TestRunHeadlessExport:
         account = _account(robots=[robot])
         dest = tmp_path / "out.csv"
         with (
-            patch("asher.connection._connect_headless", AsyncMock(return_value=account)),
-            patch("asher.connection._keyring_load_robot", return_value=""),
+            patch("asher.core.credentials.connect_headless", AsyncMock(return_value=account)),
+            patch("asher.core.credentials.load_preferred_robot", return_value=""),
         ):
-            code = await export._run_headless_export(_export_args(export="month", output=str(dest)))
+            code = await headless.run_legacy_export(_export_args(export="month", output=str(dest)))
         assert code == EXIT_OK
         robot.get_activity_history.assert_called_once_with(limit=500)
 

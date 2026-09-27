@@ -1,4 +1,4 @@
-"""Tests for asher.config — JSON load/save over defaults.
+"""Tests for asher.core.config — JSON load/save over defaults.
 
 Mirrors the style of ``tests/test_mcp_config.py``: real JSON I/O against
 ``tmp_path`` via a patched module path constant, no Textual or pylitterbot
@@ -14,8 +14,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from asher import config
-from asher.config import _DEFAULTS, config_path, load, save, update
+from asher.core import config
+from asher.core.config import _DEFAULTS, config_path, load, save, update
 
 
 @pytest.fixture
@@ -182,7 +182,7 @@ class TestConfigPath:
 class TestAppWiring:
     def test_init_reads_persisted_values(self) -> None:
         """AsherApp.__init__ should read its runtime settings from config.load()."""
-        from asher.app import AsherApp
+        from asher.tui.app import AsherApp
 
         fake_cfg = {
             "poll_interval_seconds": 42,
@@ -193,9 +193,9 @@ class TestAppWiring:
             "notification_sound": True,
         }
         with (
-            patch("asher.connection._keyring_available", return_value=False),
+            patch("asher.core.credentials.keyring_available", return_value=False),
             patch("os.getenv", return_value=""),
-            patch("asher.config.load", return_value=fake_cfg),
+            patch("asher.core.config.load", return_value=fake_cfg),
         ):
             app = AsherApp()
         assert app._poll_interval == 42
@@ -206,12 +206,12 @@ class TestAppWiring:
         assert app._notification_sound is True
 
     def test_init_falls_back_to_defaults_when_load_returns_defaults(self) -> None:
-        from asher.app import AsherApp
+        from asher.tui.app import AsherApp
 
         with (
-            patch("asher.connection._keyring_available", return_value=False),
+            patch("asher.core.credentials.keyring_available", return_value=False),
             patch("os.getenv", return_value=""),
-            patch("asher.config.load", return_value=dict(_DEFAULTS)),
+            patch("asher.core.config.load", return_value=dict(_DEFAULTS)),
         ):
             app = AsherApp()
         assert app._poll_interval == 300
@@ -225,19 +225,19 @@ class TestAppWiring:
 
 class TestPersistHelper:
     def test_persist_calls_config_update(self) -> None:
-        from asher.commands import _persist
+        from asher.tui.commands.slash import _persist
 
         app = MagicMock()
-        with patch("asher.config.update", return_value={}) as mock_update:
+        with patch("asher.core.config.update", return_value={}) as mock_update:
             _persist(app, poll_interval_seconds=99)
         mock_update.assert_called_once_with(poll_interval_seconds=99)
         app._log_warn.assert_not_called()
 
     def test_persist_logs_warning_on_oserror(self) -> None:
-        from asher.commands import _persist
+        from asher.tui.commands.slash import _persist
 
         app = MagicMock()
-        with patch("asher.config.update", side_effect=OSError("read-only")):
+        with patch("asher.core.config.update", side_effect=OSError("read-only")):
             _persist(app, cat_panel_visible=False)
         app._log_warn.assert_called_once()
         assert "read-only" in app._log_warn.call_args[0][0]
@@ -249,12 +249,12 @@ class TestPersistHelper:
 def _stub_app() -> Any:
     """A real AsherApp with DOM-touching methods stubbed, so command handlers
     run without a mounted screen (no ``run_test()`` harness needed)."""
-    from asher.app import AsherApp
+    from asher.tui.app import AsherApp
 
     with (
-        patch("asher.connection._keyring_available", return_value=False),
+        patch("asher.core.credentials.keyring_available", return_value=False),
         patch("os.getenv", return_value=""),
-        patch("asher.config.load", return_value=dict(_DEFAULTS)),
+        patch("asher.core.config.load", return_value=dict(_DEFAULTS)),
     ):
         app = AsherApp()
     # Command handlers call these; without a screen they'd raise ScreenStackError.
@@ -272,86 +272,86 @@ class TestSlashCommandPersistence:
     """Smoke tests: the slash commands that mutate persisted state call _persist."""
 
     async def test_refresh_persists_interval(self) -> None:
-        from asher.commands import RefreshCommand
+        from asher.tui.commands.slash import RefreshCommand
 
         app = _stub_app()
         app._poll_timer = None
-        with patch("asher.commands._persist") as mock_persist:
+        with patch("asher.tui.commands.slash._persist") as mock_persist:
             await RefreshCommand().run(app, ["30"])
         mock_persist.assert_called_once_with(app, poll_interval_seconds=30)
         assert app._poll_interval == 30
 
     async def test_refresh_off_persists_zero(self) -> None:
-        from asher.commands import RefreshCommand
+        from asher.tui.commands.slash import RefreshCommand
 
         app = _stub_app()
         app._poll_timer = MagicMock()
-        with patch("asher.commands._persist") as mock_persist:
+        with patch("asher.tui.commands.slash._persist") as mock_persist:
             await RefreshCommand().run(app, ["off"])
         mock_persist.assert_called_once_with(app, poll_interval_seconds=0)
         assert app._poll_interval == 0
 
     async def test_cat_color_persists(self) -> None:
-        from asher.commands import CatCommand
+        from asher.tui.commands.slash import CatCommand
 
         app = _stub_app()
-        with patch("asher.commands._persist") as mock_persist:
+        with patch("asher.tui.commands.slash._persist") as mock_persist:
             await CatCommand().run(app, ["color", "ff79c6"])
         mock_persist.assert_called_once_with(app, cat_panel_color="#ff79c6")
         assert app._cat_color == "#ff79c6"
 
     async def test_cat_reset_persists_none(self) -> None:
-        from asher.commands import CatCommand
+        from asher.tui.commands.slash import CatCommand
 
         app = _stub_app()
-        with patch("asher.commands._persist") as mock_persist:
+        with patch("asher.tui.commands.slash._persist") as mock_persist:
             await CatCommand().run(app, ["reset"])
         mock_persist.assert_called_once_with(app, cat_panel_color=None)
         assert app._cat_color is None
 
     async def test_cat_off_persists_visibility(self) -> None:
-        from asher.commands import CatCommand
+        from asher.tui.commands.slash import CatCommand
 
         app = _stub_app()
-        with patch("asher.commands._persist") as mock_persist:
+        with patch("asher.tui.commands.slash._persist") as mock_persist:
             await CatCommand().run(app, ["off"])
         mock_persist.assert_called_once_with(app, cat_panel_visible=False)
         assert app._cat_panel_visible is False
 
     async def test_pet_index_persists(self) -> None:
-        from asher.commands import PetCommand
+        from asher.tui.commands.slash import PetCommand
 
         app = _stub_app()
         app._pets = [MagicMock(name="Asher"), MagicMock(name="Luna")]
-        with patch("asher.commands._persist") as mock_persist:
+        with patch("asher.tui.commands.slash._persist") as mock_persist:
             await PetCommand().run(app, ["1"])
         mock_persist.assert_called_once_with(app, active_pet_index=1)
         assert app._active_pet_idx == 1
 
     async def test_notify_off_persists(self) -> None:
-        from asher.commands import NotifyCommand
+        from asher.tui.commands.slash import NotifyCommand
 
         app = _stub_app()
-        with patch("asher.commands._persist") as mock_persist:
+        with patch("asher.tui.commands.slash._persist") as mock_persist:
             await NotifyCommand().run(app, ["off"])
         mock_persist.assert_called_once_with(app, notifications=False)
         assert app._notifications_enabled is False
 
     async def test_notify_on_persists(self) -> None:
-        from asher.commands import NotifyCommand
+        from asher.tui.commands.slash import NotifyCommand
 
         app = _stub_app()
         app._notifications_enabled = False
-        with patch("asher.commands._persist") as mock_persist:
+        with patch("asher.tui.commands.slash._persist") as mock_persist:
             await NotifyCommand().run(app, ["on"])
         mock_persist.assert_called_once_with(app, notifications=True)
         assert app._notifications_enabled is True
 
     async def test_notify_sound_on_persists(self) -> None:
-        from asher.commands import NotifyCommand
+        from asher.tui.commands.slash import NotifyCommand
 
         app = _stub_app()
-        with patch("asher.commands._persist") as mock_persist:
+        with patch("asher.tui.commands.slash._persist") as mock_persist:
             await NotifyCommand().run(app, ["sound", "on"])
         mock_persist.assert_called_once_with(app, notification_sound=True)
         assert app._notification_sound is True

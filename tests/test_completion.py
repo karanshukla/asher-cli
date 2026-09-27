@@ -2,7 +2,7 @@
 
 Three layers:
 
-1. Pure helpers in ``asher.completion`` — slash matching, enter-completion
+1. Pure helpers in ``asher.tui.completion`` — slash matching, enter-completion
    decision, popup rendering, and the ``CommandSuggester`` are data-in/
    data-out, tested directly without a Textual event loop.
 2. Pilot integration for the slash popup (``#completion-overlay``) — appears/
@@ -26,9 +26,9 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from textual.widgets import Input, Static
 
-from asher.app import AsherApp
-from asher.commands import _registry
-from asher.completion import (
+from asher.tui.app import AsherApp
+from asher.tui.commands.registry import _registry
+from asher.tui.completion import (
     CommandSuggester,
     enter_completes,
     render_completion,

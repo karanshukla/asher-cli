@@ -1,11 +1,11 @@
-"""Integration tests for asher.auth using Textual's Pilot."""
+"""Integration tests for asher.tui.loginscreen using Textual's Pilot."""
 
 from __future__ import annotations
 
 import pytest
 from textual.app import App
 
-from asher.auth import LoginScreen
+from asher.tui.loginscreen import LoginScreen
 
 
 class LoginTestApp(App):

@@ -1,11 +1,11 @@
-"""Tests for asher.helpers pure functions."""
+"""Tests for asher.core.helpers pure functions."""
 
 from __future__ import annotations
 
 from datetime import datetime, time, timedelta, timezone
 
-from asher import theme
-from asher.helpers import (
+from asher.core import theme
+from asher.core.helpers import (
     activity_type,
     dev_mode,
     drawer_bar,

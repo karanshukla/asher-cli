@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from asher.app import AsherApp
+from asher.tui.app import AsherApp
 
 
 @pytest.fixture(autouse=True)
@@ -17,7 +17,7 @@ def no_update_check():
     live it reaches PyPI, and a slow response outlives ``run_test()`` so the
     worker writes to a torn-down screen.
     """
-    with patch("asher.updates.check", return_value=None):
+    with patch("asher.core.updates.check", return_value=None):
         yield
 
 
@@ -85,7 +85,7 @@ async def test_version_handles_missing_package(app_no_connect):
     def _raise(pkg):
         raise PackageNotFoundError(pkg)
 
-    with patch("asher.commands.pkg_version", side_effect=_raise):
+    with patch("asher.tui.commands.slash.pkg_version", side_effect=_raise):
         async with app_no_connect.run_test() as pilot:
             await pilot.pause()
             await pilot.click("#cmd-input")

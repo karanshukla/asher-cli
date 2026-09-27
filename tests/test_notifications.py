@@ -1,4 +1,4 @@
-"""Tests for asher.notifications — the plyer toast + beep façade.
+"""Tests for asher.desktop.notifications — the plyer toast + beep façade.
 
 Pure unit tests (no Textual, no Pilot). The façade's contract is that both
 ``fire`` and ``beep`` are always-safe: a missing plyer, a flaky platform
@@ -14,7 +14,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from asher import notifications
+from asher.desktop import notifications
 
 
 def _no_real_toasts() -> Any:

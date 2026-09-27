@@ -7,9 +7,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from asher.app import AsherApp
-from asher.config import _DEFAULTS
-from asher.robot_adapters import LR3Adapter
+from asher.core.config import _DEFAULTS
+from asher.robot.adapters import LR3Adapter
+from asher.tui.app import AsherApp
 
 
 @pytest.fixture
@@ -29,7 +29,7 @@ def connected_app():
     robot.refresh = AsyncMock()
     robot.get_activity_history = AsyncMock(return_value=[])
 
-    with patch("asher.config.load", return_value=dict(_DEFAULTS)):
+    with patch("asher.core.config.load", return_value=dict(_DEFAULTS)):
         app = AsherApp()
     app._robot = robot
     app._adapter = LR3Adapter(robot)
@@ -312,7 +312,10 @@ async def test_pet_no_pets_shows_warning(connected_app):
 @pytest.mark.asyncio
 async def test_export_calls_get_activity_history(connected_app, tmp_path):
     connected_app._robot.get_activity_history = AsyncMock(return_value=[])
-    with patch("asher.commands._open_folder"), patch("pathlib.Path.home", return_value=tmp_path):
+    with (
+        patch("asher.tui.commands.robot._open_folder"),
+        patch("pathlib.Path.home", return_value=tmp_path),
+    ):
         async with connected_app.run_test() as pilot:
             await pilot.pause()
             await pilot.click("#cmd-input")
@@ -328,7 +331,10 @@ async def test_export_calls_get_activity_history(connected_app, tmp_path):
 @pytest.mark.asyncio
 async def test_export_7_days(connected_app, tmp_path):
     connected_app._robot.get_activity_history = AsyncMock(return_value=[])
-    with patch("asher.commands._open_folder"), patch("pathlib.Path.home", return_value=tmp_path):
+    with (
+        patch("asher.tui.commands.robot._open_folder"),
+        patch("pathlib.Path.home", return_value=tmp_path),
+    ):
         async with connected_app.run_test() as pilot:
             await pilot.pause()
             await pilot.click("#cmd-input")
@@ -361,7 +367,10 @@ async def test_export_writes_csv(connected_app, tmp_path):
     downloads = tmp_path / "Downloads"
     downloads.mkdir()
 
-    with patch("asher.commands._open_folder"), patch("pathlib.Path.home", return_value=tmp_path):
+    with (
+        patch("asher.tui.commands.robot._open_folder"),
+        patch("pathlib.Path.home", return_value=tmp_path),
+    ):
         async with connected_app.run_test() as pilot:
             await pilot.pause()
             await pilot.click("#cmd-input")
@@ -399,7 +408,7 @@ async def test_export_invalid_period_shows_warning(connected_app):
 @pytest.mark.asyncio
 async def test_export_without_robot_shows_error():
     with (
-        patch("asher.connection._keyring_available", return_value=False),
+        patch("asher.core.credentials.keyring_available", return_value=False),
         patch("os.getenv", return_value=""),
     ):
         app = AsherApp()

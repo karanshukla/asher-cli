@@ -1,4 +1,4 @@
-"""Tests for asher.daemon — pid-file bookkeeping and watcher process control.
+"""Tests for asher.desktop.daemon — pid-file bookkeeping and watcher process control.
 
 Real file I/O against ``tmp_path`` via patched module path constants, in the
 style of ``tests/test_config.py``. Nothing here spawns a watcher: ``Popen`` and
@@ -14,8 +14,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from asher import daemon
-from asher.export import EXIT_COMMAND_REJECTED, EXIT_OK
+from asher.core.export import EXIT_COMMAND_REJECTED, EXIT_OK
+from asher.desktop import daemon
 
 
 @pytest.fixture
@@ -29,7 +29,7 @@ def runtime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setattr(daemon, "_PID_PATH", tmp_path / "watch.pid")
     monkeypatch.setattr(daemon, "_LOG_PATH", tmp_path / "watch.log")
     monkeypatch.setattr(daemon, "_STARTUP_GRACE_SECONDS", 0)
-    monkeypatch.setattr("asher.connection.credentials_available", lambda: True)
+    monkeypatch.setattr("asher.core.credentials.available", lambda: True)
     return tmp_path
 
 
@@ -177,7 +177,7 @@ class TestStart:
         """The watcher claims the pid file before authenticating, so it would
         register, report a pid, and stop a moment later with the reason buried
         in the log."""
-        monkeypatch.setattr("asher.connection.credentials_available", lambda: False)
+        monkeypatch.setattr("asher.core.credentials.available", lambda: False)
         with patch.object(daemon.subprocess, "Popen") as popen:
             ok, message = daemon.start()
         assert ok is False
@@ -193,9 +193,9 @@ class TestStart:
         monkeypatch.setattr(daemon, "_PID_PATH", runtime / "watch.pid")
         monkeypatch.setattr(daemon, "_LOG_PATH", runtime / "watch.log")
         monkeypatch.setattr(daemon, "_STARTUP_GRACE_SECONDS", 0)
-        monkeypatch.setattr("asher.connection._keyring_load_token", lambda: None)
-        monkeypatch.setattr("asher.connection._keyring_available", lambda: True)
-        monkeypatch.setattr("asher.connection._keyring_load", lambda: ("a@b.com", "pw"))
+        monkeypatch.setattr("asher.core.credentials.load_token", lambda: None)
+        monkeypatch.setattr("asher.core.credentials.keyring_available", lambda: True)
+        monkeypatch.setattr("asher.core.credentials.load", lambda: ("a@b.com", "pw"))
         with (
             patch.object(daemon.subprocess, "Popen", return_value=_spawned()),
             patch("pylitterbot.Account") as account,
@@ -316,7 +316,7 @@ class TestStatus:
         assert "not running" in message
 
     def test_reports_autostart_state(self, runtime: Path) -> None:
-        with patch("asher.autostart.describe", return_value="enabled (launchd)"):
+        with patch("asher.desktop.autostart.describe", return_value="enabled (launchd)"):
             _, message = daemon.status()
         assert "autostart: enabled (launchd)" in message
 
@@ -353,7 +353,7 @@ class TestDispatch:
 
     def test_enable_registers_autostart(self, runtime: Path) -> None:
         with (
-            patch("asher.autostart.enable", return_value=(True, "enabled")) as enable,
+            patch("asher.desktop.autostart.enable", return_value=(True, "enabled")) as enable,
             patch.object(daemon, "running_pid", return_value=99),
         ):
             assert daemon.dispatch("enable") == EXIT_OK
@@ -362,7 +362,7 @@ class TestDispatch:
     def test_enable_also_starts_watching_now(self, runtime: Path) -> None:
         """`systemctl enable --now` semantics: don't make the user wait for a login."""
         with (
-            patch("asher.autostart.enable", return_value=(True, "enabled")),
+            patch("asher.desktop.autostart.enable", return_value=(True, "enabled")),
             patch.object(daemon, "start", return_value=(True, "started")) as start,
         ):
             assert daemon.dispatch("enable") == EXIT_OK
@@ -370,7 +370,7 @@ class TestDispatch:
 
     def test_enable_does_not_start_a_duplicate(self, runtime: Path) -> None:
         with (
-            patch("asher.autostart.enable", return_value=(True, "enabled")),
+            patch("asher.desktop.autostart.enable", return_value=(True, "enabled")),
             patch.object(daemon, "running_pid", return_value=99),
             patch.object(daemon, "start") as start,
         ):
@@ -378,7 +378,7 @@ class TestDispatch:
         start.assert_not_called()
 
     def test_disable_removes_autostart(self, runtime: Path) -> None:
-        with patch("asher.autostart.disable", return_value=(True, "disabled")) as disable:
+        with patch("asher.desktop.autostart.disable", return_value=(True, "disabled")) as disable:
             assert daemon.dispatch("disable") == EXIT_OK
         disable.assert_called_once()
 
@@ -396,7 +396,7 @@ class TestRunForeground:
         """Autostart plus a manual start would otherwise notify twice."""
         with (
             patch.object(daemon, "running_pid", return_value=99),
-            patch("asher.watcher.watch") as watch,
+            patch("asher.desktop.watcher.watch") as watch,
         ):
             assert daemon.run_foreground() == EXIT_COMMAND_REJECTED
         watch.assert_not_called()
@@ -404,8 +404,11 @@ class TestRunForeground:
     def test_owns_the_pid_file_while_watching(self, runtime: Path) -> None:
         seen: list[int | None] = []
         with (
-            patch("asher.tray.is_available", return_value=False),
-            patch("asher.watcher.watch", side_effect=lambda **_: seen.append(daemon.read_pid())),
+            patch("asher.desktop.tray.is_available", return_value=False),
+            patch(
+                "asher.desktop.watcher.watch",
+                side_effect=lambda **_: seen.append(daemon.read_pid()),
+            ),
         ):
             daemon.run_foreground()
         assert seen == [os.getpid()]
@@ -413,33 +416,33 @@ class TestRunForeground:
 
     def test_skips_the_tray_when_unavailable(self, runtime: Path) -> None:
         with (
-            patch("asher.tray.is_available", return_value=False),
-            patch("asher.watcher.watch", return_value=EXIT_OK) as watch,
+            patch("asher.desktop.tray.is_available", return_value=False),
+            patch("asher.desktop.watcher.watch", return_value=EXIT_OK) as watch,
         ):
             assert daemon.run_foreground() == EXIT_OK
         assert watch.call_args.kwargs["poll_seconds"] > 0
 
     def test_uses_the_tray_when_available(self, runtime: Path) -> None:
         with (
-            patch("asher.tray.is_available", return_value=True),
-            patch("asher.tray.run", return_value=EXIT_OK) as tray_run,
+            patch("asher.desktop.tray.is_available", return_value=True),
+            patch("asher.desktop.tray.run", return_value=EXIT_OK) as tray_run,
         ):
             assert daemon.run_foreground(robot="Asher 2") == EXIT_OK
         assert tray_run.call_args.kwargs["robot_selector"] == "Asher 2"
 
     def test_no_tray_flag_wins(self, runtime: Path) -> None:
         with (
-            patch("asher.tray.is_available", return_value=True) as available,
-            patch("asher.watcher.watch", return_value=EXIT_OK),
+            patch("asher.desktop.tray.is_available", return_value=True) as available,
+            patch("asher.desktop.watcher.watch", return_value=EXIT_OK),
         ):
             daemon.run_foreground(tray=False)
         available.assert_not_called()
 
     def test_config_can_disable_the_tray(self, runtime: Path) -> None:
         with (
-            patch("asher.config.load", return_value={"watch_tray": False}),
-            patch("asher.tray.is_available", return_value=True) as available,
-            patch("asher.watcher.watch", return_value=EXIT_OK),
+            patch("asher.core.config.load", return_value={"watch_tray": False}),
+            patch("asher.desktop.tray.is_available", return_value=True) as available,
+            patch("asher.desktop.watcher.watch", return_value=EXIT_OK),
         ):
             daemon.run_foreground()
         available.assert_not_called()

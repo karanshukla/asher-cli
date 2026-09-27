@@ -1,7 +1,7 @@
-"""Tests for asher.watcher — alert detection and the supervising watch loop.
+"""Tests for asher.desktop.watcher — alert detection and the supervising watch loop.
 
 ``WatchState`` is pure, so most of this file is plain synchronous assertions
-over fake robots. The async tests drive :func:`asher.watcher.watch` with
+over fake robots. The async tests drive :func:`asher.desktop.watcher.watch` with
 ``open_session`` patched out — no network, no pylitterbot session, no Textual.
 """
 
@@ -14,9 +14,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from pylitterbot.enums import LitterBoxStatus
 
-from asher import config, watcher
-from asher.export import EXIT_OK
-from asher.watcher import Alert, WatchState, deliver, snapshot
+from asher.core import config
+from asher.core.export import EXIT_OK
+from asher.desktop import watcher
+from asher.desktop.watcher import Alert, WatchState, deliver, snapshot
 
 
 class FakeRobot:
@@ -172,7 +173,7 @@ class TestDeliver:
     def test_fires_a_toast_when_enabled(self) -> None:
         with (
             patch.object(config, "load", return_value={"notifications": True}),
-            patch("asher.notifications.fire") as fire,
+            patch("asher.desktop.notifications.fire") as fire,
         ):
             deliver(Alert("Asher — Cat", "DRAWER FULL"))
         fire.assert_called_once_with("Asher — Cat", "DRAWER FULL")
@@ -180,7 +181,7 @@ class TestDeliver:
     def test_silent_when_notifications_are_off(self) -> None:
         with (
             patch.object(config, "load", return_value={"notifications": False}),
-            patch("asher.notifications.fire") as fire,
+            patch("asher.desktop.notifications.fire") as fire,
         ):
             deliver(Alert("Asher — Cat", "DRAWER FULL"))
         fire.assert_not_called()
@@ -189,8 +190,8 @@ class TestDeliver:
         settings = {"notifications": True, "notification_sound": True}
         with (
             patch.object(config, "load", return_value=settings),
-            patch("asher.notifications.fire"),
-            patch("asher.notifications.beep") as beep,
+            patch("asher.desktop.notifications.fire"),
+            patch("asher.desktop.notifications.beep") as beep,
         ):
             deliver(Alert("Asher — Cat", "CAT DETECTED", critical=True))
         beep.assert_called_once_with(critical=True)
@@ -283,17 +284,18 @@ class TestWatch:
 
     async def test_missing_credentials_end_the_watcher(self) -> None:
         """Nothing about waiting makes credentials appear, so this must not retry."""
-        from asher.connection import HeadlessAuthError
+        from asher.core import credentials
 
         with patch(
-            "asher.headless.open_session", AsyncMock(side_effect=HeadlessAuthError("nope", 1))
+            "asher.headless.open_session",
+            AsyncMock(side_effect=credentials.HeadlessAuthError("nope", 1)),
         ):
             code = await watcher.watch(stop_event=asyncio.Event(), log=lambda _: None)
         assert code == 1
 
     async def test_an_unreachable_cloud_is_retried(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """A watcher started at login often beats the network there."""
-        from asher.connection import HeadlessAuthError
+        from asher.core import credentials
 
         monkeypatch.setattr(watcher, "_INITIAL_BACKOFF_SECONDS", 0.01)
         stop = asyncio.Event()
@@ -302,7 +304,7 @@ class TestWatch:
         async def unreachable(_selector: str | None) -> MagicMock:
             attempts.append(1)
             if len(attempts) < 3:
-                raise HeadlessAuthError("Connection failed: no route to host", 2)
+                raise credentials.HeadlessAuthError("Connection failed: no route to host", 2)
             stop.set()
             return _fake_session(FakeRobot())
 

@@ -4,7 +4,7 @@ Two layers, mirroring how the module is built:
 
 * the pure parts — ``Result`` rendering, argument parsing, the registry — which
   need no event loop and no mocks;
-* ``run()`` end to end with ``_connect_headless`` patched out, which is where
+* ``run()`` end to end with ``credentials.connect_headless`` patched out, which is where
   the exit-code contract lives.
 
 No Pilot and no Textual: the point of the module is that it works without them.
@@ -20,7 +20,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from asher.export import (
+from asher.core.export import (
     EXIT_COMMAND_REJECTED,
     EXIT_CONNECTION_FAILURE,
     EXIT_NO_CREDENTIALS,
@@ -76,7 +76,7 @@ def _account(robots=None, pets=None):
 
 
 def _session(robot=None, pets=None, output=None) -> Session:
-    from asher.robot_adapters import make_adapter
+    from asher.robot.adapters import make_adapter
 
     robot = robot or _robot()
     return Session(
@@ -101,8 +101,8 @@ def _act(*, days_ago: float = 1, action_text: str = "Clean Cycle Complete", weig
 def _connected(account):
     """Patch the credential/connection layer so ``run()`` reaches a command."""
     return (
-        patch("asher.connection._connect_headless", AsyncMock(return_value=account)),
-        patch("asher.connection._keyring_load_robot", return_value=""),
+        patch("asher.core.credentials.connect_headless", AsyncMock(return_value=account)),
+        patch("asher.core.credentials.load_preferred_robot", return_value=""),
     )
 
 
@@ -427,11 +427,11 @@ class TestRun:
         assert json.loads(capsys.readouterr().out)["status"] == "Ready"
 
     async def test_missing_credentials_exit_one(self, capsys):
-        from asher.connection import HeadlessAuthError
+        from asher.core import credentials
 
         with patch(
-            "asher.connection._connect_headless",
-            AsyncMock(side_effect=HeadlessAuthError("no creds", EXIT_NO_CREDENTIALS)),
+            "asher.core.credentials.connect_headless",
+            AsyncMock(side_effect=credentials.HeadlessAuthError("no creds", EXIT_NO_CREDENTIALS)),
         ):
             assert await run("status") == EXIT_NO_CREDENTIALS
         assert "no creds" in capsys.readouterr().err

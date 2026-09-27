@@ -38,7 +38,7 @@ tray = ["pystray>=0.19", "pillow>=10.0", "pygobject>=3.42; sys_platform == 'linu
 
 [project.scripts]
 asher = "asher.__main__:main"
-asher-mcp-launch = "asher.mcp_bridge:main"
+asher-mcp-launch = "asher.mcp.bridge:main"
 
 [project.urls]
 Homepage = "https://github.com/karanshukla/asher-cli"
@@ -127,7 +127,6 @@ known-first-party = ["asher"]
 python_version = "3.10"
 warn_return_any = true
 ignore_missing_imports = true  # pylitterbot and textual have incomplete stubs
-exclude = ["asher/slash-commands"]
 
 # ── bump-my-version ───────────────────────────────────────────────────────────
 

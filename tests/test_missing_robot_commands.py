@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from asher.app import AsherApp
-from asher.robot_adapters import LR3Adapter
+from asher.robot.adapters import LR3Adapter
+from asher.tui.app import AsherApp
 
 
 def _make_insight() -> MagicMock:
@@ -539,7 +539,7 @@ async def test_sleep_schedule_alias_works(connected_app):
 
 def _lr5_app(app):
     """Re-front the same fake robot with an LR5 adapter, which can write schedules."""
-    from asher.robot_adapters import LR5Adapter
+    from asher.robot.adapters import LR5Adapter
 
     app._robot.set_sleep_mode = AsyncMock(return_value=True)
     app._adapter = LR5Adapter(app._robot)
@@ -623,7 +623,7 @@ async def test_sleep_schedule_disable(connected_app):
 
 @pytest.mark.asyncio
 async def test_sleep_schedule_write_on_lr4_points_at_the_app(connected_app):
-    from asher.robot_adapters import LR4Adapter
+    from asher.robot.adapters import LR4Adapter
 
     connected_app._robot.set_sleep_mode = AsyncMock(return_value=True)
     connected_app._adapter = LR4Adapter(connected_app._robot)

@@ -20,41 +20,61 @@ asher                  # after: uv sync && uv run asher  OR  pip install -e .
 
 ```
 asher/
-  __init__.py
-  app.py            AsherApp class (thin orchestrator — composes mixins)
-  auth.py           LoginScreen modal (ModalScreen[tuple[str,str]]) — available, not primary flow
-  helpers.py        fmt_ago(), fmt_until(), drawer_bar(), ts(), robot_model(), status_text() + argument parsing shared by the TUI and headless surfaces: hex_colour(), parse_clock(), parse_day(), split_type_flag(), activity_type()  (pure, testable)
-  constants.py      STATUS_COLORS, CAT_PANEL_STATUS_LABELS, ACTIVITY_TYPES, ROBOT_MODELS
-  theme.py          Catppuccin Mocha palette + semantic roles (BACKGROUND, MUTED, DANGER, …) + CSS_VARIABLES/apply() — the only place a hex literal belongs
-  config.py         runtime settings persistence — load()/save()/update() over ~/.asher-cli/config.json; holds poll interval, cat-panel visibility/colour, active pet index, notification settings (non-secret UI prefs only; credentials stay in keyring)
-  notifications.py  desktop toast + audible alert façade — plyer first, then the platform's own tool (osascript/notify-send); fire/beep are always-safe no-ops on failure/headless
-  watcher.py        background notification loop with no TUI — pure WatchState (robot snapshots → Alert list) + supervising watch() that reconnects with backoff, plus WatcherRunner (asyncio on a worker thread, for the tray)
-  daemon.py         detached watcher process control — `start` pre-flights `connection.credentials_available()` (presence only, no network, so starting offline still works) because the watcher claims the pid file *before* authenticating and would otherwise report a pid for a process that stops a moment later — pid file/log in ~/.asher-cli, start/stop/status/run, cross-platform detach + liveness (os.kill would *terminate* on Windows)
-  tray.py           optional pystray/Pillow system-tray icon over WatcherRunner; every path degrades to a headless watcher. Icon is a panel-toned silhouette + status dot — colour rides the badge, never the whole glyph
-  launcher.py       open_app() — start the TUI in a new terminal from the tray (a detached tray has none): new console on Windows, Terminal.app via AppleScript on macOS, first installed emulator on Linux (desktop's own preferred)
-  desktoptheme.py   panel_is_dark() — is the tray/menu-bar background dark? kdeglobals luma / gsettings / AppleInterfaceStyle / the Personalize registry keys, behind a TTL cache; every probe degrades to a fallback, never raises
-  autostart.py      login items — AutostartBackend ABC + launchd/systemd-user/registry subclasses + backend() factory; all per-user, no admin rights, disable() removes exactly what enable() wrote
-  updates.py        PyPI release check — read-only over HTTPS, once a day, reports only. Never installs (see its docstring for why that stays manual)
-  cats.py           CATS dict (ASCII art)
-  login_flow.py     LoginFlow state machine — inline email/password prompt in command bar
-  robot_protocol.py RobotProtocol structural Protocol for pylitterbot robot objects
-  robot_adapters.py RobotAdapter ABC + LR3/LR4/LR5 subclasses + make_adapter() factory
-  mcp_config.py     Claude Desktop config read/write for the /mcp slash command
-  mcp_bridge.py     asher-mcp-launch console script — keyring-backed pylitterbot MCP launcher
-  faults.py         check_faults(robot) — model-scoped safety/component fault detection (status enum + per-model attr allowlist incl. LR4 USB power fault; hopper never a fault)
-  history_view.py   HistoryScreen (ModalScreen) + format_history_rows()/format_history_text() — scrollable activity-history pager pushed by the `history` command; `c` copies the full history (plain text) to the clipboard via action_copy_all()
-  export.py         shared activity-history CSV core + exit-code contract: build_history_csv(), resolve_dest(), resolve_robot(), parse_days(), EXIT_*, ExportError — no Textual imports; the TUI `export` command and `asher export` both call build_history_csv()
-  headless.py       headless command surface for `asher <command>` — Session/Result/CommandError, the COMMANDS registry, and run(); plain strings only, no Textual, routes model differences through RobotAdapter
-  completion.py     pure helpers for command completion: slash popup (slash_matches, enter_completes, render_completion) + inline ghost text (CommandSuggester) — fed by _registry, no Textual imports except the Suggester base class
   __main__.py       main() entry point — argparse subcommands (headless) vs no-args (TUI); `--export` kept as a deprecated alias
-  commands/
-    base.py         Command ABC, SlashCommand, CommandRegistry
-    __init__.py     CommandsMixin — all command classes + registry + dispatch
-  connection/       ConnectionMixin — keyring auth, _connect_worker, keyring helpers, _connect_headless() (no-UI auth for `asher --export`)
-  monitoring/       MonitoringMixin — _poll_status_interval, _refresh_status
-  ui/               UIMixin — CSS, compose(), log helpers, cat helpers
-  slash-commands/   Convention doc
+  headless.py       headless command surface for `asher <command>` — Session/Result/CommandError, the COMMANDS registry, run(), run_legacy_export(); plain strings only, no Textual, routes model differences through RobotAdapter
 
+  core/             shared domain + infrastructure — no Textual, imported by every surface
+    helpers.py        fmt_ago(), fmt_until(), drawer_bar(), ts(), robot_model(), status_text() + argument parsing shared by the TUI and headless surfaces: hex_colour(), parse_clock(), parse_day(), split_type_flag(), activity_type()  (pure, testable)
+    constants.py      STATUS_COLORS, CAT_PANEL_STATUS_LABELS, ACTIVITY_TYPES, ROBOT_MODELS
+    theme.py          Catppuccin Mocha palette + semantic roles (BACKGROUND, MUTED, DANGER, …) + CSS_VARIABLES/apply() — the only place a hex literal belongs
+    config.py         runtime settings persistence — load()/save()/update() over ~/.asher-cli/config.json; holds poll interval, cat-panel visibility/colour, active pet index, notification settings (non-secret UI prefs only; credentials stay in keyring)
+    credentials.py    keyring + dev-mode .env credentials — load()/save()/delete(), load_token()/save_token(), preferred robot, password_login(), available() (presence only, no network), connect_headless(), HeadlessAuthError
+    faults.py         check_faults(robot) — model-scoped safety/component fault detection (status enum + per-model attr allowlist incl. LR4 USB power fault; hopper never a fault)
+    activity.py       ACTION_LABELS + format_activity() — raw pylitterbot activity strings → readable (label, colour); shared by `history` and export
+    export.py         shared activity-history CSV core + exit-code contract: build_history_csv(), resolve_dest(), resolve_robot(), parse_days(), EXIT_*, ExportError — the TUI `export` command and `asher export` both call build_history_csv()
+    updates.py        PyPI release check — read-only over HTTPS, once a day, reports only. Never installs (see its docstring for why that stays manual)
+
+  robot/
+    protocol.py       RobotProtocol structural Protocol for pylitterbot robot objects
+    adapters.py       RobotAdapter ABC + LR3/LR4/LR5 subclasses + make_adapter() factory
+
+  tui/              the Textual dashboard — nothing outside tui/ imports it except __main__
+    app.py            AsherApp class (thin orchestrator — composes mixins)
+    ui.py             UIMixin — compose(), log helpers (_log_ok/err/warn/info, _log_stamped for hanging-indent lines), cat helpers
+    style.tcss        the app stylesheet ($asher-* variables)
+    connection.py     ConnectionMixin — _connect_worker, token/password connect, post-connect setup (credentials come from core.credentials)
+    monitoring.py     MonitoringMixin — _poll_status_interval, _refresh_status
+    loginflow.py      LoginFlow state machine — inline email/password prompt in command bar
+    loginscreen.py    LoginScreen modal (ModalScreen[tuple[str,str]]) — available, not primary flow
+    completion.py     pure helpers for command completion: slash popup (slash_matches, enter_completes, render_completion) + inline ghost text (CommandSuggester) — fed by _registry, no Textual imports except the Suggester base class
+    history.py        HistoryScreen (ModalScreen) + format_history_rows()/format_history_text() — scrollable activity-history pager pushed by the `history` command; `c` copies the full history (plain text) to the clipboard via action_copy_all()
+    cats.py           CATS dict (ASCII art)
+    commands/
+      __init__.py     CommandsMixin — input routing, dispatch, history nav, completion keys, help rendering
+      base.py         Command ABC, SlashCommand, CommandRegistry, HINT_* bar texts
+      registry.py     _registry — every command instance, registered in one place
+      robot.py        robot commands (clean, status, info, lock, …, sleep-schedule, history, export)
+      lr5.py          LR5-only robot commands (privacy, volume, camera-audio, drawer-reset)
+      builtin.py      help, clear, quit
+      slash.py        slash commands (app management) + _persist()
+
+  desktop/          background + OS integration — never imports tui/
+    watcher.py        background notification loop with no TUI — pure WatchState (robot snapshots → Alert list) + supervising watch() that reconnects with backoff, plus WatcherRunner (asyncio on a worker thread, for the tray)
+    daemon.py         detached watcher process control — `start` pre-flights `credentials.available()` (presence only, no network, so starting offline still works) because the watcher claims the pid file *before* authenticating and would otherwise report a pid for a process that stops a moment later — pid file/log in ~/.asher-cli, start/stop/status/run, cross-platform detach + liveness (os.kill would *terminate* on Windows)
+    tray.py           optional pystray/Pillow system-tray icon over WatcherRunner; every path degrades to a headless watcher. Icon is a panel-toned silhouette + status dot — colour rides the badge, never the whole glyph
+    launcher.py       open_app() — start the TUI in a new terminal from the tray (a detached tray has none): new console on Windows, Terminal.app via AppleScript on macOS, first installed emulator on Linux (desktop's own preferred)
+    desktoptheme.py   panel_is_dark() — is the tray/menu-bar background dark? kdeglobals luma / gsettings / AppleInterfaceStyle / the Personalize registry keys, behind a TTL cache; every probe degrades to a fallback, never raises
+    autostart.py      login items — AutostartBackend ABC + launchd/systemd-user/registry subclasses + backend() factory; all per-user, no admin rights, disable() removes exactly what enable() wrote
+    notifications.py  desktop toast + audible alert façade — plyer first, then the platform's own tool (osascript/notify-send); fire/beep are always-safe no-ops on failure/headless
+
+  mcp/
+    config.py         Claude Desktop config read/write for the /mcp slash command
+    bridge.py         asher-mcp-launch console script — keyring-backed pylitterbot MCP launcher
+```
+
+**Layering** (enforced by `tests/test_layering.py`): `core/` and `robot/` import only each other; `mcp/` imports neither `tui/` nor `desktop/`; `desktop/` may use `core/`, `robot/` and `headless`, never `tui/`; only `__main__` imports `tui/`. Something both the TUI and the watcher need belongs in `core/`.
+
+```
 tests/
   testhelpers.py          unit tests for helpers.py
   test_cats.py            CATS dict structure
@@ -62,7 +82,8 @@ tests/
   test_auth_pilot.py      Textual Pilot integration tests for LoginScreen
   test_app_pilot.py       Textual Pilot integration tests for AsherApp
   test_commands_pilot.py  Textual Pilot integration tests for command dispatch
-  test_connection.py      keyring helper functions
+  test_credentials.py     keyring/env credential helpers (core.credentials)
+  test_layering.py        subpackage import boundaries (AST scan of asher/)
   test_connection_mixin.py ConnectionMixin structure
   test_monitoring.py      MonitoringMixin async methods
   test_ui.py              UIMixin constants, CSS, helper existence
@@ -109,21 +130,21 @@ LITTER_ROBOT_USER=...
 LITTER_ROBOT_PASSWORD=...
 ```
 
-Every environment read goes through `_env_credentials()` in
-`asher/connection/__init__.py` — the one place the gate is applied. Don't call
+Every environment read goes through `credentials.from_env()` in
+`asher/core/credentials.py` — the one place the gate is applied. Don't call
 `os.getenv("LITTER_ROBOT_*")` anywhere else. `helpers.dev_mode()` is the shared
 predicate (it also selects the `dev` version string).
 
 Keyring service name: `asher-cli`, keys `email` and `password`.
-Helper functions in `asher/connection/__init__.py`: `_keyring_load()`, `_keyring_save()`, `_keyring_delete()`.
+Helpers live in `asher/core/credentials.py` (`load()`, `save()`, `delete()`, …); call them through the module (`credentials.load()`) so tests have one patch target.
 
 ## Command convention
 
-Command names, slash-command names, and their args are not listed here — see the `_registry` in `asher/commands/__init__.py`, which is authoritative; `/help` renders it at runtime. `/mcp`'s credential-bridging design is documented in the `mcp-bridge` skill.
+Command names, slash-command names, and their args are not listed here — see `_registry` in `asher/tui/commands/registry.py`, which is authoritative; `/help` renders it at runtime. `/mcp`'s credential-bridging design is documented in the `mcp-bridge` skill.
 
 **Normal commands** (no prefix) are robot actions only; **slash commands** (`/` prefix) are app management only.
 
-`/refresh`, `/cat`, `/pet`, and `/notify` persist their settings to `~/.asher-cli/config.json` (via `asher.config.update()`), so they survive restarts. That file is also the only channel to a running watcher, which re-reads it per alert rather than caching at startup. Credentials and the preferred-robot serial stay in the OS keyring; the config file holds only non-secret UI preferences.
+`/refresh`, `/cat`, `/pet`, and `/notify` persist their settings to `~/.asher-cli/config.json` (via `asher.core.config.update()`), so they survive restarts. That file is also the only channel to a running watcher, which re-reads it per alert rather than caching at startup. Credentials and the preferred-robot serial stay in the OS keyring; the config file holds only non-secret UI preferences.
 
 Do not add robot-control commands as slash commands, and do not add app-management commands as bare commands.
 
@@ -132,7 +153,7 @@ Do not add robot-control commands as slash commands, and do not add app-manageme
 
 **Headless commands** (`asher <command>`) are a parallel registry in `asher/headless.py`: same robot actions, no Textual, plain-string + JSON output. `asher watch` and `asher update` are deliberately *not* in that registry — `watch` manages a long-lived process rather than doing one thing and exiting, and `update` talks to PyPI rather than a robot, so neither should be forced through `open_session()` and made to authenticate. Both declare their subparser directly in `__main__.py`. Slash commands have no headless equivalent — they configure the TUI, which isn't running. A robot command worth scripting should exist in both registries; the shared logic lives in `RobotAdapter`, not in either command class.
 
-> If you add a command, update the tables in `README.md` and the list in `asher/slash-commands/__init__.py`. If it's a robot command, consider adding it to `COMMANDS` in `asher/headless.py` too.
+> If you add a command, update the tables in `README.md`. If it's a robot command, consider adding it to `COMMANDS` in `asher/headless.py` too.
 
 ## Architecture
 
@@ -180,19 +201,19 @@ LoginScreen (ModalScreen) — available in auth.py but not the primary auth path
 | `on_key()` | `↑`/`↓` history nav, plus completion nav (arrows cycle the slash popup, `Tab`/`Enter` accept, `Esc` dismisses); `Tab` also accepts the inline ghost-text suggestion when the popup is closed |
 | `_start_login_flow()` | begin inline email/password prompt in command bar |
 | `_cmd_logout()` | delete creds from keyring, disconnect |
-| `make_adapter(robot)` | factory in `robot_adapters.py` — returns correct `RobotAdapter` subclass |
+| `make_adapter(robot)` | factory in `robot/adapters.py` — returns correct `RobotAdapter` subclass |
 | `_log_ok/err/warn/info()` | timestamped log helpers |
 
 ## Robot compatibility
 
-pylitterbot auto-detects robot type. Commands that differ per model are handled by `RobotAdapter` subclasses in `robot_adapters.py` — `make_adapter(robot)` returns the right one based on `type(robot).__name__`. Status-bar reads use `getattr(..., default)` for graceful degradation on older models. See the `pylitterbot-ref` skill for the confirmed API surface.
+pylitterbot auto-detects robot type. Commands that differ per model are handled by `RobotAdapter` subclasses in `robot/adapters.py` — `make_adapter(robot)` returns the right one based on `type(robot).__name__`. Status-bar reads use `getattr(..., default)` for graceful degradation on older models. See the `pylitterbot-ref` skill for the confirmed API surface.
 
 ## Colour
 
-Every colour comes from `asher/theme.py` (Catppuccin Mocha). Reference the **semantic roles** (`theme.MUTED`, `theme.DANGER`, …), not the raw swatches (`theme.OVERLAY0`) and never a hex literal — a re-flavour then only repoints the roles.
+Every colour comes from `asher/core/theme.py` (Catppuccin Mocha). Reference the **semantic roles** (`theme.MUTED`, `theme.DANGER`, …), not the raw swatches (`theme.OVERLAY0`) and never a hex literal — a re-flavour then only repoints the roles.
 
 - **Rich styles:** `style=theme.ACCENT`, or `style=f"bold {theme.ACCENT}"`. Prefer building `Text` objects with explicit styles over `Text.from_markup` with inline colours.
-- **`ui/style.tcss`:** use the `$asher-*` variables; `AsherApp.get_css_variables()` supplies them.
+- **`tui/style.tcss`:** use the `$asher-*` variables; `AsherApp.get_css_variables()` supplies them.
 - **Inline `CSS`/`DEFAULT_CSS` on a Screen or Widget:** wrap the block in `theme.apply(...)`, which bakes the `$asher-*` values in at class-definition time. A screen mounted on a host app that isn't `AsherApp` (as the Pilot tests do) would otherwise fail to parse.
 
 ## Code comments
@@ -206,7 +227,7 @@ Don't add comments above functions or inline unless the WHY is genuinely non-obv
 - Cat modes: `idle`, `happy`, `cleaning` (animated), `sleeping`, `error`, `full`
 - `VERSION` is read from `importlib.metadata.version("asher-cli")` — falls back to `"dev"` when running from source
 - **No `assert` in `asher/`** — Bandit enforces this (B101 is enabled; only `tests/` is exempt, via `exclude_dirs`). For a `requires_robot` command, narrow with `if app._robot is None: return` rather than an assert: `_dispatch_command` already rejects the disconnected case, and unlike `assert` the guard survives `python -O`
-- The primary login path is the inline flow in `login_flow.py` (`LoginFlow` state machine: `IDLE` → `AWAITING_EMAIL` → `AWAITING_PASSWORD`). `LoginScreen` (`auth.py`) still exists as a modal but is not used in the current main flow.
+- The primary login path is the inline flow in `tui/loginflow.py` (`LoginFlow` state machine: `IDLE` → `AWAITING_EMAIL` → `AWAITING_PASSWORD`). `LoginScreen` (`tui/loginscreen.py`) still exists as a modal but is not used in the current main flow.
 - `LoginScreen` uses `event.stop()` on `Input.Submitted` and `Button.Pressed` to prevent bubbling to the App's `on_input_submitted` (relevant if re-activating the modal path)
 
 ### IoT command timing — optimistic UI updates
@@ -217,15 +238,15 @@ Commands that need a confirmed cloud state before showing a result (e.g. sleep/w
 
 ## Common tasks
 
-**Add a robot command:** create a class inheriting `Command` in `asher/commands/__init__.py`, implement `async def run(self, app, args)`, and call `_registry.register(MyCommand())`.
+**Add a robot command:** create a class inheriting `Command` in `asher/tui/commands/robot.py` (or `lr5.py`), implement `async def run(self, app, args)`, and register it in `registry.py`.
 
-**Add a slash command:** create a class inheriting `SlashCommand` (sets `prefix = "/"`), implement `async def run(self, app, args)`, register it, and document in `asher/slash-commands/__init__.py`.
+**Add a slash command:** create a class inheriting `SlashCommand` (sets `prefix = "/"`) in `asher/tui/commands/slash.py`, implement `async def run(self, app, args)`, and register it in `registry.py`.
 
 **Add a headless command:** write `async def _my_command(session, args) -> Result` in `asher/headless.py` and add a `HeadlessCommand(...)` entry to `COMMANDS`. The argparse subparser is generated from the registry — nothing to add in `__main__.py`. Build the `Result` with `_rows()` (read commands) or `_outcome()` (actions) so text and JSON stay in step, and raise `CommandError` rather than printing.
 
 **Change poll interval:** `self.set_interval(300, ...)` in `on_mount`.
 
-**Add a new cat state:** add entry to `CATS` dict in `asher/cats.py` (str for static, list[str] for animated), then call `_set_cat("name", "label")`.
+**Add a new cat state:** add entry to `CATS` dict in `asher/tui/cats.py` (str for static, list[str] for animated), then call `_set_cat("name", "label")`.
 
 **File naming convention:** no underscores in filenames (except Python-required `__init__.py` and `__main__.py`).
 
@@ -254,5 +275,5 @@ Regenerate with `changelog-release X.Y.Z`, never plain `changelog` — the workf
 - Pilot-based integration tests use `app.run_test()` with `await pilot.pause()` before querying widgets
 - Helper app wrappers for screens must **not** start with `Test` (pytest will try to collect them); use e.g. `LoginTestApp`
 - Mock external deps with `unittest.mock.AsyncMock` for async robot/account methods
-- `from pylitterbot import Account` is a local import inside `_connect_worker` — patch it at `pylitterbot.Account`, not `asher.connection.Account`
+- `from pylitterbot import Account` is a local import inside `_connect_worker` — patch it at `pylitterbot.Account`, not `asher.tui.connection.Account`
 - Coverage: ~76% overall; main gaps are async exception paths and `_connect_worker` auth flow

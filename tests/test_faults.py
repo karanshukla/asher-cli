@@ -1,4 +1,4 @@
-"""Tests for asher.faults — model-scoped live fault & safety detection."""
+"""Tests for asher.core.faults — model-scoped live fault & safety detection."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 from pylitterbot.enums import GlobeMotorFaultStatus, LitterBoxStatus
 from pylitterbot.robot.litterrobot4 import UsbFaultStatus
 
-from asher.faults import SEVERITY_ERROR, SEVERITY_WARN, Fault, check_faults
+from asher.core.faults import SEVERITY_ERROR, SEVERITY_WARN, Fault, check_faults
 
 _OK_GLOBE = GlobeMotorFaultStatus.NONE
 _FAULT_GLOBE = GlobeMotorFaultStatus.FAULT_OVERTORQUE_AMP

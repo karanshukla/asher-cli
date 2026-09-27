@@ -1,4 +1,4 @@
-"""Tests for asher.history_view — the activity-history pager.
+"""Tests for asher.tui.history — the activity-history pager.
 
 Covers two layers:
 
@@ -21,7 +21,7 @@ from textual.app import App
 from textual.containers import ScrollableContainer
 from textual.widgets import Static
 
-from asher.history_view import HistoryScreen, format_history_rows, format_history_text
+from asher.tui.history import HistoryScreen, format_history_rows, format_history_text
 
 
 def _act(action: Any, *, timestamp: datetime | None = None) -> SimpleNamespace:
@@ -308,8 +308,8 @@ async def test_history_command_pushes_screen_with_default_limit():
     """End-to-end: typing `history` fetches with the default and pushes the pager."""
     from unittest.mock import AsyncMock, MagicMock
 
-    from asher.app import AsherApp
-    from asher.robot_adapters import LR3Adapter
+    from asher.robot.adapters import LR3Adapter
+    from asher.tui.app import AsherApp
 
     robot = MagicMock()
     robot.name = "TestBot"
@@ -352,8 +352,8 @@ async def test_history_screen_arrow_keys_scroll_through_asher_app():
     """
     from unittest.mock import AsyncMock, MagicMock
 
-    from asher.app import AsherApp
-    from asher.robot_adapters import LR3Adapter
+    from asher.robot.adapters import LR3Adapter
+    from asher.tui.app import AsherApp
 
     robot = MagicMock()
     robot.name = "TestBot"

@@ -1,9 +1,9 @@
-"""Tests for asher.auth module."""
+"""Tests for asher.tui.loginscreen module."""
 
 from __future__ import annotations
 
-from asher import theme
-from asher.auth import LoginScreen
+from asher.core import theme
+from asher.tui.loginscreen import LoginScreen
 
 
 class TestLoginScreenStructure:
