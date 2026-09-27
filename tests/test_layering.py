@@ -42,7 +42,9 @@ def _imported_layers(path: Path) -> set[str]:
 @pytest.mark.parametrize("layer", sorted(FORBIDDEN))
 def test_layer_imports_stay_inside_their_boundary(layer: str) -> None:
     violations = {
-        str(path.relative_to(PACKAGE.parent)): sorted(_imported_layers(path) & FORBIDDEN[layer])
+        path.relative_to(PACKAGE.parent).as_posix(): sorted(
+            _imported_layers(path) & FORBIDDEN[layer]
+        )
         for path in (PACKAGE / layer).rglob("*.py")
     }
     assert {path: bad for path, bad in violations.items() if bad} == {}
@@ -50,7 +52,7 @@ def test_layer_imports_stay_inside_their_boundary(layer: str) -> None:
 
 def test_only_the_entry_point_reaches_into_the_tui() -> None:
     importers = {
-        str(path.relative_to(PACKAGE.parent))
+        path.relative_to(PACKAGE.parent).as_posix()
         for path in PACKAGE.rglob("*.py")
         if "tui" not in path.relative_to(PACKAGE).parts[:1] and "tui" in _imported_layers(path)
     }
