@@ -269,8 +269,8 @@ requires-dist = [
     { name = "pillow", marker = "extra == 'tray'", specifier = ">=10.0" },
     { name = "plyer", specifier = ">=2.1.0" },
     { name = "pygobject", marker = "sys_platform == 'linux' and extra == 'tray'", specifier = ">=3.42" },
-    { name = "pylitterbot", specifier = "==2025.6.5" },
-    { name = "pylitterbot", extras = ["mcp"], marker = "extra == 'mcp'", specifier = "==2025.6.5" },
+    { name = "pylitterbot", specifier = "==2025.6.6" },
+    { name = "pylitterbot", extras = ["mcp"], marker = "extra == 'mcp'", specifier = "==2025.6.6" },
     { name = "pystray", marker = "extra == 'tray'", specifier = ">=0.19" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "rich", specifier = ">=13.0.0" },
@@ -2585,7 +2585,7 @@ crypto = [
 
 [[package]]
 name = "pylitterbot"
-version = "2025.6.5"
+version = "2025.6.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -2593,9 +2593,9 @@ dependencies = [
     { name = "pycognito" },
     { name = "pyjwt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/83/33/7768130bdb281c4523e4af96b212d6364d911adb4dd9e07bded0e4abb133/pylitterbot-2025.6.5.tar.gz", hash = "sha256:6128c00385fbf843c51f379983221a2a8a71003aa9e6e1771d37bf6b337c7a5d", size = 68619, upload-time = "2026-09-04T22:32:40.031Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/70/b6/1b07fa1a1c64c7c601d5db083c5a0edabf912c882bddc698fe10ead49f81/pylitterbot-2025.6.6.tar.gz", hash = "sha256:5b87c3485b0ba2642876ee8f614ab017d0bdbf5a41e21e03e3cf09eed0cd5ebc", size = 69169, upload-time = "2026-09-30T01:39:32.338Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/88/ba/b87cf7bad59f0ef1cb2484ca1e148f0393a08e17e62f2a4befed813dafc6/pylitterbot-2025.6.5-py3-none-any.whl", hash = "sha256:d9cf5f855b106b17d84dce6dc8c0d89c387a9254eb7418e0ea78ea5bbe89af13", size = 85682, upload-time = "2026-09-04T22:32:38.942Z" },
+    { url = "https://files.pythonhosted.org/packages/bf/04/d4c0153ac5665f0aca52735343a87c9dbc2cf6305c8073c584d38e9d4b7b/pylitterbot-2025.6.6-py3-none-any.whl", hash = "sha256:7668fb6f80536c773988c6aff6b7a29f35bb988c71ef56329208397a15192811", size = 86084, upload-time = "2026-09-30T01:39:31.38Z" },
 ]
 
 [package.optional-dependencies]

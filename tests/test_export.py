@@ -207,6 +207,22 @@ class TestBuildHistoryCsv:
         count = await build_history_csv(robot, [], 7, dest)
         assert count == 1
 
+    async def test_lr4_fetch_passes_window_start(self, tmp_path):
+        class LitterRobot4(MagicMock):
+            pass
+
+        robot = LitterRobot4(get_activity_history=AsyncMock(return_value=[]))
+        await build_history_csv(robot, [], 30, tmp_path / "out.csv")
+        start = robot.get_activity_history.await_args.kwargs["start"]
+        assert start.tzinfo is timezone.utc
+        age = datetime.now(timezone.utc) - start
+        assert timedelta(days=30) <= age < timedelta(days=30, seconds=5)
+
+    async def test_non_lr4_fetch_sends_no_start(self, tmp_path):
+        robot = _robot()
+        await build_history_csv(robot, [], 30, tmp_path / "out.csv")
+        robot.get_activity_history.assert_awaited_once_with(limit=500)
+
     async def test_sorts_ascending_by_timestamp(self, tmp_path):
         newer = _act(days_ago=1)
         older = _act(days_ago=5)

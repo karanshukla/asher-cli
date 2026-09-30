@@ -32,6 +32,8 @@ await robot.set_panel_lockout(enabled: bool)
 await robot.set_night_light_brightness(brightness: int)   # or:
 await robot.set_night_light_mode(mode: NightLightMode)
 await robot.get_activity_history(limit: int)  # -> list[Activity]
+# LR4 only (2025.6.6+): start= reaches past the ~6 days the API returns without it
+await robot.get_activity_history(limit: int, start: datetime | None = None)
 ```
 
 ## Activity objects
