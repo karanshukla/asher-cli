@@ -20,7 +20,8 @@ if TYPE_CHECKING:
     from ..robot.protocol import RobotProtocol
 
 # Whisker caps activity history at 30 days; fetching with a high limit ensures
-# full coverage up to that ceiling.
+# full coverage up to that ceiling. The LR4 also needs a start time, or it
+# stops at about 6 days whatever the limit.
 _FETCH_LIMIT = 500
 _MAX_DAYS = 30
 
@@ -60,9 +61,8 @@ def parse_days(raw: str | None) -> int:
         ) from None
 
 
-def _filter_recent(acts: list[Any], days: int) -> list[tuple[Any, datetime]]:
-    """Keep only events newer than ``days`` ago, returning ``(act, aware_ts)`` pairs."""
-    cutoff = datetime.now(tz=timezone.utc) - timedelta(days=days)
+def _filter_recent(acts: list[Any], cutoff: datetime) -> list[tuple[Any, datetime]]:
+    """Keep only events at or after ``cutoff``, returning ``(act, aware_ts)`` pairs."""
     filtered: list[tuple[Any, datetime]] = []
     for act in acts:
         ts_dt = getattr(act, "timestamp", None)
@@ -106,12 +106,18 @@ async def build_history_csv(robot: RobotProtocol, pets: list[Any], days: int, de
     ``ACTION_LABELS`` / ``activity_raw_text`` so events render identically to
     the ``history`` command output.
     """
+    cutoff = datetime.now(tz=timezone.utc) - timedelta(days=days)
+    # Only the LR4's get_activity_history() takes a start time.
+    fetch: Any = robot.get_activity_history
     try:
-        acts = await robot.get_activity_history(limit=_FETCH_LIMIT)
+        if type(robot).__name__ == "LitterRobot4":
+            acts = await fetch(limit=_FETCH_LIMIT, start=cutoff)
+        else:
+            acts = await fetch(limit=_FETCH_LIMIT)
     except Exception as exc:  # noqa: BLE001 — surface any API failure as a clean exit
         raise ExportError(f"Failed to fetch history: {exc}", EXIT_CONNECTION_FAILURE) from exc
 
-    filtered = _filter_recent(list(acts), days)
+    filtered = _filter_recent(list(acts), cutoff)
 
     serial = getattr(robot, "serial", "") or ""
     robot_name = getattr(robot, "name", "") or ""
