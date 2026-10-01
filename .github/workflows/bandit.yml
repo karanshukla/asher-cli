@@ -37,7 +37,7 @@ jobs:
         # --exit-zero: findings must not fail the job, or the upload step below
         # is skipped and code scanning keeps showing the previous run's alerts.
         run: >-
-          uvx --from 'bandit[toml,sarif]' bandit
+          uvx --from 'bandit[toml,sarif]==1.9.4' bandit
           -c pyproject.toml -r . -f sarif -o bandit.sarif --exit-zero
 
       - name: Upload SARIF to code scanning

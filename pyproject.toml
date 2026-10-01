@@ -81,7 +81,7 @@ lint   = "ruff check ."
 fmt    = "ruff format --check ."
 types  = "mypy asher/ --ignore-missing-imports"
 test   = "pytest tests/ -v --tb=short"
-security.cmd = "uvx --from bandit[toml] bandit -c pyproject.toml -r ."
+security.cmd = "uvx --from bandit[toml]==1.9.4 bandit -c pyproject.toml -r ."
 security.help = "run the same Bandit scan as the Bandit workflow"
 fix.sequence = [{cmd = "ruff check --fix ."}, {cmd = "ruff format ."}]
 dev    = "textual run --dev asher/__main__.py"
