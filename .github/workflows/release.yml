@@ -6,8 +6,7 @@ on:
       - "release/*"
 
 permissions:
-  contents: write  # needed to create GitHub Releases
-  id-token: write  # needed for PyPI OIDC trusted publishing
+  contents: read
 
 jobs:
   build:
@@ -32,6 +31,8 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     environment: pypi
+    permissions:
+      id-token: write  # needed for PyPI OIDC trusted publishing
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
@@ -43,6 +44,8 @@ jobs:
     name: Create GitHub Release
     needs: [build, publish]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # needed to create GitHub Releases
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
