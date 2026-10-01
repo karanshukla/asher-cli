@@ -11,6 +11,10 @@ from pathlib import Path
 _SERVER_NAME = "Asher CLI MCP Bridge"
 
 
+class McpConfigError(Exception):
+    """A Claude Desktop config file exists but can't be read as a JSON object."""
+
+
 def mcp_extra_installed() -> bool:
     """Whether pylitterbot's mcp extra (the third-party `mcp` SDK) is importable."""
     return importlib.util.find_spec("mcp") is not None
@@ -60,10 +64,12 @@ def _load(path: Path) -> dict:
     if not path.exists():
         return {}
     try:
-        data: dict = json.loads(path.read_text(encoding="utf-8"))
-        return data
-    except (json.JSONDecodeError, OSError):
-        return {}
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as e:
+        raise McpConfigError(f"Can't read {path}: {e}") from e
+    if not isinstance(data, dict):
+        raise McpConfigError(f"Can't read {path}: not a JSON object")
+    return data
 
 
 def _save(path: Path, data: dict) -> None:
@@ -74,12 +80,13 @@ def _save(path: Path, data: dict) -> None:
 def set_mcp_enabled(enabled: bool) -> list[Path]:
     """Add or remove the MCP server entry in every known config location.
 
-    Returns the list of config paths actually written.
+    Returns the list of config paths actually written. Raises McpConfigError,
+    before writing anything, if any existing config can't be read.
     """
     touched: list[Path] = []
+    configs = [(path, _load(path)) for path in config_paths()]
 
-    for path in config_paths():
-        data = _load(path)
+    for path, data in configs:
         servers = data.setdefault("mcpServers", {})
 
         if enabled:
@@ -101,7 +108,9 @@ def mcp_status() -> list[tuple[Path, bool]]:
     """Return (path, enabled) for every known Claude Desktop config location."""
     result = []
     for path in config_paths():
-        data = _load(path)
-        enabled = _SERVER_NAME in data.get("mcpServers", {})
+        try:
+            enabled = _SERVER_NAME in _load(path).get("mcpServers", {})
+        except McpConfigError:
+            enabled = False
         result.append((path, enabled))
     return result

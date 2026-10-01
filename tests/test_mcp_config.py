@@ -5,7 +5,15 @@ from __future__ import annotations
 import json
 from unittest.mock import patch
 
-from asher.mcp.config import _SERVER_NAME, config_paths, mcp_status, set_mcp_enabled
+import pytest
+
+from asher.mcp.config import (
+    _SERVER_NAME,
+    McpConfigError,
+    config_paths,
+    mcp_status,
+    set_mcp_enabled,
+)
 
 
 class TestSetMcpEnabled:
@@ -45,13 +53,28 @@ class TestSetMcpEnabled:
         assert touched == []
         assert not path.exists()
 
-    def test_handles_corrupt_config_file(self, tmp_path):
+    @pytest.mark.parametrize("content", ["{not valid json", "[]"])
+    def test_refuses_to_overwrite_an_unreadable_config(self, tmp_path, content):
         path = tmp_path / "claude_desktop_config.json"
-        path.write_text("{not valid json", encoding="utf-8")
-        with patch("asher.mcp.config.config_paths", return_value=[path]):
+        path.write_text(content, encoding="utf-8")
+        with (
+            patch("asher.mcp.config.config_paths", return_value=[path]),
+            pytest.raises(McpConfigError),
+        ):
             set_mcp_enabled(True)
-        data = json.loads(path.read_text(encoding="utf-8"))
-        assert _SERVER_NAME in data["mcpServers"]
+        assert path.read_text(encoding="utf-8") == content
+
+    def test_writes_no_location_when_any_is_unreadable(self, tmp_path):
+        good = tmp_path / "good" / "claude_desktop_config.json"
+        bad = tmp_path / "bad" / "claude_desktop_config.json"
+        bad.parent.mkdir()
+        bad.write_text("{not valid json", encoding="utf-8")
+        with (
+            patch("asher.mcp.config.config_paths", return_value=[good, bad]),
+            pytest.raises(McpConfigError),
+        ):
+            set_mcp_enabled(True)
+        assert not good.exists()
 
     def test_enables_across_multiple_locations(self, tmp_path):
         standard = tmp_path / "standard" / "claude_desktop_config.json"
@@ -79,6 +102,13 @@ class TestMcpStatus:
         with patch("asher.mcp.config.config_paths", return_value=[path]):
             result = mcp_status()
         assert result == [(path, True)]
+
+    def test_reports_disabled_for_an_unreadable_config(self, tmp_path):
+        path = tmp_path / "claude_desktop_config.json"
+        path.write_text("{not valid json", encoding="utf-8")
+        with patch("asher.mcp.config.config_paths", return_value=[path]):
+            result = mcp_status()
+        assert result == [(path, False)]
 
 
 class TestConfigPaths:
