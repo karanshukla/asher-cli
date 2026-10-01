@@ -81,10 +81,11 @@ class TestMcpCommand:
         with (
             patch("asher.core.credentials.load", return_value=("a@b.com", "pw")),
             patch("asher.mcp.config.mcp_extra_installed", return_value=False),
-            patch("asyncio.create_subprocess_exec", return_value=proc),
+            patch("asyncio.create_subprocess_exec", return_value=proc) as mock_exec,
             patch("asher.mcp.config.set_mcp_enabled", return_value=[Path("x")]) as mock_set,
         ):
             await McpCommand().run(app, ["on"])
+        assert "mcp<2" in mock_exec.call_args.args
         mock_set.assert_called_once_with(True)
 
     async def test_on_skips_enabling_when_install_fails(self, app):
