@@ -439,14 +439,15 @@ async def _ensure_mcp_extra(app: AsherApp) -> bool:
     if mcp_extra_installed():
         return True
 
-    pin = f"pylitterbot[mcp]=={pkg_version('pylitterbot')}"
-    app._log_info(f"Installing {pin}…")
+    # Same requirements as the `mcp` extra in pyproject.toml, cap included.
+    requirements = [f"pylitterbot[mcp]=={pkg_version('pylitterbot')}", "mcp<2"]
+    app._log_info(f"Installing {' '.join(requirements)}…")
     proc = await asyncio.create_subprocess_exec(
         sys.executable,
         "-m",
         "pip",
         "install",
-        pin,
+        *requirements,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
     )
@@ -458,7 +459,8 @@ async def _ensure_mcp_extra(app: AsherApp) -> bool:
     app._log_err("Failed to install pylitterbot[mcp]:")
     for line in output.splitlines()[-10:]:
         app._log_err(f"  {line}")
-    app._log_info(f"Try manually: {sys.executable} -m pip install '{pin}'")
+    quoted = " ".join(f"'{r}'" for r in requirements)
+    app._log_info(f"Try manually: {sys.executable} -m pip install {quoted}")
     return False
 
 
