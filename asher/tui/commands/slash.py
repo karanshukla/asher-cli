@@ -467,7 +467,7 @@ class McpCommand(SlashCommand):
     description = "on|off|status  Litter-Robot MCP server for Claude Desktop"
 
     async def run(self, app: AsherApp, args: list[str]) -> None:
-        from ...mcp.config import mcp_status, set_mcp_enabled  # noqa: PLC0415
+        from ...mcp.config import McpConfigError, mcp_status, set_mcp_enabled  # noqa: PLC0415
 
         sub = args[0].lower() if args else "status"
         if sub not in ("on", "off", "status"):
@@ -507,9 +507,12 @@ class McpCommand(SlashCommand):
                 return
             if not await _ensure_mcp_extra(app):
                 return
-            touched = set_mcp_enabled(True)
-        else:
-            touched = set_mcp_enabled(False)
+
+        try:
+            touched = set_mcp_enabled(sub == "on")
+        except McpConfigError as e:
+            app._log_err(f"{e}. Nothing was changed.")
+            return
 
         verb = "enabled" if sub == "on" else "disabled"
         if touched:

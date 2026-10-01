@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from asher.mcp.config import McpConfigError
 from asher.tui.commands.slash import McpCommand
 
 
@@ -106,6 +107,12 @@ class TestMcpCommand:
             await McpCommand().run(app, ["off"])
         mock_set.assert_called_once_with(False)
         app._log_ok.assert_called_once()
+
+    async def test_off_reports_an_unreadable_config_instead_of_writing(self, app):
+        with patch("asher.mcp.config.set_mcp_enabled", side_effect=McpConfigError("Can't read x")):
+            await McpCommand().run(app, ["off"])
+        app._log_err.assert_called_once()
+        app._log_ok.assert_not_called()
 
     async def test_off_when_already_disabled_logs_info_not_ok(self, app):
         with patch("asher.mcp.config.set_mcp_enabled", return_value=[]):
