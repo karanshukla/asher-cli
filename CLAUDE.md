@@ -277,3 +277,7 @@ Regenerate with `changelog-release X.Y.Z`, never plain `changelog` — the workf
 - Mock external deps with `unittest.mock.AsyncMock` for async robot/account methods
 - `from pylitterbot import Account` is a local import inside `_connect_worker` — patch it at `pylitterbot.Account`, not `asher.tui.connection.Account`
 - Coverage: ~76% overall; main gaps are async exception paths and `_connect_worker` auth flow
+
+## Temp files and large downloads
+
+`/tmp` is tmpfs on this machine, and so is Claude Code's scratchpad (it lives under `/tmp`), so anything written there is held in RAM. Put venvs, model and runtime downloads, extracted archives and build output on disk under `~/.cache/claude-scratch/<task>/` instead, and keep only small throwaway files in the scratchpad. An in-repo `.venv` or `target/` is already on disk and fine.
