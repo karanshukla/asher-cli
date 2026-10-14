@@ -19,7 +19,7 @@ A Claude Code-style terminal dashboard for monitoring and controlling Litter Rob
 - Live status bar — unit name, online/offline, drawer fill level, last activity, cat weight
 - Human-readable robot status — translates raw API states into plain English (`Ready`, `Cleaning`, `Cat Detected`, `Drawer Full`, etc.)
 - Real-time cycling indicator with elapsed time (`⟳ Cycling  M:SS`)
-- Fault & safety monitoring — model-scoped in-panel alerts for cat detected, pinch, motor/position/gas faults (LR5: bonnet/laser/drawer); press `d` to dismiss
+- Fault & safety monitoring — model-scoped in-panel alerts for cat detected, pinch, motor/position/gas faults, dirty laser sensors (LR4/LR5), LR5 bonnet/drawer; press `d` to dismiss
 - Cat panel with mode label + status badges (status chip, lock, night light, sleep, wait time) under the art
 - Scrollable activity-history pager — `history [count|all] [--type <kind>]` opens a full-screen, paginated view (arrow keys, `Page Up`/`Page Down`, `Home`/`End`); `c` copies the whole history to the clipboard; `q`/`Esc`/`Enter` to close
 - Commands: `clean`, `status`, `info`, `lock`, `unlock`, `sleep`, `wake`, `night-light on|off|auto|color <hex>`, `night-light-brightness`, `panel-brightness <low|medium|high>` (LR4/LR5), `wait-time`, `power on|off`, `rename`, `insight`, `sleep-schedule [set|disable]`, plus LR5 extras (`privacy`, `volume`, `camera-audio`, `drawer-reset`), `history [count|all] [--type <kind>]`, `export [days|month]`, `help`, `quit`
@@ -414,7 +414,7 @@ Scan settings live in `[tool.bandit]` in `pyproject.toml`, so local runs and the
 Bandit workflow report identical findings. Results from `main` and pull requests
 are published to the repository's **Security → Code scanning** tab.
 
-CI runs on Python 3.10 / 3.11 / 3.12 across Ubuntu, Windows, and macOS on every push.
+CI runs on Python 3.11 / 3.12 across Ubuntu, Windows, and macOS on every push.
 
 ## Changelog
 

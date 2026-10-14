@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import argparse
 import csv
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -155,7 +155,7 @@ def _act(
     pet_id: str | None = None,
 ) -> MagicMock:
     act = MagicMock()
-    act.timestamp = datetime.now(timezone.utc) - timedelta(days=days_ago)
+    act.timestamp = datetime.now(UTC) - timedelta(days=days_ago)
     act.action = MagicMock(text=action_text)
     act.weight = weight
     act.pet_id = pet_id
@@ -214,8 +214,8 @@ class TestBuildHistoryCsv:
         robot = LitterRobot4(get_activity_history=AsyncMock(return_value=[]))
         await build_history_csv(robot, [], 30, tmp_path / "out.csv")
         start = robot.get_activity_history.await_args.kwargs["start"]
-        assert start.tzinfo is timezone.utc
-        age = datetime.now(timezone.utc) - start
+        assert start.tzinfo is UTC
+        age = datetime.now(UTC) - start
         assert timedelta(days=30) <= age < timedelta(days=30, seconds=5)
 
     async def test_non_lr4_fetch_sends_no_start(self, tmp_path):
@@ -272,7 +272,7 @@ class TestBuildHistoryCsv:
 
     async def test_naive_timestamp_treated_as_utc(self, tmp_path):
         act = MagicMock()
-        act.timestamp = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=1)
+        act.timestamp = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=1)
         act.action = MagicMock(text="Ready")
         act.weight = None
         act.pet_id = None

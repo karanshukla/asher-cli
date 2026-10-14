@@ -20,6 +20,7 @@ robot.sleep_mode_enabled      # bool — NOT "sleeping"
 robot.panel_lock_enabled      # bool — NOT "panel_lockout"
 robot.night_light_mode_enabled # bool
 robot.last_seen               # datetime | None
+robot.is_laser_dirty          # bool — LR4 since 2025.7.0, LR5 always
 ```
 
 ## Robot methods (all async, await required)

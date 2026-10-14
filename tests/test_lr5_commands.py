@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -24,7 +24,7 @@ def lr5_app():
     robot.panel_lock_enabled = False
     robot.night_light_mode_enabled = False
     robot.serial = "LR5C001"
-    robot.last_seen = datetime.now(timezone.utc)
+    robot.last_seen = datetime.now(UTC)
     robot.pet_weight = 9.1
     robot.sound_volume = 50
     robot.refresh = AsyncMock()

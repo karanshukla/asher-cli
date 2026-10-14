@@ -51,7 +51,7 @@ uv run pytest --cov=asher --cov-report=term-missing
 Per-file descriptions are in `CLAUDE.md` § Package structure. Pilot gotchas are
 in `CLAUDE.md` § Testing notes.
 
-CI matrix: Python 3.10 / 3.11 / 3.12 × Ubuntu / Windows / macOS.
+CI matrix: Python 3.11 / 3.12 × Ubuntu / Windows / macOS.
 
 ### Coverage
 
