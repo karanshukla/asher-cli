@@ -104,6 +104,9 @@ _MODEL_ENUM_FAULTS: dict[str, tuple[_EnumCheck, ...]] = {
 
 _MODEL_BOOL_FAULTS: dict[str, tuple[_BoolCheck, ...]] = {
     # LR3 has no component-fault attributes exposed by pylitterbot.
+    "LitterRobot4": (
+        _BoolCheck("is_laser_dirty", "LASER SENSOR DIRTY — clean globe", SEVERITY_WARN),
+    ),
     "LitterRobot5": (
         _BoolCheck("is_bonnet_removed", "BONNET OPEN", SEVERITY_WARN),
         _BoolCheck("is_laser_dirty", "LASER SENSOR DIRTY — clean globe", SEVERITY_WARN),

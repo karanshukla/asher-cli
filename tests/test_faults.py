@@ -139,8 +139,12 @@ class TestLR4ComponentFaults:
         assert check_faults(_lr4(usb_fault_status=UsbFaultStatus.NONE)) == []
         assert check_faults(_lr4(usb_fault_status=UsbFaultStatus.CLEAR)) == []
 
+    def test_laser_dirty_is_warn(self):
+        faults = check_faults(_lr4(is_laser_dirty=True))
+        assert faults == [Fault("LASER SENSOR DIRTY — clean globe", SEVERITY_WARN)]
+
     def test_lr4_ignores_lr5_only_bool_attrs(self):
-        """LR4 allowlist must not check bonnet/laser/gas/drawer-removed."""
+        """LR4 allowlist must not check bonnet/gas/drawer-removed."""
         r = _lr4()
         r.is_bonnet_removed = True
         r.is_gas_sensor_fault_detected = True
