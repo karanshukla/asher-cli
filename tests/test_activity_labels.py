@@ -7,7 +7,7 @@ about how ``action`` (``str | LitterBoxStatus``) is read.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 
 from pylitterbot.enums import LitterBoxStatus
@@ -29,7 +29,7 @@ def _act(action, *, weight=None, pet_id=None, timestamp=None):
     Using ``SimpleNamespace`` lets us attach them without subclassing.
     """
     return SimpleNamespace(
-        timestamp=timestamp or datetime(2026, 6, 14, 12, 0, tzinfo=timezone.utc),
+        timestamp=timestamp or datetime(2026, 6, 14, 12, 0, tzinfo=UTC),
         action=action,
         weight=weight,
         pet_id=pet_id,
@@ -52,7 +52,7 @@ class TestActivityRawText:
 
     def test_missing_action_attribute_falls_back_to_str_none(self):
         # Defensive: a malformed object with no .action attr should not raise.
-        assert activity_raw_text(SimpleNamespace(timestamp=datetime.now(timezone.utc))) == "None"
+        assert activity_raw_text(SimpleNamespace(timestamp=datetime.now(UTC))) == "None"
 
 
 # ── format_activity ──────────────────────────────────────────────────────────

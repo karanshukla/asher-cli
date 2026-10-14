@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -52,7 +52,7 @@ class TestUpdateLastCatSeen:
 
         mock_act = MagicMock()
         mock_act.action = LitterBoxStatus.CAT_DETECTED
-        mock_ts = datetime.now(timezone.utc) - timedelta(hours=1)
+        mock_ts = datetime.now(UTC) - timedelta(hours=1)
         mock_act.timestamp = mock_ts
 
         mixin._robot.get_activity_history = AsyncMock(return_value=[mock_act])
@@ -68,7 +68,7 @@ class TestUpdateLastCatSeen:
 
         mock_act = MagicMock()
         mock_act.action = LitterBoxStatus.CLEAN_CYCLE_COMPLETE
-        mock_act.timestamp = datetime.now(timezone.utc) - timedelta(minutes=5)
+        mock_act.timestamp = datetime.now(UTC) - timedelta(minutes=5)
 
         mixin._robot.get_activity_history = AsyncMock(return_value=[mock_act])
 

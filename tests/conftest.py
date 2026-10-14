@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -25,7 +25,7 @@ def mock_robot():
     r.panel_lock_enabled = False
     r.night_light_mode_enabled = False
     r.serial = "ABC123"
-    r.last_seen = datetime.now(timezone.utc)
+    r.last_seen = datetime.now(UTC)
     # Fault sources in their healthy/no-fault state (enums are truthy even
     # when healthy, so they must be set explicitly to avoid false positives).
     r.globe_motor_fault_status = GlobeMotorFaultStatus.NONE

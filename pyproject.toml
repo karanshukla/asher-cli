@@ -4,20 +4,19 @@ version = "1.5.0"
 description = "Terminal dashboard for Litter Robot (LR3/LR4/LR5) via the Whisker cloud API"
 readme = "README.md"
 license = { file = "LICENSE" }
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 keywords = ["litter-robot", "whisker", "tui", "terminal", "smart-home"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Console",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Home Automation",
 ]
 dependencies = [
-    "pylitterbot==2025.6.6",
+    "pylitterbot==2025.7.0",
     "textual>=0.47.0",
     "rich>=13.0.0",
     "python-dotenv>=1.0.0",
@@ -31,7 +30,7 @@ dependencies = [
 # `from mcp.server.fastmcp import FastMCP`, and mcp 2.0 deleted that module.
 # Cap it here, and in _ensure_mcp_extra (tui/commands/slash.py), until
 # pylitterbot ships a 2.x-compatible release.
-mcp = ["pylitterbot[mcp]==2025.6.6", "mcp<2"]
+mcp = ["pylitterbot[mcp]==2025.7.0", "mcp<2"]
 # PyGObject is what puts pystray on its AppIndicator backend. Without it pystray
 # silently falls back to a legacy XEmbed icon, which KDE Plasma and GNOME no
 # longer host at all — the watcher runs, draws an icon, and nothing shows it.
@@ -105,7 +104,7 @@ packages = ["asher"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py311"
 # Ruff 0.16 added "*.md" to the default include list, which pulls the Python
 # snippets in docs/ and .claude/skills/ into `ruff format`. Those are
 # illustrative, not compiled, so keep the formatter scoped to real source.
@@ -125,7 +124,7 @@ known-first-party = ["asher"]
 # ── Mypy ──────────────────────────────────────────────────────────────────────
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.11"
 warn_return_any = true
 ignore_missing_imports = true  # pylitterbot and textual have incomplete stubs
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import re
-from datetime import datetime, time, timezone
+from datetime import UTC, datetime, time
 
 from rich.text import Text
 
@@ -42,8 +42,8 @@ def fmt_ago(dt: datetime | None) -> str:
     if dt is None:
         return "never"
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    s = int((datetime.now(timezone.utc) - dt).total_seconds())
+        dt = dt.replace(tzinfo=UTC)
+    s = int((datetime.now(UTC) - dt).total_seconds())
     if s < 60:
         return f"{s}s ago"
     if s < 3600:
@@ -58,8 +58,8 @@ def fmt_until(dt: datetime | None) -> str:
     if dt is None:
         return "—"
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    seconds = (dt - datetime.now(timezone.utc)).total_seconds()
+        dt = dt.replace(tzinfo=UTC)
+    seconds = (dt - datetime.now(UTC)).total_seconds()
     stamp = dt.date().isoformat()
     # Counted away from now in whole days, so 3 days and an hour ago reads as
     # "3d" in either direction — timedelta.days alone floors that to 4.

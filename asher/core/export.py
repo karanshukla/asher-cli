@@ -10,7 +10,7 @@ identical regardless of how it was invoked.
 from __future__ import annotations
 
 import csv
-from datetime import datetime, timedelta, timezone, tzinfo
+from datetime import UTC, datetime, timedelta, tzinfo
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -69,7 +69,7 @@ def _filter_recent(acts: list[Any], cutoff: datetime) -> list[tuple[Any, datetim
         if ts_dt is None:
             continue
         if ts_dt.tzinfo is None:
-            ts_dt = ts_dt.replace(tzinfo=timezone.utc)
+            ts_dt = ts_dt.replace(tzinfo=UTC)
         if ts_dt >= cutoff:
             filtered.append((act, ts_dt))
     filtered.sort(key=lambda x: x[1])
@@ -106,7 +106,7 @@ async def build_history_csv(robot: RobotProtocol, pets: list[Any], days: int, de
     ``ACTION_LABELS`` / ``activity_raw_text`` so events render identically to
     the ``history`` command output.
     """
-    cutoff = datetime.now(tz=timezone.utc) - timedelta(days=days)
+    cutoff = datetime.now(tz=UTC) - timedelta(days=days)
     # Only the LR4's get_activity_history() takes a start time.
     fetch: Any = robot.get_activity_history
     try:
@@ -127,7 +127,7 @@ async def build_history_csv(robot: RobotProtocol, pets: list[Any], days: int, de
 
         local_tz: tzinfo = get_localzone()
     except Exception:  # noqa: BLE001 — tz discovery is best-effort; fall back to UTC
-        local_tz = timezone.utc
+        local_tz = UTC
 
     try:
         with dest.open("w", newline="", encoding="utf-8") as f:

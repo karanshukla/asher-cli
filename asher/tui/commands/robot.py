@@ -121,7 +121,7 @@ class CleanCommand(Command):
         timed_out = False
         try:
             await asyncio.wait_for(done.wait(), timeout=300)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             timed_out = True
         finally:
             unsubscribe()

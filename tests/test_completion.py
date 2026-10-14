@@ -19,7 +19,7 @@ so the command bar is live but no real cloud calls happen.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
@@ -72,7 +72,7 @@ def connected_app():
     robot.panel_lock_enabled = False
     robot.night_light_mode_enabled = False
     robot.serial = "LR12345"
-    robot.last_seen = datetime.now(timezone.utc)
+    robot.last_seen = datetime.now(UTC)
     robot.pet_weight = 10.5
     robot.refresh = AsyncMock()
     robot.start_cleaning = AsyncMock(return_value=True)

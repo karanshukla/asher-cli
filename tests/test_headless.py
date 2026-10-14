@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import csv
 import json
-from datetime import datetime, time, timedelta, timezone
+from datetime import UTC, datetime, time, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -49,7 +49,7 @@ def _robot(*, serial: str = "S1", name: str = "Asher", model: str = "LitterRobot
     robot.waste_drawer_level = 42.0
     robot.litter_level = 71.0
     robot.pet_weight = 9.1
-    robot.last_seen = datetime.now(timezone.utc)
+    robot.last_seen = datetime.now(UTC)
     robot.night_light_mode = None
     robot.night_light_mode_enabled = False
     robot.panel_brightness = None
@@ -91,7 +91,7 @@ def _session(robot=None, pets=None, output=None) -> Session:
 
 def _act(*, days_ago: float = 1, action_text: str = "Clean Cycle Complete", weight=9.1):
     act = MagicMock()
-    act.timestamp = datetime.now(timezone.utc) - timedelta(days=days_ago)
+    act.timestamp = datetime.now(UTC) - timedelta(days=days_ago)
     act.action = MagicMock(text=action_text)
     act.weight = weight
     act.pet_id = None
@@ -687,7 +687,7 @@ class TestSleepScheduleWrites:
 
 class TestFilterReminder:
     async def test_info_shows_the_next_filter_date_when_the_model_has_one(self):
-        due = datetime.now(timezone.utc) + timedelta(days=23, hours=1)
+        due = datetime.now(UTC) + timedelta(days=23, hours=1)
         robot = _robot(model="LitterRobot5", next_filter_replacement_date=due)
         result = await COMMANDS_BY_NAME["info"].handler(_session(robot), [])
         assert result.data["filter_due"] == f"{due.date().isoformat()} (in 23d)"

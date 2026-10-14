@@ -11,7 +11,7 @@ Covers two layers:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any
 
@@ -27,7 +27,7 @@ from asher.tui.history import HistoryScreen, format_history_rows, format_history
 def _act(action: Any, *, timestamp: datetime | None = None) -> SimpleNamespace:
     """A duck-typed Activity — only ``timestamp`` and ``action`` are read here."""
     return SimpleNamespace(
-        timestamp=timestamp or datetime(2026, 6, 14, 12, 0, tzinfo=timezone.utc),
+        timestamp=timestamp or datetime(2026, 6, 14, 12, 0, tzinfo=UTC),
         action=action,
     )
 
@@ -37,9 +37,9 @@ def _some_acts() -> list:
     return [
         _act(
             LitterBoxStatus.CLEAN_CYCLE_COMPLETE,
-            timestamp=datetime(2026, 6, 14, 14, 0, tzinfo=timezone.utc),
+            timestamp=datetime(2026, 6, 14, 14, 0, tzinfo=UTC),
         ),
-        _act(LitterBoxStatus.READY, timestamp=datetime(2026, 6, 14, 10, 0, tzinfo=timezone.utc)),
+        _act(LitterBoxStatus.READY, timestamp=datetime(2026, 6, 14, 10, 0, tzinfo=UTC)),
     ]
 
 
@@ -58,8 +58,8 @@ class TestFormatHistoryRows:
         # local-converted strings rather than the raw UTC literals.
         from tzlocal import get_localzone
 
-        newer = datetime(2026, 6, 14, 14, 0, tzinfo=timezone.utc)
-        older = datetime(2026, 6, 14, 10, 0, tzinfo=timezone.utc)
+        newer = datetime(2026, 6, 14, 14, 0, tzinfo=UTC)
+        older = datetime(2026, 6, 14, 10, 0, tzinfo=UTC)
         acts = [
             _act(LitterBoxStatus.READY, timestamp=newer),
             _act("Clean Cycle Complete", timestamp=older),
@@ -75,8 +75,8 @@ class TestFormatHistoryRows:
         # to the same width so the event column lines up vertically.
         from tzlocal import get_localzone
 
-        today = datetime.now(tz=timezone.utc)
-        older = datetime(2025, 1, 1, 9, 0, tzinfo=timezone.utc)
+        today = datetime.now(tz=UTC)
+        older = datetime(2025, 1, 1, 9, 0, tzinfo=UTC)
         rows = format_history_rows([_act("Ready", timestamp=today), _act("Ready", timestamp=older)])
         first_ts = str(rows[0]).split("Ready")[0]
         second_ts = str(rows[1]).split("Ready")[0]
@@ -98,7 +98,7 @@ class TestFormatHistoryRows:
     def test_translated_label_and_colour_flow_through(self):
         pets = [SimpleNamespace(id="pet-1", name="Asher")]
         act = SimpleNamespace(
-            timestamp=datetime.now(tz=timezone.utc),
+            timestamp=datetime.now(tz=UTC),
             action="Cat Detected",
             weight=9.1,
             pet_id="pet-1",
@@ -120,11 +120,9 @@ class TestFormatHistoryText:
         acts = [
             _act(
                 LitterBoxStatus.CLEAN_CYCLE_COMPLETE,
-                timestamp=datetime(2026, 6, 14, 14, 0, tzinfo=timezone.utc),
+                timestamp=datetime(2026, 6, 14, 14, 0, tzinfo=UTC),
             ),
-            _act(
-                LitterBoxStatus.READY, timestamp=datetime(2026, 6, 14, 10, 0, tzinfo=timezone.utc)
-            ),
+            _act(LitterBoxStatus.READY, timestamp=datetime(2026, 6, 14, 10, 0, tzinfo=UTC)),
         ]
         text = format_history_text(acts, None, "TestBot")
         assert "Activity history" in text
@@ -315,7 +313,7 @@ async def test_history_command_pushes_screen_with_default_limit():
     robot.name = "TestBot"
     robot.is_online = True
     robot.status = MagicMock(value="Ready")
-    robot.last_seen = datetime.now(timezone.utc)
+    robot.last_seen = datetime.now(UTC)
     robot.get_activity_history = AsyncMock(
         return_value=[_act(LitterBoxStatus.CLEAN_CYCLE_COMPLETE)]
     )
@@ -359,11 +357,11 @@ async def test_history_screen_arrow_keys_scroll_through_asher_app():
     robot.name = "TestBot"
     robot.is_online = True
     robot.status = MagicMock(value="Ready")
-    robot.last_seen = datetime.now(timezone.utc)
+    robot.last_seen = datetime.now(UTC)
     robot.get_activity_history = AsyncMock(
         return_value=[
             SimpleNamespace(
-                timestamp=datetime(2026, 7, i % 28 + 1, 12, 0, tzinfo=timezone.utc),
+                timestamp=datetime(2026, 7, i % 28 + 1, 12, 0, tzinfo=UTC),
                 action=LitterBoxStatus.CLEAN_CYCLE_COMPLETE,
             )
             for i in range(40)

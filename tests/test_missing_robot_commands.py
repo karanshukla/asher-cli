@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -37,7 +37,7 @@ def connected_app():
     robot.panel_lock_enabled = False
     robot.night_light_mode_enabled = False
     robot.serial = "LR12345"
-    robot.last_seen = datetime.now(timezone.utc)
+    robot.last_seen = datetime.now(UTC)
     robot.pet_weight = 10.5
     robot.power_status = "on"
     robot.clean_cycle_wait_time_minutes = 7
@@ -378,7 +378,7 @@ async def test_info_handles_missing_optional_props():
     robot.sleep_mode_enabled = False
     robot.panel_lock_enabled = False
     robot.night_light_mode_enabled = False
-    robot.last_seen = datetime.now(timezone.utc)
+    robot.last_seen = datetime.now(UTC)
     robot.refresh = AsyncMock()
 
     app = AsherApp()

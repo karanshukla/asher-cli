@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -24,7 +24,7 @@ def connected_app():
     robot.panel_lock_enabled = False
     robot.night_light_mode_enabled = False
     robot.serial = "LR12345"
-    robot.last_seen = datetime.now(timezone.utc)
+    robot.last_seen = datetime.now(UTC)
     robot.pet_weight = 10.5
     robot.refresh = AsyncMock()
     robot.get_activity_history = AsyncMock(return_value=[])
@@ -354,7 +354,7 @@ async def test_export_writes_csv(connected_app, tmp_path):
     # A hard-coded date sitting on the 30-day cutoff edge gets filtered out
     # once real-world time passes it.
     act = MagicMock()
-    act.timestamp = datetime.now(timezone.utc) - timedelta(days=1)
+    act.timestamp = datetime.now(UTC) - timedelta(days=1)
     act.action = MagicMock()
     act.action.text = "Clean Cycle Complete"
     act.weight = 9.1

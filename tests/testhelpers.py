@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, time, timedelta, timezone
+from datetime import UTC, datetime, time, timedelta
 
 from asher.core import theme
 from asher.core.helpers import (
@@ -25,23 +25,23 @@ class TestFmtAgo:
         assert fmt_ago(None) == "never"
 
     def test_seconds(self):
-        dt = datetime.now(timezone.utc) - timedelta(seconds=30)
+        dt = datetime.now(UTC) - timedelta(seconds=30)
         assert fmt_ago(dt) == "30s ago"
 
     def test_minutes(self):
-        dt = datetime.now(timezone.utc) - timedelta(minutes=5)
+        dt = datetime.now(UTC) - timedelta(minutes=5)
         assert fmt_ago(dt) == "5m ago"
 
     def test_hours(self):
-        dt = datetime.now(timezone.utc) - timedelta(hours=3)
+        dt = datetime.now(UTC) - timedelta(hours=3)
         assert fmt_ago(dt) == "3h ago"
 
     def test_days(self):
-        dt = datetime.now(timezone.utc) - timedelta(days=7)
+        dt = datetime.now(UTC) - timedelta(days=7)
         assert fmt_ago(dt) == "7d ago"
 
     def test_naive_datetime_treated_as_utc(self):
-        dt = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=10)
+        dt = datetime.now(UTC).replace(tzinfo=None) - timedelta(minutes=10)
         result = fmt_ago(dt)
         assert result.endswith("m ago")
 
@@ -148,23 +148,23 @@ class TestFmtUntil:
         assert fmt_until(None) == "—"
 
     def test_future_date_counts_down(self):
-        dt = datetime.now(timezone.utc) + timedelta(days=23, hours=1)
+        dt = datetime.now(UTC) + timedelta(days=23, hours=1)
         assert fmt_until(dt) == f"{dt.date().isoformat()} (in 23d)"
 
     def test_today_says_today(self):
-        dt = datetime.now(timezone.utc) + timedelta(hours=2)
+        dt = datetime.now(UTC) + timedelta(hours=2)
         assert "(today)" in fmt_until(dt)
 
     def test_past_date_is_overdue(self):
-        dt = datetime.now(timezone.utc) - timedelta(days=3, hours=1)
+        dt = datetime.now(UTC) - timedelta(days=3, hours=1)
         assert "(overdue by 3d)" in fmt_until(dt)
 
     def test_just_past_still_reads_as_today(self):
-        dt = datetime.now(timezone.utc) - timedelta(hours=2)
+        dt = datetime.now(UTC) - timedelta(hours=2)
         assert "(today)" in fmt_until(dt)
 
     def test_naive_datetime_is_read_as_utc(self):
-        dt = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=5, hours=1)
+        dt = datetime.now(UTC).replace(tzinfo=None) + timedelta(days=5, hours=1)
         assert "(in 5d)" in fmt_until(dt)
 
 

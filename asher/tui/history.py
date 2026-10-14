@@ -22,7 +22,7 @@ vertically regardless of an event's age — every event shows its date.
 from __future__ import annotations
 
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from rich.text import Text
@@ -61,7 +61,7 @@ def _localize(ts: object) -> datetime | None:
     if not isinstance(ts, datetime):
         return None
     if ts.tzinfo is None:
-        ts = ts.replace(tzinfo=timezone.utc)
+        ts = ts.replace(tzinfo=UTC)
     return ts.astimezone(get_localzone())
 
 
@@ -69,7 +69,7 @@ def _ts_str(local_dt: datetime | None) -> str:
     """Fixed-width timestamp: ``MM/DD HH:MM`` this year, ``YYYY-MM-DD`` older."""
     if local_dt is None:
         return "?"
-    if local_dt.year == datetime.now(tz=timezone.utc).year:
+    if local_dt.year == datetime.now(tz=UTC).year:
         return local_dt.strftime("%m/%d %H:%M")
     return local_dt.strftime("%Y-%m-%d")
 
