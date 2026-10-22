@@ -34,7 +34,7 @@ mcp = ["pylitterbot[mcp]==2025.7.0", "mcp<2"]
 # PyGObject is what puts pystray on its AppIndicator backend. Without it pystray
 # silently falls back to a legacy XEmbed icon, which KDE Plasma and GNOME no
 # longer host at all — the watcher runs, draws an icon, and nothing shows it.
-tray = ["pystray>=0.19", "pillow>=10.0", "pygobject>=3.42; sys_platform == 'linux'"]
+tray = ["pystray>=0.19", "pillow>=13.0", "pygobject>=3.42; sys_platform == 'linux'"]
 
 [project.scripts]
 asher = "asher.__main__:main"
@@ -58,7 +58,7 @@ dev = [
     "textual-dev>=1.0",
     "watchfiles>=0.21",
     "git-cliff>=2.0",
-    "pillow>=10.0",  # so the tray icon renderer is covered in CI
+    "pillow>=13.0",  # so the tray icon renderer is covered in CI
 ]
 # Mirrors the `tray` extra, because a plain `uv run` re-syncs the environment to
 # the default groups and prunes everything else — which silently removed pystray
@@ -69,7 +69,7 @@ dev = [
 # from source and the runners have no GObject-introspection headers.
 tray = [
     "pystray>=0.19",
-    "pillow>=10.0",
+    "pillow>=13.0",
     "pygobject>=3.42; sys_platform == 'linux'",
 ]
 
