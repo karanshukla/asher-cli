@@ -1,6 +1,6 @@
 [project]
 name = "asher-cli"
-version = "1.6.0"
+version = "1.7.0"
 description = "Terminal dashboard for Litter Robot (LR3/LR4/LR5) via the Whisker cloud API"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -16,7 +16,7 @@ classifiers = [
     "Topic :: Home Automation",
 ]
 dependencies = [
-    "pylitterbot==2025.7.0",
+    "pylitterbot==2025.8.0",
     "textual>=0.47.0",
     "rich>=13.0.0",
     "python-dotenv>=1.0.0",
@@ -26,11 +26,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# pylitterbot asks for mcp[cli]>=1.0.0 with no upper bound, but its server does
-# `from mcp.server.fastmcp import FastMCP`, and mcp 2.0 deleted that module.
-# Cap it here, and in _ensure_mcp_extra (tui/commands/slash.py), until
-# pylitterbot ships a 2.x-compatible release.
-mcp = ["pylitterbot[mcp]==2025.7.0", "mcp<2"]
+mcp = ["pylitterbot[mcp]==2025.8.0"]
 # PyGObject is what puts pystray on its AppIndicator backend. Without it pystray
 # silently falls back to a legacy XEmbed icon, which KDE Plasma and GNOME no
 # longer host at all — the watcher runs, draws an icon, and nothing shows it.
@@ -131,7 +127,7 @@ ignore_missing_imports = true  # pylitterbot and textual have incomplete stubs
 # ── bump-my-version ───────────────────────────────────────────────────────────
 
 [tool.bumpversion]
-current_version = "1.6.0"
+current_version = "1.7.0"
 commit = true
 tag = true
 tag_name = "v{new_version}"

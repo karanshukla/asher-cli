@@ -18,13 +18,6 @@ if TYPE_CHECKING:
 # litterrobot3.SLEEP_DURATION_HOURS), so only the start time is settable.
 LR3_SLEEP_HOURS = 8
 
-# The LR4 exposes no schedule setter at all — the app is the only way to change
-# one, and saying so beats a cloud rejection the user can't act on.
-LR4_SCHEDULE_NOTE = (
-    "LR4 sleep schedules can only be changed in the Whisker app — "
-    "'sleep-schedule' shows the one it's running"
-)
-
 # Only the LR5's activity endpoint takes a type parameter; the LR3/LR4 history
 # call returns whatever the cloud feels like sending.
 HISTORY_FILTER_NOTE = "Filtering history by type is only available on the LR5"
@@ -77,7 +70,7 @@ class RobotAdapter(ABC):
 
         Disabling is the same cloud call as waking the robot on every model that
         has one, so this rides on ``set_sleep`` rather than repeating the
-        per-model dispatch — including the LR4's "use the app" refusal.
+        per-model dispatch.
         """
         ok, msg = await self.set_sleep(False)
         return (True, "Sleep schedule disabled for every day") if ok else (False, msg)
@@ -165,15 +158,41 @@ class LR3Adapter(RobotAdapter):
         )
 
 
-class LR4Adapter(RobotAdapter):
+class _WeekdaySleepMixin:
+    """Sleep commands for the LR4 and LR5, which share pylitterbot's per-weekday
+    ``set_sleep_mode(value, sleep, wake_time=, day_of_week=)``."""
+
+    robot: RobotProtocol
+
     async def set_sleep(self, enable: bool) -> tuple[bool, str]:
-        return False, LR4_SCHEDULE_NOTE
+        try:
+            ok = await self.robot.set_sleep_mode(enable)
+        except Exception as exc:
+            return False, f"Sleep mode change failed: {exc}"
+        if not ok:
+            return False, "Sleep mode command rejected"
+        return True, "Sleep mode enabled" if enable else "Robot woken up"
 
     async def set_sleep_window(
         self, weekday: int | None, sleep: time, wake: time
     ) -> tuple[bool, str]:
-        return False, LR4_SCHEDULE_NOTE
+        robot: Any = self.robot
+        try:
+            ok = await robot.set_sleep_mode(
+                True,
+                sleep.hour * 60 + sleep.minute,
+                wake_time=wake.hour * 60 + wake.minute,
+                day_of_week=_to_day_of_week(weekday),
+            )
+        except Exception as exc:
+            return False, f"Sleep schedule change failed: {exc}"
+        if not ok:
+            return False, "Sleep schedule command rejected"
+        when = "every day" if weekday is None else DAY_NAMES[weekday]
+        return True, f"Sleeping {sleep:%H:%M} → {wake:%H:%M} on {when}"
 
+
+class LR4Adapter(_WeekdaySleepMixin, RobotAdapter):
     async def set_night_light(self, mode: str) -> tuple[bool, str]:
         from pylitterbot.enums import NightLightMode  # noqa: PLC0415
 
@@ -224,17 +243,8 @@ class LR4Adapter(RobotAdapter):
         return True, f"Panel brightness set to {level}"
 
 
-class LR5Adapter(RobotAdapter):
+class LR5Adapter(_WeekdaySleepMixin, RobotAdapter):
     supports_history_filter = True
-
-    async def set_sleep(self, enable: bool) -> tuple[bool, str]:
-        try:
-            ok = await self.robot.set_sleep_mode(enable)
-        except Exception as exc:
-            return False, f"Sleep mode change failed: {exc}"
-        if not ok:
-            return False, "Sleep mode command rejected"
-        return True, "Sleep mode enabled" if enable else "Robot woken up"
 
     async def set_night_light(self, mode: str) -> tuple[bool, str]:
         from pylitterbot.enums import NightLightMode  # noqa: PLC0415
@@ -335,24 +345,6 @@ class LR5Adapter(RobotAdapter):
             return False, "Night light colour command rejected"
         return True, f"Night light colour set to {colour}"
 
-    async def set_sleep_window(
-        self, weekday: int | None, sleep: time, wake: time
-    ) -> tuple[bool, str]:
-        robot: Any = self.robot
-        try:
-            ok = await robot.set_sleep_mode(
-                True,
-                sleep.hour * 60 + sleep.minute,
-                wake_time=wake.hour * 60 + wake.minute,
-                day_of_week=_to_day_of_week(weekday),
-            )
-        except Exception as exc:
-            return False, f"Sleep schedule change failed: {exc}"
-        if not ok:
-            return False, "Sleep schedule command rejected"
-        when = "every day" if weekday is None else DAY_NAMES[weekday]
-        return True, f"Sleeping {sleep:%H:%M} → {wake:%H:%M} on {when}"
-
     async def get_history(
         self, limit: int, activity_type: str | None = None
     ) -> tuple[list[Activity] | None, str]:
@@ -380,10 +372,8 @@ class LR5Adapter(RobotAdapter):
 def _to_day_of_week(weekday: int | None) -> int | None:
     """Convert a Python weekday (Mon=0…Sun=6) to pylitterbot's DayOfWeek (Sun=0…Sat=6).
 
-    ``set_sleep_mode``'s own docstring claims 0=Monday, but it matches the value
-    against the ``dayOfWeek`` field of the schedule the cloud sent back, and
-    those follow the ``DayOfWeek`` enum — so the enum's numbering is the one
-    that actually selects a day.
+    ``set_sleep_mode`` matches the value against the ``dayOfWeek`` field of the
+    schedule the cloud sent back, and those follow the ``DayOfWeek`` enum.
     """
     return None if weekday is None else (weekday + 1) % 7
 

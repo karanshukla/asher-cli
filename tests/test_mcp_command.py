@@ -86,7 +86,7 @@ class TestMcpCommand:
             patch("asher.mcp.config.set_mcp_enabled", return_value=[Path("x")]) as mock_set,
         ):
             await McpCommand().run(app, ["on"])
-        assert "mcp<2" in mock_exec.call_args.args
+        assert "pylitterbot[mcp]==" in " ".join(mock_exec.call_args.args)
         mock_set.assert_called_once_with(True)
 
     async def test_on_skips_enabling_when_install_fails(self, app):

@@ -303,6 +303,25 @@ class TestSleepSchedule:
         assert result.data["days"][1]["sleep_time"] == "22:00"
         assert result.data["days"][0]["enabled"] is False
 
+    async def test_a_full_day_window_is_called_out(self):
+        robot = _robot(
+            sleep_schedule=SimpleNamespace(
+                is_enabled=True,
+                days=[
+                    SimpleNamespace(
+                        day=1,
+                        is_enabled=True,
+                        sleep_time=time(22, 0),
+                        wake_time=time(22, 0),
+                        is_full_day=True,
+                    ),
+                ],
+            )
+        )
+        result = await COMMANDS_BY_NAME["sleep-schedule"].handler(_session(robot), [])
+        assert result.data["days"][0]["full_day"] is True
+        assert result.lines[0].endswith("22:00 → 22:00 (all day)")
+
 
 # ── action commands ──────────────────────────────────────────────────────────
 
@@ -677,12 +696,13 @@ class TestSleepScheduleWrites:
             await COMMANDS_BY_NAME["sleep-schedule"].handler(_session(), ["reticulate"])
         assert "Usage" in str(excinfo.value)
 
-    async def test_writing_a_schedule_on_an_lr4_points_at_the_app(self):
-        with pytest.raises(CommandError) as excinfo:
-            await COMMANDS_BY_NAME["sleep-schedule"].handler(
-                _session(), ["set", "all", "22:00", "07:00"]
-            )
-        assert "Whisker app" in str(excinfo.value)
+    async def test_writing_a_schedule_on_an_lr4_sends_the_window(self):
+        robot = _robot()
+        robot.set_sleep_mode = AsyncMock(return_value=True)
+        await COMMANDS_BY_NAME["sleep-schedule"].handler(
+            _session(robot), ["set", "all", "22:00", "07:00"]
+        )
+        robot.set_sleep_mode.assert_awaited_once_with(True, 1320, wake_time=420, day_of_week=None)
 
 
 class TestFilterReminder:

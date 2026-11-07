@@ -96,7 +96,7 @@ The keyring is the only place an installed copy reads credentials from. Working 
 | `rename <new name>` | Rename the unit in the Whisker cloud |
 | `insight [days\|month]` | Show cycle-usage statistics (default: 30 days) |
 | `sleep-schedule` | Show the per-day sleep schedule |
-| `sleep-schedule set <day\|all> <HH:MM> <HH:MM>` | Set the sleep → wake window (LR3: one window for every day, wake time fixed; LR4: read-only, use the Whisker app) |
+| `sleep-schedule set <day\|all> <HH:MM> <HH:MM>` | Set the sleep → wake window (LR3: one window for every day, wake time fixed; LR4: the same sleep and wake time sleeps all day) |
 | `sleep-schedule disable` | Turn every scheduled sleep window off |
 | `privacy on\|off` | Toggle LR5 privacy mode |
 | `volume <0-100>` | Set LR5 sound volume |

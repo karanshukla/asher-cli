@@ -175,19 +175,11 @@ async def test_lr3_night_light_brightness_unsupported(robot):
 
 
 @pytest.mark.asyncio
-async def test_lr4_sleep_unsupported(robot):
-    ok, msg = await LR4Adapter(robot).set_sleep(True)
-    assert not ok
-    assert "LR4" in msg
-    assert "sleep-schedule" in msg
-
-
-@pytest.mark.asyncio
-async def test_lr4_wake_unsupported(robot):
-    ok, msg = await LR4Adapter(robot).set_sleep(False)
-    assert not ok
-    assert "LR4" in msg
-    assert "sleep-schedule" in msg
+@pytest.mark.parametrize("enable", [True, False])
+async def test_lr4_sleep_toggles_the_schedule(robot, enable):
+    ok, _ = await LR4Adapter(robot).set_sleep(enable)
+    assert ok
+    robot.set_sleep_mode.assert_awaited_once_with(enable)
 
 
 @pytest.mark.asyncio
@@ -768,30 +760,23 @@ async def test_lr3_refuses_a_single_day(robot):
 
 
 @pytest.mark.asyncio
-async def test_lr4_sleep_window_points_at_the_app(robot):
-    ok, msg = await LR4Adapter(robot).set_sleep_window(None, time(22, 0), time(7, 0))
-    assert not ok
-    assert "Whisker app" in msg
-    robot.set_sleep_mode.assert_not_called()
+async def test_lr4_sleep_window_sends_one_day(robot):
+    ok, msg = await LR4Adapter(robot).set_sleep_window(0, time(22, 0), time(7, 0))
+    assert ok
+    assert "Mon" in msg
+    robot.set_sleep_mode.assert_awaited_once_with(True, 1320, wake_time=420, day_of_week=1)
 
 
 # ── sleep schedule: disable ───────────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("adapter_cls", [LR3Adapter, LR5Adapter])
+@pytest.mark.parametrize("adapter_cls", [LR3Adapter, LR4Adapter, LR5Adapter])
 async def test_disable_schedule_turns_sleep_off(robot, adapter_cls):
     ok, msg = await adapter_cls(robot).disable_sleep_schedule()
     assert ok
     assert "disabled" in msg
     robot.set_sleep_mode.assert_awaited_once_with(False)
-
-
-@pytest.mark.asyncio
-async def test_disable_schedule_on_lr4_explains_instead(robot):
-    ok, msg = await LR4Adapter(robot).disable_sleep_schedule()
-    assert not ok
-    assert "Whisker app" in msg
 
 
 @pytest.mark.asyncio
