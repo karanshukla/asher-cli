@@ -754,6 +754,9 @@ class SleepScheduleCommand(Command):
             t.append(f"  {name} ", style=theme.MUTED)
             if day_enabled:
                 window_str = f"{_fmt_sleep_time(sleep_t)} → {_fmt_sleep_time(wake_t)}"
+                # LR4 only: matching sleep and wake times mean asleep all day.
+                if getattr(day, "is_full_day", False):
+                    window_str += " (all day)"
                 t.append(window_str, style=theme.FOREGROUND)
                 if idx in active_day_indices:
                     t.append("   ● now", style=f"bold {theme.WARN}")

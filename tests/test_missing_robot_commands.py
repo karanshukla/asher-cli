@@ -622,7 +622,7 @@ async def test_sleep_schedule_disable(connected_app):
 
 
 @pytest.mark.asyncio
-async def test_sleep_schedule_write_on_lr4_points_at_the_app(connected_app):
+async def test_sleep_schedule_write_on_lr4_sends_the_window(connected_app):
     from asher.robot.adapters import LR4Adapter
 
     connected_app._robot.set_sleep_mode = AsyncMock(return_value=True)
@@ -636,8 +636,10 @@ async def test_sleep_schedule_write_on_lr4_points_at_the_app(connected_app):
 
         log = _log_text(connected_app)
 
-    connected_app._robot.set_sleep_mode.assert_not_called()
-    assert "Whisker app" in log
+    connected_app._robot.set_sleep_mode.assert_called_once_with(
+        True, 1320, wake_time=420, day_of_week=None
+    )
+    assert "Sleeping" in log
 
 
 @pytest.mark.asyncio

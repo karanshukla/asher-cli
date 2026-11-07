@@ -48,6 +48,10 @@ class Fault:
 _SAFETY_STATUSES: dict[LitterBoxStatus, tuple[str, str]] = {
     LitterBoxStatus.CAT_DETECTED: ("CAT DETECTED — cycle halted", SEVERITY_ERROR),
     LitterBoxStatus.CAT_SENSOR_INTERRUPTED: ("CAT SENSOR INTERRUPTED", SEVERITY_ERROR),
+    LitterBoxStatus.CAT_SENSOR_FAULT: (
+        "CAT SENSOR FAULT — check for a blocked sensor",
+        SEVERITY_ERROR,
+    ),
     LitterBoxStatus.PINCH_DETECT: ("PINCH DETECT — possible obstruction", SEVERITY_ERROR),
     LitterBoxStatus.STARTUP_PINCH_DETECT: ("PINCH DETECT — possible obstruction", SEVERITY_ERROR),
     LitterBoxStatus.OVER_TORQUE_FAULT: ("OVER-TORQUE — globe blocked or jammed", SEVERITY_WARN),

@@ -29,6 +29,8 @@ robot.is_laser_dirty          # bool — LR4 since 2025.7.0, LR5 always
 await robot.refresh()
 await robot.start_cleaning()
 await robot.set_sleep_mode(enabled: bool)
+# LR4 (2025.8.0+) and LR5: per-weekday window, minutes from midnight, DayOfWeek Sun=0
+await robot.set_sleep_mode(True, 1320, wake_time=420, day_of_week=1)
 await robot.set_panel_lockout(enabled: bool)
 await robot.set_night_light_brightness(brightness: int)   # or:
 await robot.set_night_light_mode(mode: NightLightMode)
@@ -54,7 +56,7 @@ model_name = type(robot).__name__  # "LitterRobot4", "LitterRobot3", etc.
 
 | Feature | LR3 | LR4 | LR5 |
 |---|---|---|---|
-| `set_sleep_mode()` | Simple on/off | Per-weekday schedule | TBD |
+| `set_sleep_mode()` | On/off + start time, fixed 8h | Per-weekday schedule (2025.8.0+); sleep == wake sleeps all day | Per-weekday schedule |
 | Night light | `set_night_light_brightness(int)` | `set_night_light_mode(NightLightMode)` | TBD |
 
 Use `asher/robot/adapters.py` for all model-specific dispatch — do not branch on `type(robot).__name__` inline in command handlers.

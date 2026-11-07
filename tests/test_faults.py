@@ -89,6 +89,12 @@ class TestSafetyStatuses:
         assert len(faults) == 1
         assert faults[0].severity == SEVERITY_ERROR
 
+    def test_cat_sensor_fault_is_error(self):
+        # pylitterbot reports this for the LR4 panel's 30-minute cat-detect fault.
+        faults = check_faults(_lr4(status=LitterBoxStatus.CAT_SENSOR_FAULT))
+        assert len(faults) == 1
+        assert faults[0].severity == SEVERITY_ERROR
+
     def test_over_torque_fault_is_warn(self):
         faults = check_faults(_lr4(status=LitterBoxStatus.OVER_TORQUE_FAULT))
         assert len(faults) == 1

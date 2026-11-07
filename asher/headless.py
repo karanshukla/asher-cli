@@ -381,6 +381,8 @@ async def _sleep_schedule(session: Session, args: list[str]) -> Result:
                 "enabled": bool(getattr(day, "is_enabled", False)),
                 "sleep_time": _sleep_time(getattr(day, "sleep_time", None)),
                 "wake_time": _sleep_time(getattr(day, "wake_time", None)),
+                # LR4 only: matching sleep and wake times mean asleep all day.
+                "full_day": bool(getattr(day, "is_full_day", False)),
             }
         )
     days.sort(key=lambda entry: DAY_NAMES.index(entry["day"]))
@@ -392,6 +394,8 @@ async def _sleep_schedule(session: Session, args: list[str]) -> Result:
             if entry["enabled"]
             else "off"
         )
+        if entry["enabled"] and entry["full_day"]:
+            window += " (all day)"
         lines.append(f"  {entry['day']}  {window}")
     return Result(data={"enabled": enabled, "days": days}, lines=lines)
 
