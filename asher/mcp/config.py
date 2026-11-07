@@ -16,8 +16,15 @@ class McpConfigError(Exception):
 
 
 def mcp_extra_installed() -> bool:
-    """Whether pylitterbot's mcp extra (the third-party `mcp` SDK) is importable."""
-    return importlib.util.find_spec("mcp") is not None
+    """Whether pylitterbot's mcp extra (the third-party `mcp` SDK, 2.x) is importable.
+
+    Probes the module pylitterbot's server imports rather than `mcp` itself, so an
+    mcp 1.x left over from an older `/mcp on` counts as missing and gets upgraded.
+    """
+    try:
+        return importlib.util.find_spec("mcp.server.mcpserver") is not None
+    except ModuleNotFoundError:
+        return False
 
 
 def config_paths() -> list[Path]:
