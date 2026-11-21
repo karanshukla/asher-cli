@@ -329,6 +329,29 @@ async def test_export_calls_get_activity_history(connected_app, tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_export_survives_missing_file_opener(connected_app, tmp_path):
+    connected_app._robot.get_activity_history = AsyncMock(return_value=[])
+    with (
+        patch(
+            "asher.tui.commands.robot.subprocess.Popen", side_effect=FileNotFoundError("xdg-open")
+        ),
+        patch("pathlib.Path.home", return_value=tmp_path),
+    ):
+        async with connected_app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.click("#cmd-input")
+            for ch in "export":
+                await pilot.press(ch)
+            await pilot.press("enter")
+            await connected_app.workers.wait_for_complete()
+            await pilot.pause()
+            assert connected_app.is_running
+
+            log_content = str(connected_app.query_one("#log").lines)
+            assert "Couldn't open the folder" in log_content
+
+
+@pytest.mark.asyncio
 async def test_export_7_days(connected_app, tmp_path):
     connected_app._robot.get_activity_history = AsyncMock(return_value=[])
     with (

@@ -794,7 +794,10 @@ async def _run_export(app: AsherApp, days: int) -> None:
     app._log_ok(f"Saved → {dest}")
     app._log_info(f"{count} events")
     app._log_info("Opening folder…")
-    _open_folder(dest)
+    try:
+        _open_folder(dest)
+    except OSError as exc:
+        app._log_warn(f"Couldn't open the folder: {exc}")
 
 
 class ExportCommand(Command):
