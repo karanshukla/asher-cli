@@ -14,7 +14,10 @@ Notifications item, has to reach a process that may have been up for days.
 
 from __future__ import annotations
 
+import contextlib
 import json
+import os
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -63,9 +66,31 @@ def load() -> dict[str, Any]:
 
 
 def save(settings: dict[str, Any]) -> None:
-    """Write settings, creating the parent directory if needed."""
-    _CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    _CONFIG_PATH.write_text(json.dumps(settings, indent=2) + "\n", encoding="utf-8")
+    """Write settings atomically with restricted permissions, creating parent dir if needed."""
+    _CONFIG_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
+    with contextlib.suppress(OSError):
+        os.chmod(_CONFIG_DIR, 0o700)
+    payload = (json.dumps(settings, indent=2) + "\n").encode("utf-8")
+    fd, tmp_name = tempfile.mkstemp(
+        dir=str(_CONFIG_PATH.parent),
+        prefix=f".{_CONFIG_PATH.name}.",
+        suffix=".tmp",
+    )
+    tmp_path = Path(tmp_name)
+    try:
+        with contextlib.suppress(OSError):
+            os.chmod(tmp_path, 0o600)
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(tmp_path, _CONFIG_PATH)
+        with contextlib.suppress(OSError):
+            os.chmod(_CONFIG_PATH, 0o600)
+    except Exception:
+        with contextlib.suppress(OSError):
+            tmp_path.unlink()
+        raise
 
 
 def update(**changes: Any) -> dict[str, Any]:

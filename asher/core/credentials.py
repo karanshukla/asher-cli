@@ -13,11 +13,9 @@ from typing import Any
 
 import keyring
 import keyring.errors
-from dotenv import load_dotenv
+from dotenv import dotenv_values, find_dotenv
 
 from .helpers import dev_mode
-
-load_dotenv()
 
 SERVICE = "asher-cli"
 
@@ -44,7 +42,14 @@ def from_env() -> tuple[str, str]:
     """
     if not dev_mode():
         return "", ""
-    return os.getenv("LITTER_ROBOT_USER") or "", os.getenv("LITTER_ROBOT_PASSWORD") or ""
+    user = os.getenv("LITTER_ROBOT_USER") or ""
+    password = os.getenv("LITTER_ROBOT_PASSWORD") or ""
+    if not user or not password:
+        dotenv_path = find_dotenv(usecwd=True)
+        values = dotenv_values(dotenv_path) if dotenv_path else {}
+        user = user or (values.get("LITTER_ROBOT_USER") or "")
+        password = password or (values.get("LITTER_ROBOT_PASSWORD") or "")
+    return user, password
 
 
 def keyring_available() -> bool:

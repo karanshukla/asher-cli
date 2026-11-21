@@ -768,7 +768,7 @@ class SleepScheduleCommand(Command):
             app._log_info("Outside the active sleep window right now.")
 
 
-def _open_folder(path: Path) -> None:
+def _open_folder(path: Path, app: AsherApp | None = None) -> None:
     if sys.platform == "win32":
         argv = ["explorer", "/select,", str(path)]
     elif sys.platform == "darwin":
@@ -776,14 +776,24 @@ def _open_folder(path: Path) -> None:
     else:
         argv = ["xdg-open", str(path.parent)]
 
-    argv[0] = shutil.which(argv[0]) or argv[0]
-    subprocess.Popen(argv)  # nosec B603 # fixed argv, no shell, path is not user-controlled
+    executable = shutil.which(argv[0])
+    if executable is None:
+        if app is not None:
+            app._log_warn(f"Could not open folder: {argv[0]} not found on PATH.")
+        return
+    argv[0] = executable
+    with contextlib.suppress(OSError):
+        subprocess.Popen(argv)  # nosec B603 # fixed argv, no shell, path is not user-controlled
 
 
 async def _run_export(app: AsherApp, days: int) -> None:
     if app._robot is None:
         return
-    dest = resolve_dest(app._robot, None)
+    try:
+        dest = resolve_dest(app._robot, None)
+    except ExportError as exc:
+        app._log_err(str(exc))
+        return
     app._log_info(f"Fetching history (last {days} days)…")
     try:
         count = await build_history_csv(app._robot, app._pets, days, dest)
@@ -794,7 +804,7 @@ async def _run_export(app: AsherApp, days: int) -> None:
     app._log_ok(f"Saved → {dest}")
     app._log_info(f"{count} events")
     app._log_info("Opening folder…")
-    _open_folder(dest)
+    _open_folder(dest, app)
 
 
 class ExportCommand(Command):

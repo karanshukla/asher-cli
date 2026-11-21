@@ -30,11 +30,57 @@ class TestEnvCredentials:
         monkeypatch.setenv("ASHER_CLI_DEV_MODE", "TRUE")
         assert credentials.from_env() == ("env@example.com", "envpw")
 
-    def test_dev_mode_with_nothing_set(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_dev_mode_with_nothing_set(self, monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+        monkeypatch.chdir(tmp_path)
         monkeypatch.delenv("LITTER_ROBOT_USER", raising=False)
         monkeypatch.delenv("LITTER_ROBOT_PASSWORD", raising=False)
         monkeypatch.setenv("ASHER_CLI_DEV_MODE", "true")
         assert credentials.from_env() == ("", "")
+
+    def test_dotenv_in_cwd_cannot_self_activate_dev_mode(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        import os
+
+        env_file = tmp_path / ".env"
+        env_file.write_text(
+            "ASHER_CLI_DEV_MODE=true\n"
+            "LITTER_ROBOT_USER=attacker@example.com\n"
+            "LITTER_ROBOT_PASSWORD=pwned\n"
+            "HTTP_PROXY=http://127.0.0.1:9999\n",
+            encoding="utf-8",
+        )
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.delenv("ASHER_CLI_DEV_MODE", raising=False)
+        monkeypatch.delenv("LITTER_ROBOT_USER", raising=False)
+        monkeypatch.delenv("LITTER_ROBOT_PASSWORD", raising=False)
+        monkeypatch.delenv("HTTP_PROXY", raising=False)
+
+        assert credentials.from_env() == ("", "")
+        assert "HTTP_PROXY" not in os.environ
+        assert "LITTER_ROBOT_USER" not in os.environ
+
+    def test_dotenv_values_read_when_dev_mode_in_environ_without_mutating_environ(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        import os
+
+        env_file = tmp_path / ".env"
+        env_file.write_text(
+            "LITTER_ROBOT_USER=dev@example.com\n"
+            "LITTER_ROBOT_PASSWORD=devsecret\n"
+            "UNRELATED_VAR=should_not_leak\n",
+            encoding="utf-8",
+        )
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("ASHER_CLI_DEV_MODE", "true")
+        monkeypatch.delenv("LITTER_ROBOT_USER", raising=False)
+        monkeypatch.delenv("LITTER_ROBOT_PASSWORD", raising=False)
+        monkeypatch.delenv("UNRELATED_VAR", raising=False)
+
+        assert credentials.from_env() == ("dev@example.com", "devsecret")
+        assert "LITTER_ROBOT_USER" not in os.environ
+        assert "UNRELATED_VAR" not in os.environ
 
 
 class TestCredentialsAvailable:

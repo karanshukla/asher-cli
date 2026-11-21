@@ -64,9 +64,21 @@ def read_pid() -> int | None:
         return None
 
 
+def _ensure_private_dir(directory: Path) -> None:
+    directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+    with contextlib.suppress(OSError):
+        os.chmod(directory, 0o700)
+
+
 def write_pid(pid: int) -> None:
-    _PID_PATH.parent.mkdir(parents=True, exist_ok=True)
-    _PID_PATH.write_text(f"{pid}\n", encoding="utf-8")
+    _ensure_private_dir(_PID_PATH.parent)
+    fd = os.open(_PID_PATH, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            stream.write(f"{pid}\n")
+    finally:
+        with contextlib.suppress(OSError):
+            os.chmod(_PID_PATH, 0o600)
 
 
 def clear_pid() -> None:
@@ -126,17 +138,61 @@ def _windows_pid_alive(pid: int) -> bool:
         kernel32.CloseHandle(handle)
 
 
-def _pid_is_watcher(pid: int) -> bool:
-    """Best-effort guard against a PID the OS has recycled.
+def _cmdline_tokens_match_watcher(tokens: list[str]) -> bool:
+    """Return True when argv tokens represent an asher watcher process."""
+    if not tokens:
+        return False
+    normalized = [t.strip() for t in tokens if t.strip()]
+    if not normalized:
+        return False
+    has_watch = "watch" in normalized
+    has_asher = any(
+        t in ("asher", "asher-cli")
+        or Path(t.replace("\\", "/")).stem in ("asher", "asher-cli")
+        or "asher" in t
+        for t in normalized
+    )
+    return has_asher and has_watch
 
-    Only Linux exposes another process's argv cheaply; elsewhere an unreadable
-    command line means "can't tell", which resolves in the pid file's favour.
+
+def _pid_is_watcher(pid: int) -> bool:
+    """Verify the target PID is actually an asher watcher process.
+
+    Fails closed (``False``) when the command line cannot be verified so ``stop()``
+    never sends ``SIGTERM``/``SIGKILL`` to an unrelated recycled PID.
     """
+    if pid <= 0:
+        return False
+    if pid == os.getpid():
+        return True
     try:
         cmdline = Path(f"/proc/{pid}/cmdline").read_bytes()
     except OSError:
-        return True
-    return b"asher" in cmdline
+        cmdline = b""
+    if cmdline:
+        tokens = [
+            part.decode("utf-8", errors="replace")
+            for part in cmdline.split(b"\x00")
+            if part
+        ]
+        return _cmdline_tokens_match_watcher(tokens)
+
+    if sys.platform == "darwin":
+        try:
+            res = subprocess.run(  # nosec B603 B607
+                ["ps", "-p", str(pid), "-o", "args="],
+                capture_output=True,
+                text=True,
+                timeout=2,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return False
+        if res.returncode != 0 or not res.stdout.strip():
+            return False
+        return _cmdline_tokens_match_watcher(res.stdout.strip().split())
+
+    return False
 
 
 # ── lifecycle ────────────────────────────────────────────────────────────────
@@ -163,7 +219,7 @@ def start(*, robot: str | None = None, tray: bool = True) -> tuple[bool, str]:
         )
 
     log = log_path()
-    log.parent.mkdir(parents=True, exist_ok=True)
+    _ensure_private_dir(log.parent)
     _truncate_oversized_log(log)
 
     argv = [sys.executable, "-m", "asher", "watch", "run"]
@@ -173,7 +229,10 @@ def start(*, robot: str | None = None, tray: bool = True) -> tuple[bool, str]:
         argv.append("--no-tray")
 
     try:
-        with log.open("a", encoding="utf-8") as stream:
+        log_fd = os.open(log, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+        with contextlib.suppress(OSError):
+            os.chmod(log, 0o600)
+        with os.fdopen(log_fd, "a", encoding="utf-8") as stream:
             process = subprocess.Popen(  # nosec B603 # fixed argv on this interpreter, no shell
                 argv,
                 stdout=stream,

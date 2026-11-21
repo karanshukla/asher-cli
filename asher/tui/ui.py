@@ -6,7 +6,6 @@ import contextlib
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as pkg_version
 
-from dotenv import load_dotenv
 from rich.table import Table
 from rich.text import Text
 from textual import work
@@ -20,8 +19,6 @@ from ..core import theme
 from ..core.helpers import dev_mode, ts
 from .cats import CATS
 from .completion import CommandSuggester
-
-load_dotenv()
 
 
 class CmdInput(Input):

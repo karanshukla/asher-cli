@@ -47,7 +47,10 @@ def watcher_argv(*, executable: str | None = None) -> list[str]:
     ``-m asher`` avoids depending on the user's PATH, which login supervisors
     frequently don't share with an interactive shell.
     """
-    return [executable or sys.executable, "-m", "asher", "watch", "run"]
+    exe = executable if executable is not None else sys.executable
+    if not exe or any(ch in exe for ch in ("\r", "\n", "\x00")):
+        raise AutostartError("Invalid interpreter path for autostart.")
+    return [exe, "-m", "asher", "watch", "run"]
 
 
 class AutostartBackend(ABC):
@@ -167,13 +170,22 @@ WantedBy=default.target
 """
 
 
-def _exec_start() -> str:
-    """Render ``ExecStart``, quoting any argument containing a space.
+def _systemd_escape_arg(arg: str) -> str:
+    if any(ch in arg for ch in ("\r", "\n", "\x00")):
+        raise AutostartError("Control characters are not allowed in systemd ExecStart.")
+    escaped = arg.replace("\\", "\\\\").replace('"', '\\"').replace("%", "%%")
+    if any(ch in arg for ch in (" ", "\t", '"', "\\", "%", "$")):
+        return f'"{escaped}"'
+    return escaped
 
-    systemd splits the line on whitespace, so an interpreter living under a
-    path with a space in it would otherwise be read as two arguments.
+
+def _exec_start() -> str:
+    """Render ``ExecStart``, quoting and escaping special characters for systemd.
+
+    systemd splits the line on whitespace and expands ``%`` specifiers and C-style
+    escapes inside double quotes.
     """
-    return " ".join(f'"{arg}"' if " " in arg else arg for arg in watcher_argv())
+    return " ".join(_systemd_escape_arg(arg) for arg in watcher_argv())
 
 
 class SystemdAutostart(AutostartBackend):
@@ -251,10 +263,13 @@ class RegistryAutostart(AutostartBackend):
     def _command(self) -> str:
         # pythonw.exe runs without a console, so login doesn't flash a black
         # window. It sits next to python.exe in every CPython layout.
-        executable = Path(sys.executable)
+        raw_exe = sys.executable
+        if not raw_exe or any(ch in raw_exe for ch in ("\r", "\n", "\x00")):
+            raise AutostartError("Invalid interpreter path for autostart.")
+        executable = Path(raw_exe)
         windowless = executable.with_name("pythonw.exe")
         argv = watcher_argv(executable=str(windowless if windowless.exists() else executable))
-        return " ".join(f'"{arg}"' if " " in arg else arg for arg in argv)
+        return subprocess.list2cmdline(argv)
 
     def is_enabled(self) -> bool:
         winreg = _winreg()

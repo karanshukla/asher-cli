@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import contextlib
 import importlib.util
 import json
 import os
+import stat
 import sys
+import tempfile
 from pathlib import Path
 
 _SERVER_NAME = "Asher CLI MCP Bridge"
@@ -80,8 +83,32 @@ def _load(path: Path) -> dict:
 
 
 def _save(path: Path, data: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    mode = 0o600
+    if path.exists():
+        with contextlib.suppress(OSError):
+            mode = stat.S_IMODE(path.stat().st_mode) & 0o600 or 0o600
+    payload = (json.dumps(data, indent=2) + "\n").encode("utf-8")
+    fd, tmp_name = tempfile.mkstemp(
+        dir=str(path.parent),
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+    )
+    tmp_path = Path(tmp_name)
+    try:
+        with contextlib.suppress(OSError):
+            os.chmod(tmp_path, mode)
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(tmp_path, path)
+        with contextlib.suppress(OSError):
+            os.chmod(path, mode)
+    except Exception:
+        with contextlib.suppress(OSError):
+            tmp_path.unlink()
+        raise
 
 
 def set_mcp_enabled(enabled: bool) -> list[Path]:

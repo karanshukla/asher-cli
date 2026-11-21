@@ -98,6 +98,26 @@ class TestResolveDest:
             dest = resolve_dest(robot, None)
         assert "asher-unknown-" in dest.name
 
+    def test_path_traversal_serial_is_sanitized(self, tmp_path):
+        robot = MagicMock(serial="../../.bashrc")
+        downloads = tmp_path / "Downloads"
+        downloads.mkdir()
+        with patch.object(export.Path, "home", return_value=tmp_path):
+            dest = resolve_dest(robot, None)
+        assert dest.parent == downloads
+        assert ".." not in dest.name
+        assert "/" not in dest.name
+        assert dest.name.startswith("asher-bashrc-")
+
+    def test_only_punctuation_serial_falls_back_to_unknown(self, tmp_path):
+        robot = MagicMock(serial="../..")
+        downloads = tmp_path / "Downloads"
+        downloads.mkdir()
+        with patch.object(export.Path, "home", return_value=tmp_path):
+            dest = resolve_dest(robot, None)
+        assert dest.parent == downloads
+        assert "asher-unknown-" in dest.name
+
 
 # ── resolve_robot ─────────────────────────────────────────────────────────────
 
@@ -287,6 +307,39 @@ class TestBuildHistoryCsv:
         await build_history_csv(robot, [], 30, dest)
         rows = list(csv.reader(dest.read_text().splitlines()))
         assert rows[1][3] == ""
+
+    @pytest.mark.parametrize("prefix", ["=", "+", "-", "@", "\t", "\r"])
+    async def test_formula_injection_prefixed_with_quote(self, tmp_path, prefix):
+        pet = MagicMock(id="pet-1")
+        pet.name = f"{prefix}cmd|' /C calc'!A0"
+        act = _act(days_ago=1, action_text=f"{prefix}SUM(1,2)", pet_id="pet-1")
+        robot = _robot(
+            serial=f"{prefix}SER",
+            name=f"{prefix}Robot",
+            acts=[act],
+        )
+        dest = tmp_path / "out.csv"
+        await build_history_csv(robot, [pet], 30, dest)
+        rows = list(csv.reader(dest.read_text().splitlines()))
+        assert rows[1][1] == f"'{prefix}SUM(1,2)"
+        assert rows[1][2] == f"'{prefix}SUM(1,2)"
+        assert rows[1][4] == f"'{prefix}cmd|' /C calc'!A0"
+        assert rows[1][5] == f"'{prefix}Robot"
+        assert rows[1][6] == f"'{prefix}SER"
+
+
+class TestOpenFolder:
+    def test_missing_executable_logs_warning_without_raising(self, tmp_path):
+        from asher.tui.commands.robot import _open_folder
+
+        app = MagicMock()
+        with (
+            patch("asher.tui.commands.robot.shutil.which", return_value=None),
+            patch("asher.tui.commands.robot.subprocess.Popen") as popen,
+        ):
+            _open_folder(tmp_path / "out.csv", app)
+        popen.assert_not_called()
+        app._log_warn.assert_called_once()
 
 
 # ── run_legacy_export ──────────────────────────────────────────────────────

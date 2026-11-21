@@ -51,6 +51,11 @@ class TestWatcherArgv:
     def test_honours_an_explicit_interpreter(self) -> None:
         assert watcher_argv(executable="/opt/py")[0] == "/opt/py"
 
+    @pytest.mark.parametrize("bad", ["/opt/py\nExecStartPost=/bin/sh", "/opt/py\r", "/opt/py\x00"])
+    def test_rejects_control_characters_in_executable(self, bad: str) -> None:
+        with pytest.raises(AutostartError):
+            watcher_argv(executable=bad)
+
 
 # ── macOS ────────────────────────────────────────────────────────────────────
 
@@ -123,6 +128,12 @@ class TestSystemd:
         ):
             assert autostart._exec_start() == '"/opt/My Tools/py" -m asher'
 
+    def test_escapes_systemd_special_characters(self, home: Path) -> None:
+        with patch.object(
+            autostart, "watcher_argv", return_value=['/opt/a"b\\c%d/py', "-m", "asher"]
+        ):
+            assert autostart._exec_start() == '"/opt/a\\"b\\\\c%%d/py" -m asher'
+
     def test_enables_the_unit(self, home: Path) -> None:
         with patch.object(autostart, "_run", side_effect=_ok_run) as run:
             SystemdAutostart().enable()
@@ -179,6 +190,12 @@ class TestRegistry:
             command = RegistryAutostart()._command()
         assert command.startswith(f'"{executable}"')
         assert command.endswith("-m asher watch run")
+
+    def test_escapes_embedded_quotes_in_registry_command(self) -> None:
+        executable = str(Path('/opt/My "Tools"/python.exe'))
+        with patch.object(autostart.sys, "executable", executable):
+            command = RegistryAutostart()._command()
+        assert r"\"Tools\"" in command
 
     def test_location_names_the_value(self) -> None:
         assert RegistryAutostart().location().endswith(r"\Run\AsherWatch")

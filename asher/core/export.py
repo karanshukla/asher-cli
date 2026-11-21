@@ -10,6 +10,7 @@ identical regardless of how it was invoked.
 from __future__ import annotations
 
 import csv
+import re
 from datetime import UTC, datetime, timedelta, tzinfo
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -33,6 +34,23 @@ EXIT_CONNECTION_FAILURE = 2
 EXIT_WRITE_FAILURE = 3
 EXIT_NO_ROBOT_MATCH = 4
 EXIT_COMMAND_REJECTED = 5
+
+_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _sanitize_serial(serial: object) -> str:
+    """Restrict a robot serial to safe filename characters."""
+    if not serial:
+        return "unknown"
+    return re.sub(r"[^A-Za-z0-9_-]", "_", str(serial)).strip("._-") or "unknown"
+
+
+def _sanitize_csv_cell(value: object) -> str:
+    """Neutralize spreadsheet formula triggers in free-text CSV cells."""
+    text = "" if value is None else str(value)
+    if text.startswith(_FORMULA_PREFIXES):
+        return f"'{text}"
+    return text
 
 
 class ExportError(Exception):
@@ -86,16 +104,21 @@ def resolve_dest(robot: RobotProtocol, output_override: str | None) -> Path:
     if output_override:
         return Path(output_override).expanduser()
 
-    serial = getattr(robot, "serial", "unknown") or "unknown"
+    raw_serial = getattr(robot, "serial", None)
+    serial = _sanitize_serial(raw_serial)
     date_str = datetime.now().strftime("%Y-%m-%d")
     filename = f"asher-{serial}-{date_str}.csv"
 
     downloads = Path.home() / "Downloads"
     if downloads.exists():
-        return downloads / filename
-    fallback = Path.home() / "Documents" / "asher-cli"
-    fallback.mkdir(parents=True, exist_ok=True)
-    return fallback / filename
+        base_dir = downloads
+    else:
+        base_dir = Path.home() / "Documents" / "asher-cli"
+        base_dir.mkdir(parents=True, exist_ok=True)
+    dest = base_dir / filename
+    if not dest.resolve().is_relative_to(base_dir.resolve()):
+        raise ExportError("Refusing to write outside export directory.", EXIT_WRITE_FAILURE)
+    return dest
 
 
 async def build_history_csv(robot: RobotProtocol, pets: list[Any], days: int, dest: Path) -> int:
@@ -119,8 +142,8 @@ async def build_history_csv(robot: RobotProtocol, pets: list[Any], days: int, de
 
     filtered = _filter_recent(list(acts), cutoff)
 
-    serial = getattr(robot, "serial", "") or ""
-    robot_name = getattr(robot, "name", "") or ""
+    serial = _sanitize_csv_cell(getattr(robot, "serial", "") or "")
+    robot_name = _sanitize_csv_cell(getattr(robot, "name", "") or "")
 
     try:
         from tzlocal import get_localzone  # noqa: PLC0415
@@ -155,7 +178,17 @@ async def build_history_csv(robot: RobotProtocol, pets: list[Any], days: int, de
                     (getattr(p, "name", "") for p in pets if getattr(p, "id", None) == pet_id),
                     "",
                 )
-                writer.writerow([iso_ts, label, raw_str, weight_str, pet_name, robot_name, serial])
+                writer.writerow(
+                    [
+                        iso_ts,
+                        _sanitize_csv_cell(label),
+                        _sanitize_csv_cell(raw_str),
+                        weight_str,
+                        _sanitize_csv_cell(pet_name),
+                        robot_name,
+                        serial,
+                    ]
+                )
     except Exception as exc:  # noqa: BLE001 — permissions, disk full, etc.
         raise ExportError(f"Failed to write CSV: {exc}", EXIT_WRITE_FAILURE) from exc
 

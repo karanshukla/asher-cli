@@ -114,6 +114,49 @@ class TestRunningPid:
             assert daemon.running_pid() is None
 
 
+class TestPidIsWatcher:
+    def test_linux_proc_cmdline_matches_watcher(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(daemon.sys, "platform", "linux")
+        raw = b"/usr/bin/python3\x00-m\x00asher\x00watch\x00run\x00"
+        with patch.object(Path, "read_bytes", return_value=raw):
+            assert daemon._pid_is_watcher(4242) is True
+
+    def test_linux_proc_cmdline_rejects_unrelated_process(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(daemon.sys, "platform", "linux")
+        raw = b"/usr/bin/python3\x00/home/asher/other_script.py\x00"
+        with patch.object(Path, "read_bytes", return_value=raw):
+            assert daemon._pid_is_watcher(4242) is False
+
+    def test_fails_closed_on_oserror(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(daemon.sys, "platform", "linux")
+        with patch.object(Path, "read_bytes", side_effect=OSError("no proc")):
+            assert daemon._pid_is_watcher(4242) is False
+
+    def test_macos_ps_fallback_matches_watcher(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(daemon.sys, "platform", "darwin")
+        proc_res = daemon.subprocess.CompletedProcess(
+            args=[], returncode=0, stdout="/usr/bin/python3 -m asher watch run\n", stderr=""
+        )
+        with (
+            patch.object(Path, "read_bytes", side_effect=OSError("no /proc")),
+            patch.object(daemon.subprocess, "run", return_value=proc_res),
+        ):
+            assert daemon._pid_is_watcher(4242) is True
+
+    def test_macos_ps_fallback_rejects_unrelated(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(daemon.sys, "platform", "darwin")
+        proc_res = daemon.subprocess.CompletedProcess(
+            args=[], returncode=0, stdout="/usr/sbin/syslogd\n", stderr=""
+        )
+        with (
+            patch.object(Path, "read_bytes", side_effect=OSError("no /proc")),
+            patch.object(daemon.subprocess, "run", return_value=proc_res),
+        ):
+            assert daemon._pid_is_watcher(4242) is False
+
+
 # ── start ────────────────────────────────────────────────────────────────────
 
 
