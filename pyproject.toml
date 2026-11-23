@@ -16,7 +16,7 @@ classifiers = [
     "Topic :: Home Automation",
 ]
 dependencies = [
-    "pylitterbot==2025.8.0",
+    "pylitterbot==2025.9.0",
     "textual>=0.47.0",
     "rich>=13.0.0",
     "python-dotenv>=1.0.0",
@@ -26,7 +26,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-mcp = ["pylitterbot[mcp]==2025.8.0"]
+mcp = ["pylitterbot[mcp]==2025.9.0"]
 # PyGObject is what puts pystray on its AppIndicator backend. Without it pystray
 # silently falls back to a legacy XEmbed icon, which KDE Plasma and GNOME no
 # longer host at all — the watcher runs, draws an icon, and nothing shows it.

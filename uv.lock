@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.15' and sys_platform == 'win32'",
@@ -241,6 +241,7 @@ wheels = [
 name = "asher-cli"
 version = "1.7.0"
 source = { editable = "." }
+default-groups = ["dev", "tray"]
 dependencies = [
     { name = "keyring" },
     { name = "plyer" },
@@ -287,8 +288,8 @@ requires-dist = [
     { name = "pillow", marker = "extra == 'tray'", specifier = ">=13.0" },
     { name = "plyer", specifier = ">=2.1.0" },
     { name = "pygobject", marker = "sys_platform == 'linux' and extra == 'tray'", specifier = ">=3.42" },
-    { name = "pylitterbot", specifier = "==2025.8.0" },
-    { name = "pylitterbot", extras = ["mcp"], marker = "extra == 'mcp'", specifier = "==2025.8.0" },
+    { name = "pylitterbot", specifier = "==2025.9.0" },
+    { name = "pylitterbot", extras = ["mcp"], marker = "extra == 'mcp'", specifier = "==2025.9.0" },
     { name = "pystray", marker = "extra == 'tray'", specifier = ">=0.19" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "rich", specifier = ">=13.0.0" },
@@ -2424,16 +2425,16 @@ crypto = [
 
 [[package]]
 name = "pylitterbot"
-version = "2025.8.0"
+version = "2025.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
     { name = "pycognito" },
     { name = "pyjwt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/64/e1/93ac0ce861ab156b351a0f66d0be8c825599c333394de7fde1a13fcc6bbe/pylitterbot-2025.8.0.tar.gz", hash = "sha256:ce63edaff802fdbfa1d3e25257380837989c75efd6c8164c36dc8082e5ea1663", size = 70804, upload-time = "2026-11-06T23:21:26.914Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b0/df/1e3b0aaef1fcd07fff55d749e69d5f8b4201f653f10780b26c326e1d56f9/pylitterbot-2025.9.0.tar.gz", hash = "sha256:4501cc3b4610b24dfbbe4debd4d6b6649b5916479b94ff6faab6a946311f8d76", size = 79402, upload-time = "2026-11-20T07:18:34.997Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/4e/db/da0ee89c9998a7d66f38685e1b74f51c91da9aac63219753c4e0d7e622ec/pylitterbot-2025.8.0-py3-none-any.whl", hash = "sha256:1bcc2a0cf39db42bc574c1aa892f3a1c00ee4a38bb22fe80fb336d06e5772f3d", size = 87632, upload-time = "2026-11-06T23:21:25.52Z" },
+    { url = "https://files.pythonhosted.org/packages/37/08/80cec5a3712fb2d4b74f639d33b6d63d8d9997415fac8f629499d1accf66/pylitterbot-2025.9.0-py3-none-any.whl", hash = "sha256:6f40a5f7a211285da3cd96fafae6386f0473d1c03d5bb35e04e86e384252261b", size = 96276, upload-time = "2026-11-20T07:18:34.159Z" },
 ]
 
 [package.optional-dependencies]
